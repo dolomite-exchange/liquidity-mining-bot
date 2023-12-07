@@ -12,7 +12,7 @@
   </a>
 </div>
 
-# Liquidity mining Bot
+# Liquidity Mining Bot
 
 Bot to automatically perform level update requests and perform oARB vesting detonations for Dolomite's liquidity mining
 program.s
@@ -42,17 +42,17 @@ mining program.
 
 ### Environment Variables
 
-| ENV Variable                | Description                                                                                                                                                                                                                               |
-|-----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| ACCOUNT_POLL_INTERVAL_MS    | How frequently to poll for account positions that need detonation. Defaults to `15000` milliseconds.                                                                                                                                      |
-| ACCOUNT_WALLET_ADDRESS      | **REQUIRED** Ethereum address of the Dolomite account owner that will do the liquidations.                                                                                                                                                |
-| ACCOUNT_WALLET_PRIVATE_KEY  | **REQUIRED** Ethereum private key the Dolomite account owner that will do the liquidations. Make sure that "0x" is at the start of it (MetaMask exports private keys without it).                                                         |
-| AUTO_DOWN_FREQUENCY_SECONDS | The duration in seconds after the bot starts that it should be automatically killed, so AWS (or whichever cloud provider being used) can restart the docker container. Useful in case the bot ever gets stuck. Defaults none `undefined`. |
-| ETHEREUM_NODE_URL           | **REQUIRED** The URL of the Ethereum node to use (e.g. an [Alchemy](https://alchemy.com) or [Infura](https://infura.io/) endpoint).                                                                                                       |
-| GAS_PRICE_MULTIPLIER        | How much to multiply the `fast` gas price by when sending transactions. Defaults to `1` but it is recommended users set this variable to something higher.                                                                                |
-| GAS_PRICE_POLL_INTERVAL_MS  | How frequently to update the gas price. Defaults to `15000` milliseconds.                                                                                                                                                                 |
-| INITIAL_GAS_PRICE_WEI       | The initial gas price used by the bot until the first successful poll occurs. Defaults to `10000000000` wei (10 gwei).                                                                                                                    |
-| NETWORK_ID                  | **REQUIRED** Ethereum Network ID. This must match the chain ID sent back from `ETHEREUM_NODE_URL`.                                                                                                                                        |
-| OWED_PREFERENCES            | **CONDITIONALLY REQUIRED** A list of preferences for which markets to liquidate first on an account when liquidating.  This variable is only required if `LIQUIDATION_MODE` is set to `Simple`.                                           |
-| REQUEST_POLL_INTERVAL_MS    | How frequently to poll for level update requests. Defaults to `3000` milliseconds.                                                                                                                                                        |
-| SUBGRAPH_URL                | **REQUIRED** The URL of the subgraph instance that contains margin account information. For Arbitrum One, the default URL is `https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum`                             |
+| ENV Variable               | Description                                                                                                                                                                                                   |
+|----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ACCOUNT_POLL_INTERVAL_MS   | How frequently to poll for account positions that need detonation. Defaults to `15000` milliseconds.                                                                                                          |
+| ACCOUNT_WALLET_ADDRESS     | **REQUIRED** Ethereum address of the Dolomite account owner that will do the liquidations.                                                                                                                    |
+| ACCOUNT_WALLET_PRIVATE_KEY | **REQUIRED** Ethereum private key the Dolomite account owner that will do the liquidations. Make sure that "0x" is at the start of it (MetaMask exports private keys without it).                             |
+| DETONATIONS_ENABLED        | True to enable detonations. Defaults to `false`                                                                                                                                                               |
+| ETHEREUM_NODE_URL          | **REQUIRED** The URL of the Ethereum node to use (e.g. an [Alchemy](https://alchemy.com) or [Infura](https://infura.io/) endpoint).                                                                           |
+| GAS_PRICE_MULTIPLIER       | How much to multiply the `fast` gas price by when sending transactions. Defaults to `1` but it is recommended users set this variable to something higher.                                                    |
+| GAS_PRICE_POLL_INTERVAL_MS | How frequently to update the gas price. Defaults to `15000` milliseconds.                                                                                                                                     |
+| INITIAL_GAS_PRICE_WEI      | The initial gas price used by the bot until the first successful poll occurs. Defaults to `10000000000` wei (10 gwei).                                                                                        |
+| LEVEL_REQUESTS_ENABLED     | True to enable level request handling. Defaults to `false`                                                                                                                                                    |
+| NETWORK_ID                 | **REQUIRED** Ethereum Network ID. This must match the chain ID sent back from `ETHEREUM_NODE_URL`.                                                                                                            |
+| REQUEST_POLL_INTERVAL_MS   | How frequently to poll for level update requests. Defaults to `3000` milliseconds.                                                                                                                            |
+| SUBGRAPH_URL               | **REQUIRED** The URL of the subgraph instance that contains margin account information. For Arbitrum One, the default URL is `https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum` |

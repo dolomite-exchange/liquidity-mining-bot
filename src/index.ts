@@ -15,8 +15,6 @@ import {
   checkEthereumAddress,
   checkExists,
   checkJsNumber,
-  checkLiquidationModeConditionally,
-  checkPreferences,
   checkPrivateKey,
 } from './lib/invariants';
 import { getLiquidationMode, LiquidationMode } from './lib/liquidation-mode';
@@ -28,35 +26,15 @@ import RiskParamsStore from './lib/risk-params-store';
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
 checkPrivateKey('ACCOUNT_WALLET_PRIVATE_KEY');
-checkEthereumAddress('BRIDGE_TOKEN_ADDRESS');
-checkLiquidationModeConditionally(
-  LiquidationMode.Simple,
-  () => checkPreferences('COLLATERAL_PREFERENCES'),
-);
-checkBigNumber('DOLOMITE_ACCOUNT_NUMBER');
+checkBooleanValue('DETONATIONS_ENABLED');
 checkExists('ETHEREUM_NODE_URL');
-checkBooleanValue('EXPIRATIONS_ENABLED');
-checkDuration('EXPIRED_ACCOUNT_DELAY_SECONDS', 0, /* isMillis = */ false);
 checkBigNumber('GAS_PRICE_ADDITION');
 checkBigNumber('GAS_PRICE_MULTIPLIER');
 checkBigNumber('GAS_PRICE_POLL_INTERVAL_MS');
 checkDuration('INITIAL_GAS_PRICE_WEI', 1);
-checkDuration('LIQUIDATE_POLL_INTERVAL_MS', 1000);
-checkDuration('LIQUIDATION_KEY_EXPIRATION_SECONDS', 1, /* isMillis = */ false);
-checkBooleanValue('LIQUIDATIONS_ENABLED');
-checkDuration('MARKET_POLL_INTERVAL_MS', 1000);
-checkBigNumber('MIN_ACCOUNT_COLLATERALIZATION');
-checkBigNumber('MIN_VALUE_LIQUIDATED');
-checkBigNumber('MIN_VALUE_LIQUIDATED_FOR_EXTERNAL_SELL');
-checkBigNumber('MIN_OWED_OUTPUT_AMOUNT_DISCOUNT');
+checkBooleanValue('LEVEL_REQUESTS_ENABLED');
 checkJsNumber('NETWORK_ID');
-checkLiquidationModeConditionally(LiquidationMode.Simple, () => checkPreferences('OWED_PREFERENCES'));
-checkLiquidationModeConditionally(
-  LiquidationMode.SellWithInternalLiquidity,
-  () => checkBooleanValue('REVERT_ON_FAIL_TO_SELL_COLLATERAL'),
-);
-checkDuration('RISK_PARAMS_POLL_INTERVAL_MS', 1000);
-checkDuration('SEQUENTIAL_TRANSACTION_DELAY_MS', 10);
+checkDuration('REQUEST_POLL_INTERVAL_MS', 1000);
 checkExists('SUBGRAPH_URL');
 
 if (!Number.isNaN(Number(process.env.AUTO_DOWN_FREQUENCY_SECONDS))) {
@@ -97,25 +75,18 @@ async function start() {
 
   Logger.info({
     message: 'DolomiteMargin data',
+    accountPollInterval: process.env.ACCOUNT_POLL_INTERVAL_MS,
     accountWalletAddress: process.env.ACCOUNT_WALLET_ADDRESS,
-    liquidationMode,
-    bridgeTokenAddress: process.env.BRIDGE_TOKEN_ADDRESS,
-    dolomiteAccountNumber: process.env.DOLOMITE_ACCOUNT_NUMBER,
+    detonationsEnabled: process.env.DETONATIONS_ENABLED,
     dolomiteMargin: libraryDolomiteMargin,
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
-    expirationsEnabled: process.env.EXPIRATIONS_ENABLED,
-    expiredAccountDelaySeconds: process.env.EXPIRED_ACCOUNT_DELAY_SECONDS,
-    expiry: dolomite.contracts.expiry.options.address,
     gasPriceMultiplier: process.env.GAS_PRICE_MULTIPLIER,
     gasPriceAddition: process.env.GAS_PRICE_ADDITION,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     initialGasPriceWei: process.env.INITIAL_GAS_PRICE_WEI,
-    liquidationKeyExpirationSeconds: process.env.LIQUIDATION_KEY_EXPIRATION_SECONDS,
-    liquidationsEnabled: process.env.LIQUIDATIONS_ENABLED,
-    liquidatorProxyV1: dolomite.contracts.liquidatorProxyV1.options.address,
-    liquidatorProxyV1WithAmm: dolomite.contracts.liquidatorProxyV1WithAmm.options.address,
+    levelRequestsEnabled: process.env.LEVEL_REQUESTS_ENABLED,
     networkId,
-    sequentialTransactionDelayMillis: process.env.SEQUENTIAL_TRANSACTION_DELAY_MS,
+    requestPollInterval: process.env.REQUEST_POLL_INTERVAL_MS,
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
 
