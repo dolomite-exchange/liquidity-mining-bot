@@ -4,20 +4,18 @@
   <a href='https://hub.docker.com/r/dolomiteprotocol/liquidity-mining-bot' style="text-decoration:none;">
     <img src='https://img.shields.io/badge/docker-container-blue.svg?longCache=true' alt='Docker' />
   </a>
-  <a href='https://coveralls.io/github/dolomite-exchange/liquidity-mining-bot' style="text-decoration:none;">
-    <img src='https://coveralls.io/repos/github/dolomite-exchange/liquidity-mining-bot/badge.svg?t=toKMwT' alt='Coverage Status' />
-  </a>
   <a href='https://github.com/dolomite-exchange/liquidity-mining-bot/blob/master/LICENSE' style="text-decoration:none;">
-    <img src='https://img.shields.io/github/license/dolomite-exchange/liquidity-mining-bot.svg?longCache=true' alt='License' />
+    <img src='https://img.shields.io/github/license/dolomite-exchange/liquidity-mining-bot.svg' alt='License' />
   </a>
   <a href='https://t.me/official' style="text-decoration:none;">
     <img src='https://img.shields.io/badge/chat-on%20telegram-9cf.svg?longCache=true' alt='Telegram' />
   </a>
 </div>
 
-# Dolomite Margin Liquidator
+# Liquidity mining Bot
 
-Bot to automatically liquidate undercollateralized and expired Dolomite accounts.
+Bot to automatically perform level update requests and perform oARB vesting detonations for Dolomite's liquidity mining
+program.s
 
 ## Usage
 
