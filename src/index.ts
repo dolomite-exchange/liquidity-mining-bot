@@ -4,7 +4,7 @@ import '../src/lib/env';
 
 import { getDolomiteRiskParams } from './clients/dolomite';
 import { getSubgraphBlockNumber } from './helpers/block-helper';
-import { dolomite, initializeDolomiteLiquidations, loadAccounts } from './helpers/web3';
+import { dolomite, loadAccounts } from './helpers/web3';
 import AccountStore from './lib/account-store';
 import DolomiteLiquidator from './lib/dolomite-liquidator';
 import GasPriceUpdater from './lib/gas-price-updater';
@@ -17,7 +17,6 @@ import {
   checkJsNumber,
   checkPrivateKey,
 } from './lib/invariants';
-import { getLiquidationMode, LiquidationMode } from './lib/liquidation-mode';
 import LiquidationStore from './lib/liquidation-store';
 import Logger from './lib/logger';
 import MarketStore from './lib/market-store';
@@ -50,9 +49,8 @@ async function start() {
   const accountStore = new AccountStore(marketStore);
   const liquidationStore = new LiquidationStore();
   const riskParamsStore = new RiskParamsStore(marketStore);
-  const dolomiteLiquidator = new DolomiteLiquidator(accountStore, marketStore, liquidationStore, riskParamsStore);
+  const dolomiteDetonator = new DolomiteLiquidator(accountStore, marketStore, liquidationStore, riskParamsStore);
   const gasPriceUpdater = new GasPriceUpdater();
-  const liquidationMode = getLiquidationMode();
 
   await loadAccounts();
 
@@ -99,44 +97,16 @@ async function start() {
     riskParamsPollIntervalMillis: process.env.RISK_PARAMS_POLL_INTERVAL_MS,
   });
 
-  if (liquidationMode === LiquidationMode.Simple) {
-    Logger.info({
-      liquidationMode,
-      message: 'Simple liquidation variables',
-      collateralPreferences: process.env.COLLATERAL_PREFERENCES,
-      minAccountCollateralization: process.env.MIN_ACCOUNT_COLLATERALIZATION,
-      minOverheadValue: process.env.MIN_VALUE_LIQUIDATED,
-      owedPreferences: process.env.OWED_PREFERENCES,
-    });
-  } else if (liquidationMode === LiquidationMode.SellWithInternalLiquidity) {
-    const revertOnFailToSellCollateral = process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL === 'true';
-    const discountUsedText = revertOnFailToSellCollateral ? '(unused)' : '';
-    Logger.info({
-      liquidationMode,
-      message: 'Sell with internal liquidity variables:',
-      revertOnFailToSellCollateral: process.env.REVERT_ON_FAIL_TO_SELL_COLLATERAL,
-      minOwedOutputAmountDiscount: `${process.env.MIN_OWED_OUTPUT_AMOUNT_DISCOUNT} ${discountUsedText}`,
-    });
-  } else if (liquidationMode === LiquidationMode.Generic) {
-    Logger.info({
-      liquidationMode,
-      message: 'Generic liquidation mode variables:',
-    });
-  } else {
-    throw new Error(`Invalid liquidation mode: ${liquidationMode}`);
-  }
-
-  if (process.env.LIQUIDATIONS_ENABLED === 'true') {
-    await initializeDolomiteLiquidations();
-  }
-
   accountStore.start();
   marketStore.start();
   riskParamsStore.start();
   gasPriceUpdater.start();
 
-  if (process.env.LIQUIDATIONS_ENABLED === 'true' || process.env.EXPIRATIONS_ENABLED === 'true') {
-    dolomiteLiquidator.start();
+  if (process.env.DETONATIONS_ENABLED === 'true') {
+    dolomiteDetonator.start();
+  }
+  if (process.env.LEVEL_REQUESTS_ENABLED === 'true') {
+    dolomiteLevelRequestor.start();
   }
   return true
 }
