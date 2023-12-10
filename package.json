@@ -43,6 +43,7 @@
     "ethers": "^5.5.3",
     "lru-cache": "^5.1.1",
     "luxon": "^1.28.1",
+    "merkletreejs": "^0.3.11",
     "request-promise-native": "^1.0.9",
     "winston": "^3.2.1",
     "winston-transport": "^4.3.0"

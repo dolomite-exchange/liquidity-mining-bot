@@ -21,7 +21,8 @@ interface OutputFile {
   };
 }
 
-const EPOCH_NUMBER = '998';
+const FIXED_EPOCH_NUMBER = '998';
+const OLD_EPOCH_NUMBER = '997';
 const FINALIZED_FOLDER_NAME = `${__dirname}/finalized`;
 const OUTPUT_FOLDER_NAME = `${__dirname}/output`;
 
@@ -45,11 +46,11 @@ function aggregateFile(file: OutputFile, acc: Record<string, BigNumber>): Record
 
 async function start() {
   const walletToFixedAmountMap = aggregateFile(
-    readOutputFile(`${OUTPUT_FOLDER_NAME}/oarb-season-0-epoch-${EPOCH_NUMBER}-output.json`),
+    readOutputFile(`${OUTPUT_FOLDER_NAME}/oarb-season-0-epoch-${FIXED_EPOCH_NUMBER}-output.json`),
     {}
   );
   const walletToOldAmountWithoutArb = aggregateFile(
-    readOutputFile(`${OUTPUT_FOLDER_NAME}/oarb-season-0-epoch-997-output.json`),
+    readOutputFile(`${OUTPUT_FOLDER_NAME}/oarb-season-0-epoch-${OLD_EPOCH_NUMBER}-output.json`),
     {}
   );
   const walletToOldAmountMap = [
@@ -63,22 +64,25 @@ async function start() {
   }, {});
 
   const walletToDeltasMap: Record<string, BigNumber> = {};
+  let total: BigNumber = new BigNumber(0);
   Object.keys(walletToFixedAmountMap).forEach(account => {
     const fixedAmount = walletToFixedAmountMap[account];
     const totalOldAmount = walletToOldAmountMap[account] ?? new BigNumber(0);
     const noArbAmount = walletToOldAmountWithoutArb[account] ?? new BigNumber(0);
     const oldArbAmount = totalOldAmount.minus(noArbAmount);
     const delta = fixedAmount.minus(oldArbAmount);
-    if (delta.gt(MINIMUM_OARB_AMOUNT_WEI) && oldArbAmount.gt(0)) {
+    if (delta.gt(MINIMUM_OARB_AMOUNT_WEI) && oldArbAmount.gte(0)) {
       walletToDeltasMap[account] = delta;
+      total = total.plus(delta);
     }
   });
+  console.log(`Total added to epoch ${FIXED_EPOCH_NUMBER}:`, total.div(1e18).toFixed());
 
   const accountToValuesMap = calculateMerkleRootAndProofs(walletToDeltasMap);
   const outputFileName = `${FINALIZED_FOLDER_NAME}/oarb-season-0-epoch-deltas-output.json`;
   const outputFile = readOutputFile(outputFileName);
-  outputFile.epochs[EPOCH_NUMBER] = accountToValuesMap.walletAddressToLeavesMap;
-  outputFile.metadata[EPOCH_NUMBER] = {
+  outputFile.epochs[FIXED_EPOCH_NUMBER] = accountToValuesMap.walletAddressToLeavesMap;
+  outputFile.metadata[FIXED_EPOCH_NUMBER] = {
     merkleRoot: accountToValuesMap.merkleRoot,
     isFinalized: true,
   }

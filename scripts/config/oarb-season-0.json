@@ -94,7 +94,7 @@
         "17": "144000"
       },
       "isFinalized": true,
-      "isOld": true
+      "message": "Not actually used. Used to derive the fix amount of oARB needed for ARB depositors for epoch 998."
     },
     "998": {
       "epoch": 998,
@@ -107,7 +107,7 @@
         "7": "25200"
       },
       "isFinalized": true,
-      "isOld": false
+      "message": "Fixed the oARB distribution for ARB depositors for epochs 1 - 3, where vesting positions were improperly counted"
     }
   }
 }
