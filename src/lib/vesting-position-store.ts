@@ -5,7 +5,7 @@ import Logger from './logger';
 import MarketStore from './market-store';
 import Pageable from './pageable';
 
-export default class AccountStore {
+export default class VestingPositionStore {
   public marketStore: MarketStore;
 
   public liquidatableDolomiteAccounts: ApiAccount[];

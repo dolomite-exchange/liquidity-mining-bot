@@ -1,4 +1,8 @@
-export interface GraphqlAccountResult {
+interface GraphqlResult {
+  errors: any[]
+}
+
+export interface GraphqlAccountResult extends GraphqlResult {
   data: {
     marginAccounts: GraphqlAccount[]
   }
@@ -44,7 +48,7 @@ export interface GraphqlDeposit {
   }
 }
 
-export interface GraphqlDepositsResult {
+export interface GraphqlDepositsResult extends GraphqlResult {
   data: {
     deposits: GraphqlDeposit[]
   }
@@ -58,7 +62,7 @@ export interface GraphqlAmmLiquidityPosition {
   liquidityTokenBalance: string
 }
 
-export interface GraphqlAmmLiquidityPositionsResult {
+export interface GraphqlAmmLiquidityPositionsResult extends GraphqlResult {
   data: {
     ammLiquidityPositions: GraphqlAmmLiquidityPosition[]
   }
@@ -74,7 +78,7 @@ export interface GraphqlAmmLiquidityPositionSnapshot {
   timestamp: string
 }
 
-export interface GraphqlAmmLiquidityPositionSnapshotsResult {
+export interface GraphqlAmmLiquidityPositionSnapshotsResult extends GraphqlResult {
   data: {
     ammLiquidityPositionSnapshots: GraphqlAmmLiquidityPositionSnapshot[]
   }
@@ -107,7 +111,7 @@ export interface GraphqlLiquidation {
   liquidBorrowedTokenAmountDeltaPar: string
 }
 
-export interface GraphqlLiquidationsResult {
+export interface GraphqlLiquidationsResult extends GraphqlResult {
   data: {
     liquidations: GraphqlLiquidation[]
   }
@@ -137,7 +141,7 @@ export interface GraphqlTrade {
   makerTokenDeltaWei: string;
 }
 
-export interface GraphqlTradesResult {
+export interface GraphqlTradesResult extends GraphqlResult {
   data: {
     trades: GraphqlTrade[]
   }
@@ -162,7 +166,7 @@ export interface GraphqlTransfer {
   }
 }
 
-export interface GraphqlTransfersResult {
+export interface GraphqlTransfersResult extends GraphqlResult {
   data: {
     transfers: GraphqlTransfer[]
   }
@@ -176,9 +180,23 @@ export interface GraphqlLiquidityMiningVestingPosition {
   oARBAmount: string
 }
 
-export interface GraphqlLiquidityMiningVestingPositionsResult {
+export interface GraphqlLiquidityMiningLevelUpdateRequests {
+  id: string
+  user: {
+    id: string
+  }
+  requestId: string
+}
+
+export interface GraphqlLiquidityMiningVestingPositionsResult extends GraphqlResult {
   data: {
     liquidityMiningVestingPositions: GraphqlLiquidityMiningVestingPosition[]
+  }
+}
+
+export interface GraphqlLiquidityMiningLevelUpdateRequestsResult extends GraphqlResult {
+  data: {
+    liquidityMiningLevelUpdateRequests: GraphqlLiquidityMiningLevelUpdateRequests[]
   }
 }
 
@@ -197,13 +215,13 @@ export interface GraphqlWithdrawal {
   }
 }
 
-export interface GraphqlWithdrawalsResult {
+export interface GraphqlWithdrawalsResult extends GraphqlResult {
   data: {
     withdrawals: GraphqlWithdrawal[]
   }
 }
 
-export interface GraphqlMarketResult {
+export interface GraphqlMarketResult extends GraphqlResult {
   data: {
     marketRiskInfos: GraphqlMarket[]
   }
@@ -225,7 +243,7 @@ export interface GraphqlMarket {
   liquidationRewardPremium: string
 }
 
-export interface GraphqlRiskParamsResult {
+export interface GraphqlRiskParamsResult extends GraphqlResult {
   data: {
     dolomiteMargins: GraphqlRiskParams[]
   }
@@ -237,11 +255,11 @@ export interface GraphqlRiskParams {
   liquidationReward: string
 }
 
-interface GraphqlBlockResult {
+interface GraphqlBlockResult extends GraphqlResult {
   number: string
 }
 
-export interface GraphqlTimestampToBlockResult {
+export interface GraphqlTimestampToBlockResult extends GraphqlResult {
   data: Record<string, GraphqlBlockResult[]>
 }
 
@@ -263,7 +281,7 @@ export interface GraphqlAmmLiquidityPosition {
 
 type GraphqlAmmDataForUserResultSubResult = GraphqlAmmPairData | GraphqlInterestRate | GraphqlAmmLiquidityPosition
 
-export interface GraphqlAmmDataForUserResult {
+export interface GraphqlAmmDataForUserResult extends GraphqlResult {
   data: Record<string, GraphqlAmmDataForUserResultSubResult[]>
 }
 
@@ -284,7 +302,7 @@ export interface GraphqlVestingPositionTransfer {
   }
 }
 
-export interface GraphqlVestingPositionTransfersResult {
+export interface GraphqlVestingPositionTransfersResult extends GraphqlResult {
   data: {
     vestingPositionTransfers: GraphqlVestingPositionTransfer[]
   }

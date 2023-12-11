@@ -6,7 +6,7 @@ import v8 from 'v8';
 import { getDolomiteRiskParams } from '../src/clients/dolomite';
 import { getSubgraphBlockNumber } from '../src/helpers/block-helper';
 import { dolomite } from '../src/helpers/web3';
-import AccountStore from '../src/lib/account-store';
+import VestingPositionStore from '../src/lib/vesting-position-store';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import './lib/env-reader';
@@ -15,7 +15,7 @@ import './lib/env-reader';
 
 async function start() {
   const marketStore = new MarketStore();
-  const accountStore = new AccountStore(marketStore);
+  const accountStore = new VestingPositionStore(marketStore);
 
   const { blockNumber } = await getSubgraphBlockNumber();
   const { riskParams } = await getDolomiteRiskParams(blockNumber);

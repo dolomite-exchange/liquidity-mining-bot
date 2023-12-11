@@ -10,6 +10,7 @@ import {
   ApiBalance,
   ApiDeposit,
   ApiLiquidation,
+  ApiLiquidityMiningLevelUpdateRequest,
   ApiLiquidityMiningVestingPosition,
   ApiMarket,
   ApiRiskParam,
@@ -28,6 +29,7 @@ import {
   GraphqlDepositsResult,
   GraphqlInterestRate,
   GraphqlLiquidationsResult,
+  GraphqlLiquidityMiningLevelUpdateRequestsResult,
   GraphqlLiquidityMiningVestingPositionsResult,
   GraphqlMarketResult,
   GraphqlRiskParamsResult,
@@ -360,6 +362,112 @@ export async function getLiquidityMiningVestingPositions(
   );
 
   return { liquidityMiningVestingPositions };
+}
+
+export async function getExpiredLiquidityMiningVestingPositions(
+  blockNumber: number,
+  lastBlockTimestamp: number,
+): Promise<{ liquidityMiningVestingPositions: ApiLiquidityMiningVestingPosition[] }> {
+  const query = `
+    query getExpiredLiquidityMiningVestingPositions($blockNumber: Int, $timestamp: BigInt!) {
+      liquidityMiningVestingPositions(
+        first: 1000
+        orderBy: endTimestamp
+        orderDirection: asc
+        where: { endTimestamp_lt: $timestamp, status: "ACTIVE" }
+        block: { number: $blockNumber }
+      ) {
+        id
+        owner {
+          id
+        }
+        arbAmountPar
+        startTimestamp
+        duration
+        endTimestamp
+      }
+    }
+  `;
+  const result: any = await axios.post(
+    subgraphUrl,
+    {
+      query,
+      variables: {
+        blockNumber,
+        timestamp: lastBlockTimestamp,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlLiquidityMiningVestingPositionsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const liquidityMiningVestingPositions = (result.data.liquidityMiningVestingPositions as any[]).map<ApiLiquidityMiningVestingPosition>(
+    liquidityMiningVestingPosition => {
+      return {
+        id: liquidityMiningVestingPosition.id,
+        effectiveUser: liquidityMiningVestingPosition.owner.id.toLowerCase(),
+        amountPar: new BigNumber(liquidityMiningVestingPosition.arbAmountPar),
+        startTimestamp: liquidityMiningVestingPosition.startTimestamp,
+        duration: liquidityMiningVestingPosition.duration,
+        endTimestamp: liquidityMiningVestingPosition.endTimestamp,
+      };
+    },
+  );
+
+  return { liquidityMiningVestingPositions };
+}
+
+export async function getUnfulfilledLevelUpdateRequests(
+  blockNumber: number,
+): Promise<{ requests: ApiLiquidityMiningLevelUpdateRequest[] }> {
+  const query = `
+    query getActiveLevelUpdateRequests($blockNumber: Int!) {
+    liquidityMiningLevelUpdateRequests(
+      first: 1000
+      orderBy: id
+      orderDirection: asc
+      block: { number: $blockNumber }
+      where: { isFulfilled: false }
+    ) {
+      user {
+        id
+      }
+      requestId
+    }
+  }
+`;
+  const result = await axios.post(
+    subgraphUrl,
+    {
+      query,
+      variables: {
+        blockNumber,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlLiquidityMiningLevelUpdateRequestsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const requests = result.data.liquidityMiningLevelUpdateRequests.map<ApiLiquidityMiningLevelUpdateRequest>(
+    request => {
+      return {
+        effectiveUser: request.user.id.toLowerCase(),
+        requestId: new BigNumber(request.requestId),
+      };
+    },
+  );
+
+  return { requests };
 }
 
 export async function getLiquidityPositions(

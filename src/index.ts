@@ -5,7 +5,7 @@ import '../src/lib/env';
 import { getDolomiteRiskParams } from './clients/dolomite';
 import { getSubgraphBlockNumber } from './helpers/block-helper';
 import { dolomite, loadAccounts } from './helpers/web3';
-import AccountStore from './lib/account-store';
+import VestingPositionStore from './lib/vesting-position-store';
 import DolomiteLiquidator from './lib/dolomite-liquidator';
 import GasPriceUpdater from './lib/gas-price-updater';
 import {
@@ -46,7 +46,7 @@ if (!Number.isNaN(Number(process.env.AUTO_DOWN_FREQUENCY_SECONDS))) {
 
 async function start() {
   const marketStore = new MarketStore();
-  const accountStore = new AccountStore(marketStore);
+  const accountStore = new VestingPositionStore(marketStore);
   const liquidationStore = new LiquidationStore();
   const riskParamsStore = new RiskParamsStore(marketStore);
   const dolomiteDetonator = new DolomiteLiquidator(accountStore, marketStore, liquidationStore, riskParamsStore);

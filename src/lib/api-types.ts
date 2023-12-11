@@ -1,4 +1,4 @@
-import { address, Integer } from '@dolomite-exchange/dolomite-margin';
+import { address, BigNumber, Integer } from '@dolomite-exchange/dolomite-margin';
 
 interface ApiMarginAccount {
   user: string;
@@ -126,6 +126,11 @@ export interface ApiLiquidityMiningVestingPosition {
   amountPar: Integer;
   duration: number;
   startTimestamp: number;
+}
+
+export interface ApiLiquidityMiningLevelUpdateRequest {
+  effectiveUser: string;
+  requestId: BigNumber;
 }
 
 export interface ApiWithdrawal {

@@ -1,7 +1,7 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { INTEGERS } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Constants';
 import { DateTime } from 'luxon';
-import AccountStore from './account-store';
+import VestingPositionStore from './vesting-position-store';
 import { ApiAccount, ApiMarket, ApiRiskParam } from './api-types';
 import { delay } from './delay';
 import LiquidationStore from './liquidation-store';
@@ -10,18 +10,16 @@ import MarketStore from './market-store';
 import RiskParamsStore from './risk-params-store';
 
 export default class DolomiteLiquidator {
-  public accountStore: AccountStore;
-  public marketStore: MarketStore;
+  public vestingPositionStore: VestingPositionStore;
   public liquidationStore: LiquidationStore;
-  public riskParamsStore: RiskParamsStore;
 
   constructor(
-    accountStore: AccountStore,
+    accountStore: VestingPositionStore,
     marketStore: MarketStore,
     liquidationStore: LiquidationStore,
     riskParamsStore: RiskParamsStore,
   ) {
-    this.accountStore = accountStore;
+    this.vestingPositionStore = accountStore;
     this.marketStore = marketStore;
     this.liquidationStore = liquidationStore;
     this.riskParamsStore = riskParamsStore;
@@ -50,7 +48,7 @@ export default class DolomiteLiquidator {
   _liquidateAccounts = async () => {
     const lastBlockTimestamp: DateTime = this.marketStore.getBlockTimestamp();
 
-    let expirableAccounts = this.accountStore.getExpirableDolomiteAccounts()
+    let expirableAccounts = this.vestingPositionStore.getExpirableDolomiteAccounts()
       .filter(a => !this.liquidationStore.contains(a))
       .filter(a => {
         return Object.values(a.balances)
@@ -73,7 +71,7 @@ export default class DolomiteLiquidator {
     }
 
     const marketMap = this.marketStore.getMarketMap();
-    const liquidatableAccounts = this.accountStore.getLiquidatableDolomiteAccounts()
+    const liquidatableAccounts = this.vestingPositionStore.getLiquidatableDolomiteAccounts()
       .filter(account => !this.liquidationStore.contains(account))
       .filter(account => !this.isCollateralized(account, marketMap, riskParams))
       .sort((a, b) => this.borrowAmountSorterDesc(a, b, marketMap));
