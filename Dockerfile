@@ -3,8 +3,8 @@ FROM node:14.17.0-alpine
 RUN apk update &&  \
     apk upgrade && \
     apk -Uuv add --no-cache make g++ git python py-pip jq openssh curl openssh docker &&  \
-    sudo python3 -m pip install -U pip && \
-    sudo python3 -m pip install -U setuptools && \
+    python3 -m pip install -U pip && \
+    python3 -m pip install -U setuptools && \
     pip install --upgrade pip awscli
 
 RUN adduser -S dolomite
