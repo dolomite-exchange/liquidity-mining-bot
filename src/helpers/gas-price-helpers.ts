@@ -2,6 +2,7 @@ import { BigNumber, DolomiteMargin, Integer } from '@dolomite-exchange/dolomite-
 import request from 'request-promise-native';
 import { ChainId, isArbitrum, isPolygon } from '../lib/chain-id';
 import Logger from '../lib/logger';
+import '../lib/env';
 
 let lastPriceWei: string = process.env.INITIAL_GAS_PRICE_WEI as string;
 
@@ -13,6 +14,7 @@ export async function updateGasPrice(dolomite: DolomiteMargin) {
     Logger.error({
       at: 'getGasPrices',
       message: 'Failed to retrieve gas prices',
+      errorMessage: error.message,
       error,
     });
     return;

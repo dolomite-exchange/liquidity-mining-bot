@@ -53,6 +53,8 @@ if (!subgraphUrl) {
   throw new Error('SUBGRAPH_URL is not set')
 }
 
+const FOUR_WEEKS = 86_400 * 7 * 4;
+
 async function getAccounts(
   marketIndexMap: { [marketId: string]: { borrow: Decimal, supply: Decimal } },
   query: string,
@@ -104,7 +106,7 @@ async function getAccounts(
         id: `${account.user.id}-${account.accountNumber}`,
         owner: account.user?.id.toLowerCase(),
         number: new BigNumber(account.accountNumber),
-        effectiveUser: account.user.effectiveUser?.id.toLowerCase(), // unavailable on the Liquidator subgraph
+        effectiveUser: account.user?.effectiveUser?.id.toLowerCase(),
         balances,
       };
     }));
@@ -322,7 +324,12 @@ export async function getLiquidityMiningVestingPositions(
 ): Promise<{ liquidityMiningVestingPositions: ApiLiquidityMiningVestingPosition[] }> {
   const query = `
     query getLiquidityMiningVestingPositions($blockNumber: Int, $lastId: ID) {
-      liquidityMiningVestingPositions(first: 1000, orderBy: id where: { id_gt: $lastId } block: { number: $blockNumber }) {
+      liquidityMiningVestingPositions(
+        first: 1000
+        orderBy: id
+        where: { id_gt: $lastId }
+        block: { number_gte: $blockNumber }
+      ) {
         id
         owner {
           id
@@ -375,7 +382,7 @@ export async function getExpiredLiquidityMiningVestingPositions(
         orderBy: endTimestamp
         orderDirection: asc
         where: { endTimestamp_lt: $timestamp, status: "ACTIVE" }
-        block: { number: $blockNumber }
+        block: { number_gte: $blockNumber }
       ) {
         id
         owner {
@@ -393,8 +400,8 @@ export async function getExpiredLiquidityMiningVestingPositions(
     {
       query,
       variables: {
-        blockNumber,
-        timestamp: lastBlockTimestamp,
+        blockNumber: blockNumber,
+        timestamp: (lastBlockTimestamp - FOUR_WEEKS).toString(),
       },
     },
     defaultAxiosConfig,
@@ -427,19 +434,19 @@ export async function getUnfulfilledLevelUpdateRequests(
 ): Promise<{ requests: ApiLiquidityMiningLevelUpdateRequest[] }> {
   const query = `
     query getActiveLevelUpdateRequests($blockNumber: Int!) {
-    liquidityMiningLevelUpdateRequests(
-      first: 1000
-      orderBy: id
-      orderDirection: asc
-      block: { number: $blockNumber }
-      where: { isFulfilled: false }
-    ) {
-      user {
-        id
+      liquidityMiningLevelUpdateRequests(
+        first: 1000
+        orderBy: id
+        orderDirection: asc
+        block: { number_gte: $blockNumber }
+        where: { isFulfilled: false }
+      ) {
+        user {
+          id
+        }
+        requestId
       }
-      requestId
     }
-  }
 `;
   const result = await axios.post(
     subgraphUrl,
@@ -476,7 +483,12 @@ export async function getLiquidityPositions(
 ): Promise<{ ammLiquidityPositions: ApiAmmLiquidityPosition[] }> {
   const query = `
     query getLiquidityPositions($blockNumber: Int, $lastId: ID) {
-      ammLiquidityPositions(first: 1000, orderBy: id where: { id_gt: $lastId } block: { number: $blockNumber }) {
+      ammLiquidityPositions(
+        first: 1000
+        orderBy: id
+        where: { id_gt: $lastId }
+        block: { number: $blockNumber }
+      ) {
         id
         effectiveUser {
           id
@@ -958,7 +970,12 @@ export async function getDolomiteMarkets(
     subgraphUrl,
     {
       query: `query getMarketRiskInfos($blockNumber: Int, $lastId: ID) {
-                marketRiskInfos(block: { number: $blockNumber } first: ${Pageable.MAX_PAGE_SIZE} where: { id_gt: $lastId } orderBy: id) {
+                marketRiskInfos(
+                  block: { number: $blockNumber }
+                  first: ${Pageable.MAX_PAGE_SIZE}
+                  where: { id_gt: $lastId }
+                  orderBy: id
+                ) {
                   token {
                     id
                     marketId

@@ -1,29 +1,19 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
-import { DateTime } from 'luxon';
 import { getDolomiteMarkets } from '../clients/dolomite';
-import { getSubgraphBlockNumber } from '../helpers/block-helper';
 import { dolomite } from '../helpers/web3';
 import { ApiMarket, MarketIndex } from './api-types';
+import BlockStore from './block-store';
 import { delay } from './delay';
 import Logger from './logger';
 import Pageable from './pageable';
 
 export default class MarketStore {
-  private blockNumber: number;
-  private blockTimestamp: DateTime;
+  private blockStore: BlockStore;
   private marketMap: { [marketId: string]: ApiMarket };
 
-  constructor() {
-    this.blockNumber = 0;
+  constructor(blockStore: BlockStore) {
+    this.blockStore = blockStore;
     this.marketMap = {};
-  }
-
-  public getBlockNumber(): number {
-    return this.blockNumber;
-  }
-
-  public getBlockTimestamp(): DateTime {
-    return this.blockTimestamp;
   }
 
   public getMarketMap(): { [marketId: string]: ApiMarket } {
@@ -87,15 +77,20 @@ export default class MarketStore {
       message: 'Updating markets...',
     });
 
-    const { blockNumber, blockTimestamp } = await getSubgraphBlockNumber();
+    const blockNumber = this.blockStore.getBlockNumber();
+    if (blockNumber === 0) {
+      Logger.info({
+        at: 'MarketStore#_update',
+        message: 'Block number is still 0, returning...',
+      });
+      return;
+    }
 
     const nextDolomiteMarkets = await Pageable.getPageableValues(async (lastId) => {
       const result = await getDolomiteMarkets(blockNumber, lastId);
       return result.markets
     });
 
-    this.blockNumber = blockNumber;
-    this.blockTimestamp = blockTimestamp;
     this.marketMap = nextDolomiteMarkets.reduce<{ [marketId: string]: ApiMarket }>((memo, market) => {
       memo[market.marketId.toString()] = market;
       return memo;

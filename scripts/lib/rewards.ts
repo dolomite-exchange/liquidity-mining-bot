@@ -249,6 +249,8 @@ export function calculateLiquidityPoints(
 export function calculateFinalPoints(
   accountToDolomiteBalanceMap: AccountSubAccountToMarketToBalanceMap,
   validMarketId: number,
+  poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
+  poolToTotalSubLiquidityPoints: Record<string, BigNumber>,
 ): Record<string, string> {
   const effectiveUserToPoints: Record<string, BigNumber> = {};
   Object.keys(accountToDolomiteBalanceMap).forEach(account => {
@@ -266,6 +268,26 @@ export function calculateFinalPoints(
       });
     });
   });
+
+  // Distribute liquidity pool rewards
+  Object.keys(poolToVirtualLiquidityPositionsAndEvents).forEach(pool => {
+    const liquidityPoolReward = effectiveUserToPoints[pool];
+    if (liquidityPoolReward && poolToTotalSubLiquidityPoints[pool]) {
+      const events = poolToVirtualLiquidityPositionsAndEvents[pool];
+      Object.keys(events.virtualLiquidityBalances).forEach(account => {
+        const balances = events.virtualLiquidityBalances[account]!;
+        const rewardAmount = liquidityPoolReward.times(balances.rewardPoints.dividedBy(
+          poolToTotalSubLiquidityPoints[pool],
+        ));
+
+        effectiveUserToPoints[account] = effectiveUserToPoints[account] ?? new BigNumber(0);
+        effectiveUserToPoints[account] = effectiveUserToPoints[account].plus(rewardAmount);
+      });
+    }
+
+    delete effectiveUserToPoints[pool];
+  });
+
 
   return Object.keys(effectiveUserToPoints).reduce<Record<string, string>>((map, account) => {
     map[account] = effectiveUserToPoints[account].multipliedBy(ONE_ETH_WEI).toFixed(0);

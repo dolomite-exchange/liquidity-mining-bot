@@ -3,10 +3,10 @@ import v8 from 'v8';
 import '../src/lib/env';
 
 import { getDolomiteRiskParams } from './clients/dolomite';
-import { getSubgraphBlockNumber } from './helpers/block-helper';
 import { dolomite, loadAccounts } from './helpers/web3';
-import VestingPositionStore from './lib/vesting-position-store';
-import DolomiteLiquidator from './lib/dolomite-liquidator';
+import BlockStore from './lib/block-store';
+import DolomiteDetonator from './lib/dolomite-detonator';
+import DolomiteRequestUpdater from './lib/dolomite-request-updater';
 import GasPriceUpdater from './lib/gas-price-updater';
 import {
   checkBigNumber,
@@ -17,10 +17,11 @@ import {
   checkJsNumber,
   checkPrivateKey,
 } from './lib/invariants';
-import LiquidationStore from './lib/liquidation-store';
+import LevelUpdateRequestCache from './lib/level-update-request-cache';
+import LevelUpdateRequestStore from './lib/level-update-request-store';
 import Logger from './lib/logger';
-import MarketStore from './lib/market-store';
-import RiskParamsStore from './lib/risk-params-store';
+import VestingPositionCache from './lib/vesting-position-cache';
+import VestingPositionStore from './lib/vesting-position-store';
 
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
@@ -30,10 +31,10 @@ checkExists('ETHEREUM_NODE_URL');
 checkBigNumber('GAS_PRICE_ADDITION');
 checkBigNumber('GAS_PRICE_MULTIPLIER');
 checkBigNumber('GAS_PRICE_POLL_INTERVAL_MS');
-checkDuration('INITIAL_GAS_PRICE_WEI', 1);
+checkBigNumber('INITIAL_GAS_PRICE_WEI');
 checkBooleanValue('LEVEL_REQUESTS_ENABLED');
 checkJsNumber('NETWORK_ID');
-checkDuration('REQUEST_POLL_INTERVAL_MS', 1000);
+checkDuration('LEVEL_REQUESTS_POLL_INTERVAL_MS', 1000);
 checkExists('SUBGRAPH_URL');
 
 if (!Number.isNaN(Number(process.env.AUTO_DOWN_FREQUENCY_SECONDS))) {
@@ -45,16 +46,19 @@ if (!Number.isNaN(Number(process.env.AUTO_DOWN_FREQUENCY_SECONDS))) {
 }
 
 async function start() {
-  const marketStore = new MarketStore();
-  const accountStore = new VestingPositionStore(marketStore);
-  const liquidationStore = new LiquidationStore();
-  const riskParamsStore = new RiskParamsStore(marketStore);
-  const dolomiteDetonator = new DolomiteLiquidator(accountStore, marketStore, liquidationStore, riskParamsStore);
+  const blockStore = new BlockStore();
+  const vestingPositionStore = new VestingPositionStore(blockStore);
+  const vestingPositionCache = new VestingPositionCache();
+  const dolomiteDetonator = new DolomiteDetonator(vestingPositionStore, vestingPositionCache, blockStore);
+  const requestUpdaterStore = new LevelUpdateRequestStore(blockStore);
+  const requestUpdaterCache = new LevelUpdateRequestCache();
+  const dolomiteRequestUpdater = new DolomiteRequestUpdater(requestUpdaterStore, requestUpdaterCache, blockStore);
   const gasPriceUpdater = new GasPriceUpdater();
 
   await loadAccounts();
 
-  const { blockNumber: subgraphBlockNumber } = await getSubgraphBlockNumber();
+  await blockStore._update();
+  const subgraphBlockNumber = blockStore.getBlockNumber();
   const { riskParams } = await getDolomiteRiskParams(subgraphBlockNumber);
   const networkId = await dolomite.web3.eth.net.getId();
 
@@ -84,7 +88,7 @@ async function start() {
     initialGasPriceWei: process.env.INITIAL_GAS_PRICE_WEI,
     levelRequestsEnabled: process.env.LEVEL_REQUESTS_ENABLED,
     networkId,
-    requestPollInterval: process.env.REQUEST_POLL_INTERVAL_MS,
+    requestPollInterval: process.env.LEVEL_REQUESTS_POLL_INTERVAL_MS,
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
 
@@ -97,16 +101,16 @@ async function start() {
     riskParamsPollIntervalMillis: process.env.RISK_PARAMS_POLL_INTERVAL_MS,
   });
 
-  accountStore.start();
-  marketStore.start();
-  riskParamsStore.start();
+  blockStore.start();
   gasPriceUpdater.start();
 
   if (process.env.DETONATIONS_ENABLED === 'true') {
+    vestingPositionStore.start();
     dolomiteDetonator.start();
   }
   if (process.env.LEVEL_REQUESTS_ENABLED === 'true') {
-    dolomiteLevelRequestor.start();
+    requestUpdaterStore.start();
+    dolomiteRequestUpdater.start();
   }
   return true
 }

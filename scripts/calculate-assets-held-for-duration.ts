@@ -3,6 +3,7 @@ import fs from 'fs';
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
+import BlockStore from '../src/lib/block-store';
 import { ONE_ETH_WEI } from '../src/lib/constants';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
@@ -10,12 +11,17 @@ import Pageable from '../src/lib/pageable';
 import liquidityMiningConfig from './config/oarb-season-0.json';
 import './lib/env-reader';
 import {
-  addLiquidityMiningVestingPositions,
   getAccountBalancesByMarket,
   getBalanceChangingEvents,
-  getAmmLiquidityPositionAndEvents,
+  getAmmLiquidityPositionAndEvents, getArbVestingLiquidityPositionAndEvents,
 } from './lib/event-parser';
-import { calculateFinalPoints, calculateLiquidityPoints, calculateTotalRewardPoints } from './lib/rewards';
+import {
+  ARB_VESTER_PROXY,
+  calculateFinalPoints,
+  calculateLiquidityPoints,
+  calculateTotalRewardPoints, ETH_USDC_POOL,
+  LiquidityPositionsAndEvents,
+} from './lib/rewards';
 import TokenAbi from './abis/isolation-mode-factory.json';
 
 /* eslint-enable */
@@ -50,12 +56,13 @@ async function start() {
     return Promise.reject(new Error(`MARKET_ID contains an element that is too large, found: ${validMarketId}`));
   }
 
-  const marketStore = new MarketStore();
+  const blockStore = new BlockStore();
+  const marketStore = new MarketStore(blockStore);
 
-  const blockRewardStart = liquidityMiningConfig.epochs[epoch].startBlockNumber;
-  const blockRewardStartTimestamp = liquidityMiningConfig.epochs[epoch].startTimestamp;
-  const blockRewardEnd = liquidityMiningConfig.epochs[epoch].endBlockNumber;
-  const blockRewardEndTimestamp = liquidityMiningConfig.epochs[epoch].endTimestamp;
+  const startBlockNumber = liquidityMiningConfig.epochs[epoch].startBlockNumber;
+  const startTimestamp = liquidityMiningConfig.epochs[epoch].startTimestamp;
+  const endBlockNumber = liquidityMiningConfig.epochs[epoch].endBlockNumber;
+  const endTimestamp = liquidityMiningConfig.epochs[epoch].endTimestamp;
 
   const networkId = await dolomite.web3.eth.net.getId();
 
@@ -69,10 +76,10 @@ async function start() {
 
   Logger.info({
     message: 'DolomiteMargin data',
-    blockRewardStart,
-    blockRewardStartTimestamp,
-    blockRewardEnd,
-    blockRewardEndTimestamp,
+    blockRewardStart: startBlockNumber,
+    blockRewardStartTimestamp: startTimestamp,
+    blockRewardEnd: endBlockNumber,
+    blockRewardEndTimestamp: endTimestamp,
     dolomiteMargin: libraryDolomiteMargin,
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
@@ -87,20 +94,19 @@ async function start() {
   const marketIndexMap = await marketStore.getMarketIndexMap(marketMap);
 
   const apiAccounts = await Pageable.getPageableValues(async (lastId) => {
-    const result = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, blockRewardStart, lastId);
+    const result = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, startBlockNumber, lastId);
     return result.accounts;
   });
 
-  const accountToDolomiteBalanceMap = getAccountBalancesByMarket(apiAccounts, blockRewardStartTimestamp);
-  await addLiquidityMiningVestingPositions(accountToDolomiteBalanceMap, blockRewardStart);
+  const accountToDolomiteBalanceMap = getAccountBalancesByMarket(apiAccounts, startTimestamp);
 
-  const accountToAssetToEventsMap = await getBalanceChangingEvents(blockRewardStart, blockRewardEnd);
+  const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
 
   const totalPointsPerMarket = calculateTotalRewardPoints(
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
-    blockRewardStartTimestamp,
-    blockRewardEndTimestamp,
+    startTimestamp,
+    endTimestamp,
   );
   const allMarketIds = Object.keys(totalPointsPerMarket);
   allMarketIds.forEach(marketId => {
@@ -109,38 +115,51 @@ async function start() {
     }
   });
 
-  const { virtualLiquidityBalances, userToLiquiditySnapshots } = await getAmmLiquidityPositionAndEvents(
-    blockRewardStart,
-    blockRewardStartTimestamp,
-    blockRewardEndTimestamp,
+  const ammLiquidityBalancesAndEvents = await getAmmLiquidityPositionAndEvents(
+    startBlockNumber,
+    startTimestamp,
+    endTimestamp,
   );
-  calculateLiquidityPoints(
-    virtualLiquidityBalances,
-    userToLiquiditySnapshots,
-    blockRewardStartTimestamp,
-    blockRewardEndTimestamp,
+
+  const vestingPositionsAndEvents = await getArbVestingLiquidityPositionAndEvents(
+    startBlockNumber,
+    startTimestamp,
+    endTimestamp,
+  );
+
+  const poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents> = {
+    [ETH_USDC_POOL]: ammLiquidityBalancesAndEvents,
+    [ARB_VESTER_PROXY]: vestingPositionsAndEvents,
+  };
+
+  const poolToTotalSubLiquidityPoints = calculateLiquidityPoints(
+    poolToVirtualLiquidityPositionsAndEvents,
+    startTimestamp,
+    endTimestamp,
   );
 
   const userToPointsMap = calculateFinalPoints(
     accountToDolomiteBalanceMap,
     validMarketId,
+    poolToVirtualLiquidityPositionsAndEvents,
+    poolToTotalSubLiquidityPoints,
   );
   const tokenAddress = await dolomite.getters.getMarketTokenAddress(new BigNumber(validMarketId));
   const token = new dolomite.web3.eth.Contract(TokenAbi, tokenAddress);
   const tokenName = await dolomite.contracts.callConstantContractFunction(token.methods.name());
 
   // eslint-disable-next-line max-len
-  const fileName = `${FOLDER_NAME}/markets-held-${blockRewardStartTimestamp}-${blockRewardEndTimestamp}-${validMarketId}-output.json`;
+  const fileName = `${FOLDER_NAME}/markets-held-${startTimestamp}-${endTimestamp}-${validMarketId}-output.json`;
   const dataToWrite = readOutputFile(fileName);
   dataToWrite.users = userToPointsMap;
   dataToWrite.metadata = {
     marketId: validMarketId,
     marketName: tokenName,
     totalPointsForMarket: totalPointsPerMarket[validMarketId].times(ONE_ETH_WEI).toFixed(0),
-    startBlock: blockRewardStart,
-    endBlock: blockRewardEnd,
-    startTimestamp: blockRewardStartTimestamp,
-    endTimestamp: blockRewardEndTimestamp,
+    startBlock: startBlockNumber,
+    endBlock: endBlockNumber,
+    startTimestamp: startTimestamp,
+    endTimestamp: endTimestamp,
   }
   writeOutputFile(fileName, dataToWrite);
 

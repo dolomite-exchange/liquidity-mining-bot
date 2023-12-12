@@ -56,7 +56,7 @@ export async function loadAccounts() {
 
   Logger.info({
     at: 'web3#loadAccounts',
-    message: 'Loaded liquidator account',
+    message: 'Loaded detonator account',
     accountWalletAddress,
     dolomiteAccountNumber: process.env.DOLOMITE_ACCOUNT_NUMBER,
   });

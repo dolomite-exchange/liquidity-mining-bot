@@ -52,18 +52,6 @@ export function getAccountBalancesByMarket(
   return accountToDolomiteBalanceMap;
 }
 
-// export async function addLiquidityMiningVestingPositions(
-//   accountToDolomiteBalanceMap: AccountSubAccountToMarketToBalanceMap,
-//   blockRewardStart: number,
-// ): Promise<void> {
-//   const liquidityMiningVestingPositions = await Pageable.getPageableValues((async (lastIndex) => {
-//     const result = await getLiquidityMiningVestingPositions(blockRewardStart, lastIndex);
-//     return result.liquidityMiningVestingPositions;
-//   }));
-//
-//   parseLiquidityMiningVestingPositions(accountToDolomiteBalanceMap, liquidityMiningVestingPositions);
-// }
-
 export async function getBalanceChangingEvents(
   rewardsStartBlockNumber: number,
   rewardsEndBlockNumber: number,

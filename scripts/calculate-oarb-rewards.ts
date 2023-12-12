@@ -5,6 +5,7 @@ import fs from 'fs';
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
+import BlockStore from '../src/lib/block-store';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
@@ -53,7 +54,8 @@ async function start() {
     return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
   }
 
-  const marketStore = new MarketStore();
+  const blockStore = new BlockStore();
+  const marketStore = new MarketStore(blockStore);
 
   const {
     startBlockNumber,

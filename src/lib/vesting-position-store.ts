@@ -1,48 +1,38 @@
-import { getExpiredAccounts, getLiquidatableDolomiteAccounts } from '../clients/dolomite';
-import { ApiAccount } from './api-types';
+import { getExpiredLiquidityMiningVestingPositions } from '../clients/dolomite';
+import { ApiLiquidityMiningVestingPosition } from './api-types';
+import BlockStore from './block-store';
 import { delay } from './delay';
 import Logger from './logger';
-import MarketStore from './market-store';
-import Pageable from './pageable';
 
 export default class VestingPositionStore {
-  public marketStore: MarketStore;
+  public explodablePositions: ApiLiquidityMiningVestingPosition[];
+  private blockStore: BlockStore;
 
-  public liquidatableDolomiteAccounts: ApiAccount[];
-  public expirableAccounts: ApiAccount[];
-
-  constructor(marketStore: MarketStore) {
-    this.marketStore = marketStore;
-    this.liquidatableDolomiteAccounts = [];
-    this.expirableAccounts = [];
+  constructor(blockStore: BlockStore) {
+    this.explodablePositions = [];
+    this.blockStore = blockStore;
   }
 
-  public getLiquidatableDolomiteAccounts(): ApiAccount[] {
-    return this.liquidatableDolomiteAccounts;
-  }
-
-  public getExpirableDolomiteAccounts(): ApiAccount[] {
-    return this.expirableAccounts;
+  public getExplodablePositions(): ApiLiquidityMiningVestingPosition[] {
+    return this.explodablePositions;
   }
 
   start = () => {
     Logger.info({
-      at: 'AccountStore#start',
-      message: 'Starting account store',
+      at: 'VestingPositionStore#start',
+      message: 'Starting vesting position store',
     });
     this._poll();
   };
 
   _poll = async () => {
-    await delay(Number(process.env.MARKET_POLL_INTERVAL_MS)); // wait for the markets to initialize
-
     // noinspection InfiniteLoopJS
     for (; ;) {
       try {
         await this._update();
       } catch (error: any) {
         Logger.error({
-          at: 'AccountStore#_poll',
+          at: 'VestingPositionStore#_poll',
           message: error.message,
           error,
         });
@@ -54,38 +44,31 @@ export default class VestingPositionStore {
 
   _update = async () => {
     Logger.info({
-      at: 'AccountStore#_update',
-      message: 'Updating accounts...',
+      at: 'VestingPositionStore#_update',
+      message: 'Updating vesting positions...',
     });
 
-    const blockNumber = this.marketStore.getBlockNumber();
-    if (blockNumber === 0) {
+    const blockNumber = this.blockStore.getBlockNumber();
+    const blockTimestamp = this.blockStore.getBlockTimestamp()?.toSeconds() ?? 0;
+    if (blockNumber === 0 || blockTimestamp === 0) {
       Logger.warn({
-        at: 'AccountStore#_update',
-        message: 'Block number from marketStore is 0, returning...',
+        at: 'VestingPositionStore#_update',
+        message: 'Block number is 0, returning...',
       });
       return;
     }
 
-    const marketMap = this.marketStore.getMarketMap();
-    const marketIndexMap = await this.marketStore.getMarketIndexMap(marketMap);
-
-    const nextLiquidatableDolomiteAccounts = await Pageable.getPageableValues(async (lastId) => {
-      const { accounts } = await getLiquidatableDolomiteAccounts(marketIndexMap, blockNumber, lastId);
-      return accounts;
-    });
-    const nextExpirableAccounts = await Pageable.getPageableValues(async (lastId) => {
-      const { accounts } = await getExpiredAccounts(marketIndexMap, blockNumber, lastId);
-      return accounts;
-    });
+    const { liquidityMiningVestingPositions } = await getExpiredLiquidityMiningVestingPositions(
+      blockNumber,
+      blockTimestamp,
+    );
 
     // don't set the field variables until both values have been retrieved from the network
-    this.liquidatableDolomiteAccounts = nextLiquidatableDolomiteAccounts;
-    this.expirableAccounts = nextExpirableAccounts;
+    this.explodablePositions = liquidityMiningVestingPositions;
 
     Logger.info({
-      at: 'AccountStore#_update',
-      message: 'Finished updating accounts',
+      at: 'VestingPositionStore#_update',
+      message: 'Finished updating vesting positions',
     });
   };
 }
