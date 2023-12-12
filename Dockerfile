@@ -3,9 +3,12 @@ FROM node:14.17.0-alpine
 RUN apk update &&  \
     apk upgrade && \
     apk -Uuv add --no-cache make g++ git python py-pip jq openssh curl openssh docker &&  \
-    python3 -m pip install -U pip && \
-    python3 -m pip install -U setuptools && \
-    pip install --upgrade pip awscli
+    apt-get update && \
+    apt-get install -y python3 python3-pip python3-setuptools && \
+    pip3 install -U pip
+
+RUN pip3 --no-cache-dir install --upgrade awscli
+
 
 RUN adduser -S dolomite
 RUN mkdir -p /home/dolomite/app
