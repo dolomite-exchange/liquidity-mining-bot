@@ -7,9 +7,9 @@ RUN apk update &&  \
 
 RUN python3 -m pip install --no-cache-dir --upgrade awscli
 
-RUN mkdir ~/.ssh/known_hosts
-
-RUN ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
+#RUN mkdir ~/.ssh/known_hosts
+#RUN ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
+RUN ssh-keyscan -t rsa github.com
 
 
 RUN adduser -S dolomite
