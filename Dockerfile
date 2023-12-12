@@ -8,7 +8,7 @@ RUN apk update &&  \
 RUN python3 -m pip install --no-cache-dir --upgrade awscli
 
 RUN mkdir ~/.ssh
-RUN mkdir ~/.ssh/known_hosts
+RUN touch ~/.ssh/known_hosts
 RUN ssh-keyscan github.com >> ~/.ssh/known_hosts
 
 
