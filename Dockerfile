@@ -9,7 +9,7 @@ RUN python3 -m pip install --no-cache-dir --upgrade awscli
 
 #RUN mkdir ~/.ssh/known_hosts
 #RUN ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
-RUN ssh-keyscan your-host.com >> /root/.ssh/known_hosts
+RUN ssh-keyscan github.com >> /root/.ssh/known_hosts
 
 
 RUN adduser -S dolomite
