@@ -51,12 +51,13 @@ async function start() {
   const maxMarketId = (await dolomite.getters.getNumMarkets()).toNumber();
   const validMarketId = parseInt(process.env.MARKET_ID ?? 'NaN', 10);
   if (Number.isNaN(validMarketId)) {
-    return Promise.reject(new Error(`Invalid MARKET_ID, found: ${process.env.MARKET_IDS}`));
+    return Promise.reject(new Error(`Invalid MARKET_ID, found: ${process.env.MARKET_ID}`));
   } else if (validMarketId >= maxMarketId) {
     return Promise.reject(new Error(`MARKET_ID contains an element that is too large, found: ${validMarketId}`));
   }
 
   const blockStore = new BlockStore();
+  await blockStore._update();
   const marketStore = new MarketStore(blockStore);
 
   const startBlockNumber = liquidityMiningConfig.epochs[epoch].startBlockNumber;
@@ -149,7 +150,7 @@ async function start() {
   const tokenName = await dolomite.contracts.callConstantContractFunction(token.methods.name());
 
   // eslint-disable-next-line max-len
-  const fileName = `${FOLDER_NAME}/markets-held-${startTimestamp}-${endTimestamp}-${validMarketId}-output.json`;
+  const fileName = `${FOLDER_NAME}/asset-held-${startTimestamp}-${endTimestamp}-${validMarketId}-output.json`;
   const dataToWrite = readOutputFile(fileName);
   dataToWrite.users = userToPointsMap;
   dataToWrite.metadata = {
