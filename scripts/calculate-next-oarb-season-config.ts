@@ -19,10 +19,21 @@ interface OutputFile {
 
 const FOLDER_NAME = `${__dirname}/config`;
 const FILE_NAME = `${FOLDER_NAME}/oarb-season-0.json`;
+const ONE_WEEK = 604_800;
 
 async function start() {
   const outputFile = readOutputFile(FILE_NAME);
-  const maxKey = Object.keys(outputFile.epochs).reduce((max, key) => Math.max(max, parseInt(key, 10)), 0);
+  const selectedEpoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
+  let maxKey = selectedEpoch
+  if (isNaN(selectedEpoch)) {
+    maxKey = Object.keys(outputFile.epochs).reduce((max, key) => {
+      const value = parseInt(key, 10);
+      if (value >= 900) {
+        return max
+      }
+      return Math.max(max, parseInt(key, 10))
+    }, 0);
+  }
 
   const oldEpoch = outputFile.epochs[maxKey];
   const { startTimestamp, startBlockNumber, endBlockNumber, endTimestamp, oArbAmount, rewardWeights } = oldEpoch;
@@ -30,7 +41,7 @@ async function start() {
   const newEpoch = oldEpoch.isFinalized ? maxKey + 1 : maxKey;
   const newStartTimestamp = oldEpoch.isFinalized ? endTimestamp : startTimestamp;
   const newStartBlockNumber = oldEpoch.isFinalized ? endBlockNumber : startBlockNumber;
-  const newEndTimestamp = endTimestamp + (86400 * 7);
+  const newEndTimestamp = Math.min(newStartTimestamp + ONE_WEEK, Math.floor(Date.now() / 1000))
   const blockResult = await getLatestBlockNumberByTimestamp(newEndTimestamp);
   const isFinalized = newEndTimestamp === blockResult.timestamp;
 

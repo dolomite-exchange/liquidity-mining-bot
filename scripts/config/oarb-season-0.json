@@ -68,8 +68,24 @@
       "epoch": 4,
       "startBlockNumber": 157581702,
       "startTimestamp": 1701907200,
-      "endBlockNumber": 157718062,
-      "endTimestamp": 1701944283,
+      "endBlockNumber": 159862660,
+      "endTimestamp": 1702512000,
+      "oArbAmount": "90000",
+      "rewardWeights": {
+        "0": "22500",
+        "3": "2700",
+        "4": "22500",
+        "7": "6300",
+        "17": "36000"
+      },
+      "isFinalized": true
+    },
+    "5": {
+      "epoch": 5,
+      "startBlockNumber": 159862660,
+      "startTimestamp": 1702512000,
+      "endBlockNumber": 159875999,
+      "endTimestamp": 1702515814,
       "oArbAmount": "90000",
       "rewardWeights": {
         "0": "22500",
@@ -108,6 +124,18 @@
       },
       "isFinalized": true,
       "message": "Fixed the oARB distribution for ARB depositors for epochs 1 - 3, where vesting positions were improperly counted"
+    },
+    "999": {
+      "epoch": 999,
+      "startBlockNumber": 157581702,
+      "startTimestamp": 1701907200,
+      "endBlockNumber": 159862660,
+      "endTimestamp": 1702512000,
+      "oArbAmount": "25200",
+      "rewardWeights": {
+        "7": "25200"
+      },
+      "isFinalized": true
     }
   }
 }

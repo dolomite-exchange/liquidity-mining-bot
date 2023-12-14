@@ -291,10 +291,10 @@ export interface GraphqlVestingPositionTransfer {
   transaction: {
     timestamp: string
   }
-  fromUser: {
+  fromEffectiveUser: {
     id: string
   }
-  toUser: {
+  toEffectiveUser: {
     id: string
   }
   vestingPosition: {
@@ -304,6 +304,6 @@ export interface GraphqlVestingPositionTransfer {
 
 export interface GraphqlVestingPositionTransfersResult extends GraphqlResult {
   data: {
-    vestingPositionTransfers: GraphqlVestingPositionTransfer[]
+    liquidityMiningVestingPositionTransfers: GraphqlVestingPositionTransfer[]
   }
 }

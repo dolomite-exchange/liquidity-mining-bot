@@ -764,7 +764,7 @@ export async function getVestingPositionTransfers(
 ): Promise<{ vestingPositionTransfers: ApiVestingPositionTransfer[] }> {
   const query = `
     query getLiquidityMiningVestingPositionTransfers($startTimestamp: BigInt, $endTimestamp: BigInt, $lastId: ID) {
-      vestingPositionTransfers(
+      liquidityMiningVestingPositionTransfers(
         first: 1000
         orderBy: id
         where: { transaction_: { timestamp_gte: $startTimestamp timestamp_lt: $endTimestamp } id_gt: $lastId }
@@ -786,7 +786,7 @@ export async function getVestingPositionTransfers(
       }
     }
   `;
-  const result: any = await axios.post(
+  const result = await axios.post(
     subgraphUrl,
     {
       query,
@@ -805,7 +805,7 @@ export async function getVestingPositionTransfers(
     return Promise.reject(result.errors[0]);
   }
 
-  const vestingPositionTransfers = (result.data.vestingPositionTransfers as any[]).map<ApiVestingPositionTransfer>(
+  const vestingPositionTransfers = result.data.liquidityMiningVestingPositionTransfers.map<ApiVestingPositionTransfer>(
     vestingPositionTransfer => {
       return {
         id: vestingPositionTransfer.id,
@@ -816,7 +816,8 @@ export async function getVestingPositionTransfers(
         amount: new BigNumber(vestingPositionTransfer.vestingPosition.arbAmountPar),
       }
     },
-  );
+  )
+    .sort((a, b) => a.timestamp - b.timestamp);
 
   return { vestingPositionTransfers };
 }
