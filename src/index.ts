@@ -26,16 +26,20 @@ import VestingPositionStore from './lib/vesting-position-store';
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
 checkPrivateKey('ACCOUNT_WALLET_PRIVATE_KEY');
+checkDuration('BLOCK_POLL_INTERVAL_MS', 1000);
 checkBooleanValue('DETONATIONS_ENABLED');
+checkDuration('DETONATIONS_KEY_EXPIRATION_SECONDS', 1, false);
+checkDuration('DETONATIONS_POLL_INTERVAL_MS', 1000);
 checkExists('ETHEREUM_NODE_URL');
 checkBigNumber('GAS_PRICE_ADDITION');
 checkBigNumber('GAS_PRICE_MULTIPLIER');
 checkBigNumber('GAS_PRICE_POLL_INTERVAL_MS');
 checkBigNumber('INITIAL_GAS_PRICE_WEI');
 checkBooleanValue('LEVEL_REQUESTS_ENABLED');
+checkDuration('LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS', 1, false);
+checkDuration('LEVEL_REQUESTS_POLL_INTERVAL_MS', 1000, true);
 checkJsNumber('NETWORK_ID');
-checkDuration('LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS', 1);
-checkDuration('LEVEL_REQUESTS_POLL_INTERVAL_MS', 1000);
+checkDuration('SEQUENTIAL_TRANSACTION_DELAY_MS', 100);
 checkExists('SUBGRAPH_URL');
 
 if (!Number.isNaN(Number(process.env.AUTO_DOWN_FREQUENCY_SECONDS))) {
@@ -77,31 +81,26 @@ async function start() {
   }
 
   Logger.info({
-    message: 'DolomiteMargin data',
-    accountPollInterval: process.env.ACCOUNT_POLL_INTERVAL_MS,
+    message: 'Dolomite Liquidity Mining Bot - Environment Data',
+    accountPollIntervalMillis: process.env.ACCOUNT_POLL_INTERVAL_MS,
     accountWalletAddress: process.env.ACCOUNT_WALLET_ADDRESS,
+    blockPollIntervalMillis: process.env.BLOCK_POLL_INTERVAL_MS,
     detonationsEnabled: process.env.DETONATIONS_ENABLED,
     detonationsKeyExpirationSeconds: process.env.DETONATIONS_KEY_EXPIRATION_SECONDS,
+    detonationsPollIntervalMillis: process.env.DETONATIONS_POLL_INTERVAL_MS,
     dolomiteMargin: libraryDolomiteMargin,
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
-    gasPriceMultiplier: process.env.GAS_PRICE_MULTIPLIER,
     gasPriceAddition: process.env.GAS_PRICE_ADDITION,
+    gasPriceMultiplier: process.env.GAS_PRICE_MULTIPLIER,
+    gasPricePollIntervalMillis: process.env.GAS_PRICE_POLL_INTERVAL_MS,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     initialGasPriceWei: process.env.INITIAL_GAS_PRICE_WEI,
     levelRequestsEnabled: process.env.LEVEL_REQUESTS_ENABLED,
     levelRequestsKeyExpirationSeconds: process.env.LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS,
+    levelRequestsPollIntervalMillis: process.env.LEVEL_REQUESTS_POLL_INTERVAL_MS,
     networkId,
-    requestPollInterval: process.env.LEVEL_REQUESTS_POLL_INTERVAL_MS,
+    sequentialTransactionDelayMillis: process.env.SEQUENTIAL_TRANSACTION_DELAY_MS,
     subgraphUrl: process.env.SUBGRAPH_URL,
-  });
-
-  Logger.info({
-    message: 'Polling intervals',
-    accountPollIntervalMillis: process.env.ACCOUNT_POLL_INTERVAL_MS,
-    gasPricePollInterval: process.env.GAS_PRICE_POLL_INTERVAL_MS,
-    liquidatePollIntervalMillis: process.env.LIQUIDATE_POLL_INTERVAL_MS,
-    marketPollIntervalMillis: process.env.MARKET_POLL_INTERVAL_MS,
-    riskParamsPollIntervalMillis: process.env.RISK_PARAMS_POLL_INTERVAL_MS,
   });
 
   blockStore.start();

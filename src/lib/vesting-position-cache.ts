@@ -6,7 +6,7 @@ export default class VestingPositionCache {
 
   constructor() {
     this.store = new LRU({
-      maxAge: Number(process.env.DETONATION_KEY_EXPIRATION_SECONDS) * 1000,
+      maxAge: Number(process.env.DETONATIONS_KEY_EXPIRATION_SECONDS) * 1000,
     });
   }
 
