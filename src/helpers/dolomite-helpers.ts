@@ -9,8 +9,9 @@ import { ApiLiquidityMiningLevelUpdateRequest, ApiLiquidityMiningVestingPosition
 import Logger from '../lib/logger';
 import { dolomite } from './web3';
 
+export const DETONATION_WINDOW_SECONDS = 86_400 * 7 * 4; // 4 weeks
+
 const network = process.env.NETWORK_ID as string;
-const FOUR_WEEKS = 86_400 * 7 * 4;
 
 export async function detonateAccount(
   position: ApiLiquidityMiningVestingPosition,
@@ -26,7 +27,7 @@ export async function detonateAccount(
     accountOwner: position.effectiveUser,
   });
 
-  const expirationTimestamp = position.startTimestamp + position.duration + FOUR_WEEKS;
+  const expirationTimestamp = position.startTimestamp + position.duration + DETONATION_WINDOW_SECONDS;
   const isExplodable = lastBlockTimestamp.toSeconds() > expirationTimestamp;
   if (!isExplodable) {
     Logger.info({

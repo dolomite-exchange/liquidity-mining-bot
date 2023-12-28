@@ -2,6 +2,7 @@
 import { address, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
+import { DETONATION_WINDOW_SECONDS } from '../helpers/dolomite-helpers';
 import { dolomite } from '../helpers/web3';
 import {
   ApiAccount,
@@ -52,8 +53,6 @@ const subgraphUrl = process.env.SUBGRAPH_URL ?? '';
 if (!subgraphUrl) {
   throw new Error('SUBGRAPH_URL is not set')
 }
-
-const FOUR_WEEKS = 86_400 * 7 * 4;
 
 async function getAccounts(
   marketIndexMap: { [marketId: string]: { borrow: Decimal, supply: Decimal } },
@@ -401,7 +400,7 @@ export async function getExpiredLiquidityMiningVestingPositions(
       query,
       variables: {
         blockNumber: blockNumber,
-        timestamp: (lastBlockTimestamp - FOUR_WEEKS).toString(),
+        timestamp: (lastBlockTimestamp - DETONATION_WINDOW_SECONDS).toString(),
       },
     },
     defaultAxiosConfig,
