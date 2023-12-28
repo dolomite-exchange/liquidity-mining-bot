@@ -7,7 +7,7 @@ import Logger from './logger';
 
 const WAIT_DURATION = 1_000;
 
-export default class DolomiteRequestUpdater {
+export default class DolomiteLevelRequestUpdater {
   public levelUpdateRequestStore: LevelUpdateRequestStore;
   public levelUpdateRequestCache: LevelUpdateRequestCache;
   public blockStore: BlockStore;
@@ -24,7 +24,7 @@ export default class DolomiteRequestUpdater {
 
   start = () => {
     Logger.info({
-      at: 'DolomiteRequestUpdater#start',
+      at: 'DolomiteLevelRequestUpdater#start',
       message: 'Starting DolomiteMargin request updater',
     });
     delay(Number(WAIT_DURATION))
@@ -45,7 +45,7 @@ export default class DolomiteRequestUpdater {
     const lastBlockTimestamp = this.blockStore.getBlockTimestamp();
     if (lastBlockTimestamp === null) {
       Logger.info({
-        at: 'DolomiteRequestUpdater#_fulfillLevelUpdateRequests',
+        at: 'DolomiteLevelRequestUpdater#_fulfillLevelUpdateRequests',
         message: 'Block timestamp is null, returning...',
       });
       return;
@@ -58,8 +58,8 @@ export default class DolomiteRequestUpdater {
     if (requests.length === 0) {
       if (truncatedTime % 10 === 0) {
         Logger.info({
-          at: 'DolomiteDetonator#_detonateAccounts',
-          message: 'No accounts to detonate',
+          at: 'DolomiteLevelRequestUpdater#_fulfillLevelUpdateRequests',
+          message: 'No accounts to level up',
         });
       }
       return;
@@ -74,7 +74,7 @@ export default class DolomiteRequestUpdater {
         await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
       } catch (error: any) {
         Logger.error({
-          at: 'DolomiteRequestUpdater#_fulfillLevelUpdateRequests',
+          at: 'DolomiteLevelRequestUpdater#_fulfillLevelUpdateRequests',
           message: `Failed to fulfill level update: ${error.message}`,
           request,
           error,

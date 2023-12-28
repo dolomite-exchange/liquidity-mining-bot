@@ -1,33 +1,12 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
-import {
-  ApiDeposit,
-  ApiLiquidation,
-  ApiLiquidityMiningVestingPosition,
-  ApiTrade,
-  ApiTransfer,
-  ApiVestingPositionTransfer,
-  ApiWithdrawal,
-} from '../../src/lib/api-types';
-import {
-  parseDeposits,
-  parseLiquidations,
-  parseLiquidityMiningVestingPositions,
-  parseTrades,
-  parseTransfers,
-  parseVestingPositionTransfers,
-  VESTING_ACCOUNT_NUMBER,
-} from '../../scripts/lib/event-parser';
-import {
-  AccountSubAccountToMarketToBalanceMap,
-  AccountToSubAccountMarketToBalanceChangeMap,
-  BalanceAndRewardPoints,
-} from '../../scripts/lib/rewards';
+import { parseDeposits, parseLiquidations, parseTrades, parseTransfers } from '../../scripts/lib/event-parser';
+import { AccountToSubAccountMarketToBalanceChangeMap } from '../../scripts/lib/rewards';
+import { ApiDeposit, ApiLiquidation, ApiTrade, ApiTransfer, ApiWithdrawal } from '../../src/lib/api-types';
 
 const address1 = '0x44f6ccf0d09ef0d4991eb74d8c26d77a52a1ba9e';
 const address2 = '0x668035c440606da01e788991bfbba5c0d24133ab';
 const subAccount1 = '3';
 const subAccount2 = '6';
-const ARB_MARKET_ID = '7';
 
 describe('event-parser', () => {
   describe('parseDeposit', () => {
@@ -228,8 +207,8 @@ describe('event-parser', () => {
             user: address2,
             accountNumber: subAccount1,
           },
-          heldToken: 0,
-          borrowedToken: 2,
+          heldMarketId: 0,
+          borrowedMarketId: 2,
           solidHeldTokenAmountDeltaPar: new BigNumber('0.4'),
           liquidHeldTokenAmountDeltaPar: new BigNumber('-0.4'),
           solidBorrowedTokenAmountDeltaPar: new BigNumber('-612'),
@@ -252,52 +231,4 @@ describe('event-parser', () => {
         .toEqual(new BigNumber('607'));
     });
   })
-
-  describe('parseLiquidityMiningVestingPositions', () => {
-    it('should work normally', async () => {
-      const user = '0x44f6ccf0d09ef0d4991eb74d8c26d77a52a1ba9e';
-      const accountToDolomiteBalanceMap: AccountSubAccountToMarketToBalanceMap = {
-        [user]: {
-          [VESTING_ACCOUNT_NUMBER]: {
-            7: new BalanceAndRewardPoints(1694407206, user, new BigNumber('1000')),
-          },
-        },
-      };
-
-      const liquidityMiningVestingPositions: ApiLiquidityMiningVestingPosition[] = [
-        {
-          id: '0x4d5d9d8a6c6f9e9b1f3f3f8a0b3a9d1d2a0f8a7d1b8a0a5b5a4c5a3b2a1a0a9a8-12',
-          effectiveUser: address1,
-          amount: '5',
-        },
-      ]
-
-      parseLiquidityMiningVestingPositions(accountToDolomiteBalanceMap, liquidityMiningVestingPositions);
-      expect(accountToDolomiteBalanceMap[address1]![VESTING_ACCOUNT_NUMBER]![ARB_MARKET_ID]!.balance)
-        .toEqual(new BigNumber(1005));
-    });
-  });
-
-  describe('parseVestingPositionTransfers', () => {
-    it('should work normally', async () => {
-      const accountToAssetToEventsMap: AccountToSubAccountMarketToBalanceChangeMap = {};
-      const vestingPositionTransfers: ApiVestingPositionTransfer[] = [
-        {
-          id: '0x4d5d9d8a6c6f9e9b1f3f3f8a0b3a9d1d2a0f8a7d1b8a0a5b5a4c5a3b2a1a0a9a8-12',
-          serialId: 95109,
-          timestamp: 1696057612,
-          fromEffectiveUser: address1,
-          toEffectiveUser: address2,
-          amount: new BigNumber('5'),
-        },
-      ];
-      parseVestingPositionTransfers(accountToAssetToEventsMap, vestingPositionTransfers);
-      expect(accountToAssetToEventsMap[address1]?.[VESTING_ACCOUNT_NUMBER]?.[ARB_MARKET_ID]?.length).toEqual(1);
-      expect(accountToAssetToEventsMap[address1]?.[VESTING_ACCOUNT_NUMBER]?.[ARB_MARKET_ID]?.[0].amountDeltaPar)
-        .toEqual(new BigNumber(-5));
-      expect(accountToAssetToEventsMap[address2]?.[VESTING_ACCOUNT_NUMBER]?.[ARB_MARKET_ID]?.length).toEqual(1);
-      expect(accountToAssetToEventsMap[address2]?.[VESTING_ACCOUNT_NUMBER]?.[ARB_MARKET_ID]?.[0].amountDeltaPar)
-        .toEqual(new BigNumber(5));
-    });
-  });
-})
+});

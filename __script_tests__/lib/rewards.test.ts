@@ -2,17 +2,19 @@ import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { ethers } from 'ethers';
 import { defaultAbiCoder, keccak256, parseEther } from 'ethers/lib/utils';
 import { MerkleTree } from 'merkletreejs';
+import liquidityMiningConfig from '../../scripts/config/oarb-season-0.json';
 import {
   AccountSubAccountToMarketToBalanceMap,
-  AccountToAmmLiquiditySnapshotsMap,
+  AccountToVirtualLiquidityBalanceMap,
+  AccountToVirtualLiquiditySnapshotsMap,
   BalanceAndRewardPoints,
   BalanceChangeEvent,
   BalanceChangeType,
   calculateFinalRewards,
   calculateLiquidityPoints,
   calculateTotalRewardPoints,
+  LiquidityPositionsAndEvents,
 } from '../../scripts/lib/rewards';
-import liquidityMiningConfig from '../../scripts/config/oarb-season-0.json';
 
 const blockRewardStartTimestamp = 1697000000;
 const blockRewardEndTimestamp = 1698000000;
@@ -96,26 +98,33 @@ const accountToDolomiteBalanceMap: AccountSubAccountToMarketToBalanceMap = {
   },
 }
 
-const ammLiquidityBalances = {
+const ammLiquidityBalances: AccountToVirtualLiquidityBalanceMap = {
   [user4]: new BalanceAndRewardPoints(blockRewardStartTimestamp, user4, new BigNumber('.05')),
   [user6]: new BalanceAndRewardPoints(blockRewardStartTimestamp, user6, new BigNumber('.05')),
 };
 
-const userToLiquiditySnapshots: AccountToAmmLiquiditySnapshotsMap = {
-  [user4]: [{ timestamp: 1697500000, balance: new BigNumber('0.025') }],
+const userToLiquiditySnapshots: AccountToVirtualLiquiditySnapshotsMap = {
+  [user4]: [{ id: user4, effectiveUser: user4, timestamp: 1697500000, balancePar: new BigNumber('0.025') }],
   [user5]: [
-    { timestamp: 1697250000, balance: new BigNumber('0.05') },
-    { timestamp: 1697750000, balance: new BigNumber('0') },
+    { id: user4, effectiveUser: user4, timestamp: 1697250000, balancePar: new BigNumber('0.05') },
+    { id: user4, effectiveUser: user4, timestamp: 1697750000, balancePar: new BigNumber('0') },
   ],
   [user6]: [
-    { timestamp: 1697250000, balance: new BigNumber('0.05') },
-    { timestamp: 1697750000, balance: new BigNumber('0') },
+    { id: user4, effectiveUser: user4, timestamp: 1697250000, balancePar: new BigNumber('0.05') },
+    { id: user4, effectiveUser: user4, timestamp: 1697750000, balancePar: new BigNumber('0') },
   ],
-  [user7]: [{ timestamp: 1697500000, balance: new BigNumber('0.05') }],
+  [user7]: [{ id: user4, effectiveUser: user4, timestamp: 1697500000, balancePar: new BigNumber('0.05') }],
 };
 
-let totalPointsPerMarket;
-let totalLiquidityPoints;
+const poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents> = {
+  [LIQUIDITY_POOL]: {
+    userToLiquiditySnapshots: userToLiquiditySnapshots,
+    virtualLiquidityBalances: ammLiquidityBalances,
+  },
+}
+
+let totalPointsPerMarket: Record<string, BigNumber>;
+let totalLiquidityPoints: Record<string, BigNumber>;
 
 describe('rewards', () => {
   describe('#processEvent', () => {
@@ -222,17 +231,16 @@ describe('rewards', () => {
 
   describe('calculateLiquidityPoints', () => {
     totalLiquidityPoints = calculateLiquidityPoints(
-      ammLiquidityBalances,
-      userToLiquiditySnapshots,
+      poolToVirtualLiquidityPositionsAndEvents,
       blockRewardStartTimestamp,
       blockRewardEndTimestamp,
     );
 
-    expect(ammLiquidityBalances[user4].rewardPoints).toEqual(new BigNumber('37500'));
-    expect(ammLiquidityBalances[user5].rewardPoints).toEqual(new BigNumber('25000'));
-    expect(ammLiquidityBalances[user6].rewardPoints).toEqual(new BigNumber('37500'));
-    expect(ammLiquidityBalances[user7].rewardPoints).toEqual(new BigNumber('25000'));
-    expect(totalLiquidityPoints).toEqual(new BigNumber('125000'));
+    expect(ammLiquidityBalances[user4]!.rewardPoints).toEqual(new BigNumber('37500'));
+    expect(ammLiquidityBalances[user5]!.rewardPoints).toEqual(new BigNumber('25000'));
+    expect(ammLiquidityBalances[user6]!.rewardPoints).toEqual(new BigNumber('37500'));
+    expect(ammLiquidityBalances[user7]!.rewardPoints).toEqual(new BigNumber('25000'));
+    expect(totalLiquidityPoints[LIQUIDITY_POOL]).toEqual(new BigNumber('125000'));
   });
 
   describe('calculateFinalRewards', () => {
@@ -244,7 +252,7 @@ describe('rewards', () => {
     const minimumOArbAmount = new BigNumber(ethers.utils.parseEther('1').toString());
     const userToOarbRewards = calculateFinalRewards(
       accountToDolomiteBalanceMap,
-      ammLiquidityBalances,
+      poolToVirtualLiquidityPositionsAndEvents,
       totalPointsPerMarket,
       totalLiquidityPoints,
       oArbRewardMap,

@@ -20,7 +20,7 @@ export default class LevelUpdateRequestStore {
   start = () => {
     Logger.info({
       at: 'LevelUpdateRequestStore#start',
-      message: 'Starting vesting position store',
+      message: 'Starting level update request store',
     });
     this._poll();
   };

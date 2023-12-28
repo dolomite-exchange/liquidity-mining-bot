@@ -6,7 +6,7 @@ export default class LevelUpdateRequestCache {
 
   constructor() {
     this.store = new LRU({
-      maxAge: Number(process.env.DETONATION_KEY_EXPIRATION_SECONDS) * 1000,
+      maxAge: Number(process.env.LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS) * 1000,
     });
   }
 
@@ -14,7 +14,7 @@ export default class LevelUpdateRequestCache {
     return request.requestId.toFixed();
   }
 
-  async add(request: ApiLiquidityMiningLevelUpdateRequest) {
+  add(request: ApiLiquidityMiningLevelUpdateRequest) {
     if (!request) {
       throw new Error('Must specify request');
     }

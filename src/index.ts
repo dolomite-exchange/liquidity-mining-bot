@@ -6,7 +6,7 @@ import { getDolomiteRiskParams } from './clients/dolomite';
 import { dolomite, loadAccounts } from './helpers/web3';
 import BlockStore from './lib/block-store';
 import DolomiteDetonator from './lib/dolomite-detonator';
-import DolomiteRequestUpdater from './lib/dolomite-request-updater';
+import DolomiteLevelRequestUpdater from './lib/dolomite-level-request-updater';
 import GasPriceUpdater from './lib/gas-price-updater';
 import {
   checkBigNumber,
@@ -34,6 +34,7 @@ checkBigNumber('GAS_PRICE_POLL_INTERVAL_MS');
 checkBigNumber('INITIAL_GAS_PRICE_WEI');
 checkBooleanValue('LEVEL_REQUESTS_ENABLED');
 checkJsNumber('NETWORK_ID');
+checkDuration('LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS', 1);
 checkDuration('LEVEL_REQUESTS_POLL_INTERVAL_MS', 1000);
 checkExists('SUBGRAPH_URL');
 
@@ -52,7 +53,7 @@ async function start() {
   const dolomiteDetonator = new DolomiteDetonator(vestingPositionStore, vestingPositionCache, blockStore);
   const requestUpdaterStore = new LevelUpdateRequestStore(blockStore);
   const requestUpdaterCache = new LevelUpdateRequestCache();
-  const dolomiteRequestUpdater = new DolomiteRequestUpdater(requestUpdaterStore, requestUpdaterCache, blockStore);
+  const dolomiteRequestUpdater = new DolomiteLevelRequestUpdater(requestUpdaterStore, requestUpdaterCache, blockStore);
   const gasPriceUpdater = new GasPriceUpdater();
 
   await loadAccounts();
@@ -80,6 +81,7 @@ async function start() {
     accountPollInterval: process.env.ACCOUNT_POLL_INTERVAL_MS,
     accountWalletAddress: process.env.ACCOUNT_WALLET_ADDRESS,
     detonationsEnabled: process.env.DETONATIONS_ENABLED,
+    detonationsKeyExpirationSeconds: process.env.DETONATIONS_KEY_EXPIRATION_SECONDS,
     dolomiteMargin: libraryDolomiteMargin,
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
     gasPriceMultiplier: process.env.GAS_PRICE_MULTIPLIER,
@@ -87,6 +89,7 @@ async function start() {
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     initialGasPriceWei: process.env.INITIAL_GAS_PRICE_WEI,
     levelRequestsEnabled: process.env.LEVEL_REQUESTS_ENABLED,
+    levelRequestsKeyExpirationSeconds: process.env.LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS,
     networkId,
     requestPollInterval: process.env.LEVEL_REQUESTS_POLL_INTERVAL_MS,
     subgraphUrl: process.env.SUBGRAPH_URL,
