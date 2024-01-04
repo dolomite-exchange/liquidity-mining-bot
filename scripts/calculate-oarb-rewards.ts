@@ -40,6 +40,9 @@ interface OutputFile {
     [epoch: string]: {
       isFinalized: boolean
       merkleRoot: string
+      marketTotalPointsForEpoch: {
+        [market: string]: string // big int
+      }
     }
   };
 }
@@ -170,6 +173,12 @@ async function start() {
   dataToWrite.metadata[epoch] = {
     merkleRoot,
     isFinalized: true,
+    marketTotalPointsForEpoch: {
+      ...Object.keys(totalPointsPerMarket).reduce((acc, market) => {
+        acc[market] = totalPointsPerMarket[market].toString();
+        return acc;
+      }, {}),
+    }
   };
   writeOutputFile(fileName, dataToWrite);
 
