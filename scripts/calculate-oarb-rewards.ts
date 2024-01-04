@@ -67,11 +67,16 @@ async function start() {
     oArbAmount,
   } = liquidityMiningConfig.epochs[epoch];
 
+  const totalOARbAmount = new BigNumber(liquidityMiningConfig.epochs[epoch].oArbAmount);
   const rewardWeights = liquidityMiningConfig.epochs[epoch].rewardWeights as Record<string, string>;
-  const oArbRewardWeiMap = Object.keys(rewardWeights).reduce<Record<string, BigNumber>>((acc, key) => {
-    acc[key] = new BigNumber(parseEther(rewardWeights[key]).toString());
-    return acc;
-  }, {});
+  const [oArbRewardWeiMap, sumOfWeights] = Object.keys(rewardWeights)
+    .reduce<[Record<string, BigNumber>, BigNumber]>(([acc, sum], key) => {
+      acc[key] = new BigNumber(parseEther(rewardWeights[key]).toString());
+      return [acc, sum.plus(rewardWeights[key])];
+    }, [{}, new BigNumber(0)]);
+  if (!totalOARbAmount.eq(sumOfWeights)) {
+    return Promise.reject(new Error(`Invalid reward weights sum, found: ${sumOfWeights.toString()}`));
+  }
 
   const { riskParams } = await getDolomiteRiskParams(startBlockNumber);
   const networkId = await dolomite.web3.eth.net.getId();
@@ -198,10 +203,10 @@ function writeOutputFile(
 }
 
 start()
-.then(() => {
-  console.log('Finished executing script!');
-})
-.catch(error => {
-  console.error(`Found error while starting: ${error.toString()}`, error);
-  process.exit(1);
-});
+  .then(() => {
+    console.log('Finished executing script!');
+  })
+  .catch(error => {
+    console.error(`Found error while starting: ${error.toString()}`, error);
+    process.exit(1);
+  });
