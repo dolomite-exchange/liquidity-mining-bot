@@ -216,6 +216,6 @@ start()
     console.log('Finished executing script!');
   })
   .catch(error => {
-    console.error(`Found error while starting: ${error.toString()}`, error);
+    console.error(`Caught error while running:`, error);
     process.exit(1);
   });
