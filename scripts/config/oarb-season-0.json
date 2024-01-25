@@ -163,6 +163,40 @@
       },
       "isFinalized": true
     },
+    "10": {
+      "epoch": 10,
+      "startBlockNumber": 171505119,
+      "startTimestamp": 1705536000,
+      "endBlockNumber": 173856950,
+      "endTimestamp": 1706140800,
+      "oArbAmount": "54000",
+      "rewardWeights": {
+        "0": "12993.75",
+        "3": "1560",
+        "4": "12993.75",
+        "7": "3637.5",
+        "17": "20790",
+        "30": "2025"
+      },
+      "isFinalized": true
+    },
+    "11": {
+      "epoch": 11,
+      "startBlockNumber": 173856950,
+      "startTimestamp": 1706140800,
+      "endBlockNumber": 173905193,
+      "endTimestamp": 1706153045,
+      "oArbAmount": "36000",
+      "rewardWeights": {
+        "0": "8662.5",
+        "3": "1040",
+        "4": "8662.5",
+        "7": "2425",
+        "17": "13860",
+        "30": "1350"
+      },
+      "isFinalized": false
+    },
     "997": {
       "epoch": 997,
       "startTimestamp": 1699488000,
