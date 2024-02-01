@@ -184,8 +184,8 @@
       "epoch": 11,
       "startBlockNumber": 173856950,
       "startTimestamp": 1706140800,
-      "endBlockNumber": 173905193,
-      "endTimestamp": 1706153045,
+      "endBlockNumber": 176212566,
+      "endTimestamp": 1706745600,
       "oArbAmount": "36000",
       "rewardWeights": {
         "0": "8662.5",
@@ -195,7 +195,7 @@
         "17": "13860",
         "30": "1350"
       },
-      "isFinalized": false
+      "isFinalized": true
     },
     "997": {
       "epoch": 997,
