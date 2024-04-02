@@ -13,6 +13,7 @@ import {
   ApiLiquidation,
   ApiLiquidityMiningLevelUpdateRequest,
   ApiLiquidityMiningVestingPosition,
+  ApiLiquidityMiningVestingPositionStatus,
   ApiMarket,
   ApiRiskParam,
   ApiTrade,
@@ -334,6 +335,12 @@ export async function getLiquidityMiningVestingPositions(
           id
         }
         arbAmountPar
+        ethSpent
+        oARBAmount
+        status
+        startTimestamp
+        endTimestamp
+        duration
       }
     }
   `;
@@ -361,8 +368,12 @@ export async function getLiquidityMiningVestingPositions(
         id: liquidityMiningVestingPosition.id,
         effectiveUser: liquidityMiningVestingPosition.owner.id.toLowerCase(),
         amountPar: new BigNumber(liquidityMiningVestingPosition.arbAmountPar),
+        oARBAmount: new BigNumber(liquidityMiningVestingPosition.oARBAmount),
+        ethSpent: new BigNumber(liquidityMiningVestingPosition.ethSpent),
         startTimestamp: liquidityMiningVestingPosition.startTimestamp,
-        duration: liquidityMiningVestingPosition.duration,
+        endTimestamp: liquidityMiningVestingPosition.endTimestamp,
+        duration: parseInt(liquidityMiningVestingPosition.duration, 10),
+        status: liquidityMiningVestingPosition.status,
       };
     },
   );
@@ -380,7 +391,7 @@ export async function getExpiredLiquidityMiningVestingPositions(
         first: 1000
         orderBy: endTimestamp
         orderDirection: asc
-        where: { endTimestamp_lt: $timestamp, status: "ACTIVE" }
+        where: { endTimestamp_lt: $timestamp, status: "${ApiLiquidityMiningVestingPositionStatus.ACTIVE}" }
         block: { number_gte: $blockNumber }
       ) {
         id
@@ -388,9 +399,11 @@ export async function getExpiredLiquidityMiningVestingPositions(
           id
         }
         arbAmountPar
+        ethSpent
         startTimestamp
         duration
         endTimestamp
+        status
       }
     }
   `;
@@ -418,9 +431,12 @@ export async function getExpiredLiquidityMiningVestingPositions(
         id: liquidityMiningVestingPosition.id,
         effectiveUser: liquidityMiningVestingPosition.owner.id.toLowerCase(),
         amountPar: new BigNumber(liquidityMiningVestingPosition.arbAmountPar),
+        oARBAmount: new BigNumber(liquidityMiningVestingPosition.oARBAmount),
+        ethSpent: new BigNumber(liquidityMiningVestingPosition.ethSpent),
         startTimestamp: liquidityMiningVestingPosition.startTimestamp,
-        duration: liquidityMiningVestingPosition.duration,
+        duration: parseInt(liquidityMiningVestingPosition.duration, 10),
         endTimestamp: liquidityMiningVestingPosition.endTimestamp,
+        status: ApiLiquidityMiningVestingPositionStatus.ACTIVE,
       };
     },
   );

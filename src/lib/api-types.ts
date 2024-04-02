@@ -1,4 +1,4 @@
-import { address, BigNumber, Integer } from '@dolomite-exchange/dolomite-margin';
+import { address, BigNumber, Decimal, Integer } from '@dolomite-exchange/dolomite-margin';
 
 interface ApiMarginAccount {
   user: string;
@@ -120,12 +120,23 @@ export interface ApiVestingPositionTransfer {
   amount: Integer;
 }
 
+export enum ApiLiquidityMiningVestingPositionStatus {
+  ACTIVE = 'ACTIVE',
+  CLOSED = 'CLOSED',
+  FORCE_CLOSED = 'FORCE_CLOSED',
+  EMERGENCY_CLOSED = 'EMERGENCY_CLOSED',
+}
+
 export interface ApiLiquidityMiningVestingPosition {
   id: string;
   effectiveUser: string;
-  amountPar: Integer;
+  amountPar: Decimal;
+  oARBAmount: Decimal;
+  ethSpent: Decimal;
   duration: number;
   startTimestamp: number;
+  endTimestamp: number;
+  status: ApiLiquidityMiningVestingPositionStatus;
 }
 
 export interface ApiLiquidityMiningLevelUpdateRequest {

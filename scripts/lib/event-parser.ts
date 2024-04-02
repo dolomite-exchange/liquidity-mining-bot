@@ -136,7 +136,7 @@ export async function getArbVestingLiquidityPositionAndEvents(
   const virtualLiquidityBalances: AccountToVirtualLiquidityBalanceMap = {};
   const userToLiquiditySnapshots: AccountToVirtualLiquiditySnapshotsMap = {};
   const vestingPositions = await Pageable.getPageableValues<VirtualLiquidityPosition>((async (lastId) => {
-    const results = await getLiquidityMiningVestingPositions(rewardsStartBlockNumber - 1, lastId);
+    const results = await getLiquidityMiningVestingPositions(undefined, rewardsStartBlockNumber - 1, lastId);
     return results.liquidityMiningVestingPositions.map<VirtualLiquidityPosition>(position => ({
       id: position.id,
       effectiveUser: position.effectiveUser,

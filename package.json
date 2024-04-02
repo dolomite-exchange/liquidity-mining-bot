@@ -17,6 +17,7 @@
     "execute:calculate-assets-held-for-duration": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=.env.local npx ts-node scripts/calculate-assets-held-for-duration.ts",
     "execute:calculate-next-oarb-season-config": "BLOCKS_SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/sushiswap/arbitrum-blocks ENV_FILENAME=.env.local npx ts-node scripts/calculate-next-oarb-season-config.ts",
     "execute:calculate-oarb-rewards": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=.env.local npx ts-node scripts/calculate-oarb-rewards.ts",
+    "execute:get-global-oarb-data": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=.env.local npx ts-node scripts/get-global-oarb-data.ts",
     "execute:rectify-oarb-rewards-for-arb": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node scripts/rectify-oarb-rewards-for-arb.ts",
     "execute:rectify-oarb-rewards-for-deltas": "SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/dolomite-exchange/dolomite-v2-arbitrum ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node scripts/rectify-oarb-rewards-for-deltas.ts"
   },
