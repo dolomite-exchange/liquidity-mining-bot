@@ -131,7 +131,7 @@ export interface ApiLiquidityMiningVestingPosition {
   id: string;
   effectiveUser: string;
   amountPar: Decimal;
-  oARBAmount: Decimal;
+  oTokenAmount: Decimal;
   ethSpent: Decimal;
   duration: number;
   startTimestamp: number;

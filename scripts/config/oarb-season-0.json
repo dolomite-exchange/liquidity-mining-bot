@@ -6,7 +6,7 @@
       "endTimestamp": 1700092800,
       "startBlockNumber": 148514486,
       "endBlockNumber": 150811015,
-      "oArbAmount": "90000",
+      "oTokenAmount": "90000",
       "rewardWeights": {
         "0": "22500",
         "3": "2700",
@@ -22,7 +22,7 @@
       "endTimestamp": 1700697600,
       "startBlockNumber": 150811015,
       "endBlockNumber": 153095992,
-      "oArbAmount": "90000",
+      "oTokenAmount": "90000",
       "rewardWeights": {
         "0": "22500",
         "3": "2700",
@@ -38,7 +38,7 @@
       "endTimestamp": 1701302400,
       "startBlockNumber": 153095992,
       "endBlockNumber": 155378529,
-      "oArbAmount": "90000",
+      "oTokenAmount": "90000",
       "rewardWeights": {
         "0": "22500",
         "3": "2700",
@@ -54,7 +54,7 @@
       "startTimestamp": 1701302400,
       "endBlockNumber": 157581702,
       "endTimestamp": 1701907200,
-      "oArbAmount": "90000",
+      "oTokenAmount": "90000",
       "rewardWeights": {
         "0": "22500",
         "3": "2700",
@@ -70,7 +70,7 @@
       "startTimestamp": 1701907200,
       "endBlockNumber": 159862660,
       "endTimestamp": 1702512000,
-      "oArbAmount": "90000",
+      "oTokenAmount": "90000",
       "rewardWeights": {
         "0": "22500",
         "3": "2700",
@@ -86,7 +86,7 @@
       "startTimestamp": 1702512000,
       "endBlockNumber": 162070953,
       "endTimestamp": 1703116800,
-      "oArbAmount": "90000",
+      "oTokenAmount": "90000",
       "rewardWeights": {
         "0": "22500",
         "3": "2700",
@@ -102,7 +102,7 @@
       "startTimestamp": 1703116800,
       "endBlockNumber": 164427302,
       "endTimestamp": 1703721600,
-      "oArbAmount": "90000",
+      "oTokenAmount": "90000",
       "rewardWeights": {
         "0": "22500",
         "3": "2700",
@@ -118,7 +118,7 @@
       "startTimestamp": 1703721600,
       "endBlockNumber": 166823322,
       "endTimestamp": 1704326400,
-      "oArbAmount": "72000",
+      "oTokenAmount": "72000",
       "rewardWeights": {
         "0": "17325",
         "3": "2080",
@@ -135,7 +135,7 @@
       "startTimestamp": 1704326400,
       "endBlockNumber": 169186814,
       "endTimestamp": 1704931200,
-      "oArbAmount": "54000",
+      "oTokenAmount": "54000",
       "rewardWeights": {
         "0": "12993.75",
         "3": "1560",
@@ -152,7 +152,7 @@
       "startTimestamp": 1704931200,
       "endBlockNumber": 171505119,
       "endTimestamp": 1705536000,
-      "oArbAmount": "54000",
+      "oTokenAmount": "54000",
       "rewardWeights": {
         "0": "12993.75",
         "3": "1560",
@@ -169,7 +169,7 @@
       "startTimestamp": 1705536000,
       "endBlockNumber": 173856950,
       "endTimestamp": 1706140800,
-      "oArbAmount": "54000",
+      "oTokenAmount": "54000",
       "rewardWeights": {
         "0": "12993.75",
         "3": "1560",
@@ -186,7 +186,7 @@
       "startTimestamp": 1706140800,
       "endBlockNumber": 176212566,
       "endTimestamp": 1706745600,
-      "oArbAmount": "36000",
+      "oTokenAmount": "36000",
       "rewardWeights": {
         "0": "8662.5",
         "3": "1040",
@@ -203,7 +203,7 @@
       "startTimestamp": 1706745600,
       "endBlockNumber": 178500794,
       "endTimestamp": 1707350400,
-      "oArbAmount": "36000",
+      "oTokenAmount": "36000",
       "rewardWeights": {
         "0": "8662.5",
         "3": "1040",
@@ -220,7 +220,7 @@
       "startTimestamp": 1707350400,
       "endBlockNumber": 180823770,
       "endTimestamp": 1707955200,
-      "oArbAmount": "36000",
+      "oTokenAmount": "36000",
       "rewardWeights": {
         "0": "8662.5",
         "3": "1040",
@@ -237,7 +237,7 @@
       "startTimestamp": 1707955200,
       "endBlockNumber": 183161025,
       "endTimestamp": 1708560000,
-      "oArbAmount": "36000",
+      "oTokenAmount": "36000",
       "rewardWeights": {
         "0": "8662.5",
         "3": "1040",
@@ -254,7 +254,7 @@
       "startTimestamp": 1708560000,
       "endBlockNumber": 185498146,
       "endTimestamp": 1709164800,
-      "oArbAmount": "36000",
+      "oTokenAmount": "36000",
       "rewardWeights": {
         "0": "8662.5",
         "3": "1040",
@@ -271,7 +271,7 @@
       "startTimestamp": 1709164800,
       "endBlockNumber": 187825531,
       "endTimestamp": 1709769600,
-      "oArbAmount": "36000",
+      "oTokenAmount": "36000",
       "rewardWeights": {
         "0": "8662.5",
         "3": "1040",
@@ -288,7 +288,7 @@
       "startTimestamp": 1709769600,
       "endBlockNumber": 190109966,
       "endTimestamp": 1710374400,
-      "oArbAmount": "36000",
+      "oTokenAmount": "36000",
       "rewardWeights": {
         "0": "8662.5",
         "3": "1040",
@@ -305,7 +305,7 @@
       "startTimestamp": 1710374400,
       "endBlockNumber": 192499174,
       "endTimestamp": 1710979200,
-      "oArbAmount": "36000",
+      "oTokenAmount": "36000",
       "rewardWeights": {
         "0": "8662.5",
         "3": "1040",
@@ -322,7 +322,7 @@
       "startTimestamp": 1710979200,
       "endBlockNumber": 194911822,
       "endTimestamp": 1711584000,
-      "oArbAmount": "36000",
+      "oTokenAmount": "36000",
       "rewardWeights": {
         "0": "8662.5",
         "3": "1040",
@@ -339,7 +339,7 @@
       "startBlockNumber": 148514486,
       "endTimestamp": 1701907200,
       "endBlockNumber": 157581702,
-      "oArbAmount": "334800",
+      "oTokenAmount": "334800",
       "rewardWeights": {
         "0": "90000",
         "3": "10800",
@@ -355,7 +355,7 @@
       "startBlockNumber": 148514486,
       "endTimestamp": 1701907200,
       "endBlockNumber": 157581702,
-      "oArbAmount": "25200",
+      "oTokenAmount": "25200",
       "rewardWeights": {
         "7": "25200"
       },
@@ -368,7 +368,7 @@
       "startTimestamp": 1701907200,
       "endBlockNumber": 159862660,
       "endTimestamp": 1702512000,
-      "oArbAmount": "25200",
+      "oTokenAmount": "25200",
       "rewardWeights": {
         "7": "25200"
       },

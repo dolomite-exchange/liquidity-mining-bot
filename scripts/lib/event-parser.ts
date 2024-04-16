@@ -27,8 +27,6 @@ import {
 } from './rewards';
 
 const ZERO = new BigNumber('0');
-export const VESTING_ACCOUNT_NUMBER = '999';
-
 export function getAccountBalancesByMarket(
   accounts: ApiAccount[],
   blockRewardStartTimestamp: number,
@@ -136,7 +134,7 @@ export async function getArbVestingLiquidityPositionAndEvents(
   const virtualLiquidityBalances: AccountToVirtualLiquidityBalanceMap = {};
   const userToLiquiditySnapshots: AccountToVirtualLiquiditySnapshotsMap = {};
   const vestingPositions = await Pageable.getPageableValues<VirtualLiquidityPosition>((async (lastId) => {
-    const results = await getLiquidityMiningVestingPositions(undefined, rewardsStartBlockNumber - 1, lastId);
+    const results = await getLiquidityMiningVestingPositions(rewardsStartBlockNumber - 1, lastId);
     return results.liquidityMiningVestingPositions.map<VirtualLiquidityPosition>(position => ({
       id: position.id,
       effectiveUser: position.effectiveUser,

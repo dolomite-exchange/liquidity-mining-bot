@@ -15,7 +15,7 @@ function getDiscountToDolomite(p: ApiLiquidityMiningVestingPosition): BigNumber 
 
 function getDiscountsToDolomite(positions: ApiLiquidityMiningVestingPosition[]): BigNumber {
   return positions.reduce((acc, p) => {
-    return acc.plus(getDiscountToDolomite(p).times(p.oARBAmount));
+    return acc.plus(getDiscountToDolomite(p).times(p.oTokenAmount));
   }, INTEGERS.ZERO)
 }
 
@@ -73,23 +73,23 @@ async function start() {
     return acc;
   }, { max: [] as Positions, otherDone: [] as Positions, otherNotDone: [] as Positions, forfeit: [] as Positions });
 
-  console.log('total free oARB', result.max.reduce((acc, p) => acc.plus(p.oARBAmount), INTEGERS.ZERO));
+  console.log('total free oToken', result.max.reduce((acc, p) => acc.plus(p.oTokenAmount), INTEGERS.ZERO));
   console.log(
-    'total DONE non-free oARB',
-    result.otherDone.reduce((acc, p) => acc.plus(p.oARBAmount), INTEGERS.ZERO),
+    'total DONE non-free oToken',
+    result.otherDone.reduce((acc, p) => acc.plus(p.oTokenAmount), INTEGERS.ZERO),
     '\n\tETH spent',
     result.otherDone.reduce((acc, p) => acc.plus(p.ethSpent), INTEGERS.ZERO),
   );
-  const nonFreeNotDoneOArb = result.otherNotDone.reduce((acc, p) => acc.plus(p.oARBAmount), INTEGERS.ZERO);
+  const nonFreeNotDoneOToken = result.otherNotDone.reduce((acc, p) => acc.plus(p.oTokenAmount), INTEGERS.ZERO);
   console.log(
-    'total NOT DONE non-free oARB',
-    nonFreeNotDoneOArb,
+    'total NOT DONE non-free oToken',
+    nonFreeNotDoneOToken,
     '\n\ttotal NOT DONE non-free after discount to Dolomite',
     getDiscountsToDolomite(result.otherNotDone).toFixed(),
   );
-  console.log('total forfeit oARB', result.forfeit.reduce((acc, p) => acc.plus(p.oARBAmount), INTEGERS.ZERO));
+  console.log('total forfeit oToken', result.forfeit.reduce((acc, p) => acc.plus(p.oTokenAmount), INTEGERS.ZERO));
   console.log(
-    'total oARB length',
+    'total oToken length',
     result.forfeit.length + result.otherNotDone.length + result.otherDone.length + result.max.length,
     '\n\ttotal max discount count', result.max.length,
     '\n\ttotal non-max discount count', result.otherNotDone.length + result.otherDone.length,

@@ -10,7 +10,7 @@ interface OutputFile {
       endTimestamp: number;
       startBlockNumber: number;
       endBlockNumber: number;
-      oArbAmount: string;
+      oTokenAmount: string;
       rewardWeights: Record<string, string>;
       isFinalized: boolean;
     }
@@ -36,7 +36,7 @@ async function start() {
   }
 
   const oldEpoch = outputFile.epochs[maxKey];
-  const { startTimestamp, startBlockNumber, endBlockNumber, endTimestamp, oArbAmount, rewardWeights } = oldEpoch;
+  const { startTimestamp, startBlockNumber, endBlockNumber, endTimestamp, oTokenAmount, rewardWeights } = oldEpoch;
 
   const newEpoch = oldEpoch.isFinalized ? maxKey + 1 : maxKey;
   const newStartTimestamp = oldEpoch.isFinalized ? endTimestamp : startTimestamp;
@@ -54,7 +54,7 @@ async function start() {
         startTimestamp: newStartTimestamp,
         endBlockNumber: blockResult.blockNumber,
         endTimestamp: blockResult.timestamp,
-        oArbAmount,
+        oTokenAmount,
         rewardWeights,
         isFinalized,
       },
