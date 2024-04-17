@@ -1,0 +1,12 @@
+{
+  "epochs": {
+    "0": {
+      "epoch": 0,
+      "startBlockNumber": 199725868,
+      "startTimestamp": 1712793600,
+      "endBlockNumber": 201991573,
+      "endTimestamp": 1713366430,
+      "isFinalized": false
+    }
+  }
+}
