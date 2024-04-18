@@ -6,7 +6,9 @@
       "startTimestamp": 1713398400,
       "endBlockNumber": 202311516,
       "endTimestamp": 1713447725,
-      "isFinalized": false
+      "isTimeElapsed": false,
+      "isMerkleRootGenerated": false,
+      "isMerkleRootWrittenOnChain": false
     }
   }
 }
