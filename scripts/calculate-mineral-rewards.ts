@@ -8,13 +8,14 @@ import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
 import './lib/env-reader';
+import { MineralConfigFile } from './calculate-mineral-season-config';
 import {
   getAccountBalancesByMarket,
   getAmmLiquidityPositionAndEvents,
   getArbVestingLiquidityPositionAndEvents,
   getBalanceChangingEvents,
 } from './lib/event-parser';
-import { MineralConfigFile, readFileFromGitHub, writeLargeFileToGitHub } from './lib/file-helpers';
+import { readFileFromGitHub, writeLargeFileToGitHub } from './lib/file-helpers';
 import {
   ARB_VESTER_PROXY,
   calculateFinalPoints,
@@ -263,6 +264,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
 
   if (epochStatus.merkleRootGenerated && !epochStatus.merkleRootWrittenOnChain) {
     // TODO: write merkle root to chain
+    // TODO: move this to another that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds for an update)
   }
 }
 

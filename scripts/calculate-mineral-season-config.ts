@@ -1,9 +1,21 @@
 import { getLatestBlockNumberByTimestamp } from '../src/clients/blocks';
+import Logger from '../src/lib/logger';
 import './lib/env-reader';
-import { MineralConfigFile, readFileFromGitHub, writeLargeFileToGitHub } from './lib/file-helpers';
+import { readFileFromGitHub, writeLargeFileToGitHub } from './lib/file-helpers';
 
-export interface MineralConfig {
+export interface MineralConfigEpoch {
+  epoch: number;
+  startTimestamp: number;
+  endTimestamp: number;
+  startBlockNumber: number;
+  endBlockNumber: number;
+  isFinalized: boolean;
+}
 
+export interface MineralConfigFile {
+  epochs: {
+    [epoch: string]: MineralConfigEpoch
+  };
 }
 
 /**
@@ -27,6 +39,10 @@ export async function calculateMineralSeasonConfig(skipConfigUpdate: boolean = f
   }
 
   if (skipConfigUpdate) {
+    Logger.info({
+      message: 'calculateMineralSeasonConfig: Skipping config update...',
+      epochNumber: maxKey,
+    });
     return maxKey;
   }
 
@@ -51,9 +67,9 @@ export async function calculateMineralSeasonConfig(skipConfigUpdate: boolean = f
           endBlockNumber: blockResult.blockNumber,
           endTimestamp: blockResult.timestamp,
           isFinalized,
-        },
+        } as MineralConfigEpoch,
       },
-    },
+    } as MineralConfigFile,
     true,
   );
 

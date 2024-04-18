@@ -1,34 +1,6 @@
 import { default as axios } from 'axios';
-import fs from 'fs';
-import { dirname as getDirName } from 'path';
-
-export interface MineralConfigEpoch {
-  epoch: number;
-  startTimestamp: number;
-  endTimestamp: number;
-  startBlockNumber: number;
-  endBlockNumber: number;
-  oTokenAmount: string;
-  rewardWeights: Record<string, string>;
-  isFinalized: boolean;
-}
-
-export interface MineralConfigFile {
-  epochs: {
-    [epoch: string]: MineralConfigEpoch
-  };
-}
 
 const FOLDER_URL = 'https://api.github.com/repos/dolomite-exchange/liquidity-mining-bot/contents';
-
-export function writeFileLocally(
-  filePath: string,
-  fileContent: string,
-): void {
-  fs.mkdirSync(getDirName(filePath), { recursive: true });
-
-  fs.writeFileSync(filePath, fileContent);
-}
 
 export async function readFileFromGitHub<T>(filePath: string): Promise<T> {
   const headers = {
