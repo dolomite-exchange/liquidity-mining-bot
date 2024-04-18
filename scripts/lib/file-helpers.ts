@@ -1,4 +1,5 @@
 import { default as axios } from 'axios';
+import { MineralOutputFile } from '../calculate-mineral-rewards';
 
 const FOLDER_URL = 'https://api.github.com/repos/dolomite-exchange/liquidity-mining-data';
 
@@ -13,7 +14,7 @@ export async function readFileFromGitHub<T>(filePath: string): Promise<T> {
 
 export async function writeLargeFileToGitHub(
   filePath: string,
-  fileContent: object,
+  fileContent: any,
   prettyPrint: boolean,
 ): Promise<void> {
   if (!process.env.GITHUB_TOKEN) {
@@ -60,9 +61,19 @@ export async function writeLargeFileToGitHub(
       }
     } else if (filePath.includes('finalized')) {
       if (filePath.includes('mineral')) {
-        message = 'Added finalized minerals epoch';
+        const mineralData = fileContent as MineralOutputFile;
+        if (fileContent.metadata.merkleRoot) {
+          message = `Added finalized minerals for epoch ${mineralData.metadata.epoch}`;
+        } else {
+          message = `Updated minerals for epoch ${mineralData.metadata.epoch}`;
+        }
       } else if (filePath.includes('oarb')) {
-        message = 'Added finalized oARB epoch';
+        const oArbData = fileContent as MineralOutputFile;
+        if (fileContent.metadata.merkleRoot) {
+          message = `Added finalized oARB for epoch ${oArbData.metadata.epoch}`;
+        } else {
+          message = `Updated oARB for epoch ${oArbData.metadata.epoch}`;
+        }
       } else {
         message = 'Added finalized data';
       }

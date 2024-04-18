@@ -52,11 +52,12 @@ interface UserMineralAllocationForFile {
   proofs: string[];
 }
 
-interface MineralOutputFile {
+export interface MineralOutputFile {
   users: {
     [walletAddressLowercase: string]: UserMineralAllocationForFile;
   };
   metadata: {
+    epoch: number;
     merkleRoot: string | null;
     marketIds: number[];
     marketNames: string[];
@@ -236,6 +237,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
   const mineralOutputFile: MineralOutputFile = {
     users: userToMineralsMapForFile,
     metadata: {
+      epoch,
       merkleRoot,
       marketNames,
       totalPoints: totalPoints.toFixed(),

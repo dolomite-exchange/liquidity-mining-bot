@@ -1,7 +1,6 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { ethers } from 'ethers';
 import { parseEther } from 'ethers/lib/utils';
-import fs from 'fs';
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
@@ -9,53 +8,51 @@ import BlockStore from '../src/lib/block-store';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
-import liquidityMiningConfig from './config/oarb-season-0.json';
 import './lib/env-reader';
+import { OTokenConfigFile } from './calculate-otoken-season-config';
 import {
   getAccountBalancesByMarket,
   getAmmLiquidityPositionAndEvents,
   getArbVestingLiquidityPositionAndEvents,
   getBalanceChangingEvents,
 } from './lib/event-parser';
+import { readFileFromGitHub, writeLargeFileToGitHub } from './lib/file-helpers';
 import {
   ARB_VESTER_PROXY,
   calculateFinalRewards,
   calculateLiquidityPoints,
   calculateMerkleRootAndProofs,
   calculateTotalRewardPoints,
-  ETH_USDC_POOL, InterestOperation,
+  ETH_USDC_POOL,
+  InterestOperation,
   LiquidityPositionsAndEvents,
 } from './lib/rewards';
 
-interface OutputFile {
-  epochs: {
-    [epoch: string]: {
-      [walletAddressLowercase: string]: {
-        amount: string // big int
-        proofs: string[]
-      }
+export interface OTokenOutputFile {
+  users: {
+    [walletAddressLowercase: string]: {
+      amount: string // big int
+      proofs: string[]
     }
   };
   metadata: {
-    [epoch: string]: {
-      isFinalized: boolean
-      merkleRoot: string
-      marketTotalPointsForEpoch: {
-        [market: string]: string // big int
-      }
+    epoch: number;
+    merkleRoot: string | null;
+    marketTotalPointsForEpoch: {
+      [market: string]: string // big int
     }
   };
 }
-
-const FOLDER_NAME = `${__dirname}/output`;
 
 const MINIMUM_O_TOKEN_AMOUNT_WEI = new BigNumber(ethers.utils.parseEther('0.01').toString());
 
 const REWARD_MULTIPLIERS_MAP = {};
 
 async function start() {
+  const oTokenConfig = await readFileFromGitHub<OTokenConfigFile>('config/oarb-season-0');
+
   const epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
-  if (Number.isNaN(epoch) || !liquidityMiningConfig.epochs[epoch]) {
+  if (Number.isNaN(epoch) || !oTokenConfig.epochs[epoch]) {
     return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
   }
 
@@ -69,11 +66,11 @@ async function start() {
     startTimestamp,
     endBlockNumber,
     endTimestamp,
-    oArbAmount,
-  } = liquidityMiningConfig.epochs[epoch];
+    oTokenAmount,
+  } = oTokenConfig.epochs[epoch];
 
-  const totalOARbAmount = new BigNumber(liquidityMiningConfig.epochs[epoch].oArbAmount);
-  const rewardWeights = liquidityMiningConfig.epochs[epoch].rewardWeights as Record<string, string>;
+  const totalOARbAmount = new BigNumber(oTokenConfig.epochs[epoch].oTokenAmount);
+  const rewardWeights = oTokenConfig.epochs[epoch].rewardWeights as Record<string, string>;
   const [oTokenRewardWeiMap, sumOfWeights] = Object.keys(rewardWeights)
     .reduce<[Record<string, BigNumber>, BigNumber]>(([acc, sum], key) => {
       acc[key] = new BigNumber(parseEther(rewardWeights[key]).toString());
@@ -109,7 +106,7 @@ async function start() {
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     networkId,
-    oArbAmount,
+    oTokenAmount,
     rewardWeights,
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
@@ -174,48 +171,23 @@ async function start() {
 
   const { merkleRoot, walletAddressToLeavesMap } = calculateMerkleRootAndProofs(userToOTokenRewards);
 
-  const fileName = `${FOLDER_NAME}/oarb-season-0-epoch-${epoch}-output.json`;
-  const dataToWrite = readOutputFile(fileName);
-  dataToWrite.epochs[epoch] = walletAddressToLeavesMap;
-  dataToWrite.metadata[epoch] = {
-    merkleRoot,
-    isFinalized: true,
-    marketTotalPointsForEpoch: {
-      ...Object.keys(totalPointsPerMarket).reduce((acc, market) => {
-        acc[market] = totalPointsPerMarket[market].toString();
-        return acc;
-      }, {}),
-    }
+  const fileName = `finalized/oarb/oarb-season-0-epoch-${epoch}-output.json`;
+  const dataToWrite: OTokenOutputFile = {
+    users: walletAddressToLeavesMap,
+    metadata: {
+      epoch,
+      merkleRoot,
+      marketTotalPointsForEpoch: {
+        ...Object.keys(totalPointsPerMarket).reduce((acc, market) => {
+          acc[market] = totalPointsPerMarket[market].toString();
+          return acc;
+        }, {}),
+      },
+    },
   };
-  writeOutputFile(fileName, dataToWrite);
+  await writeLargeFileToGitHub(fileName, dataToWrite, false);
 
   return true;
-}
-
-function readOutputFile(fileName: string): OutputFile {
-  try {
-    return JSON.parse(fs.readFileSync(fileName, 'utf8')) as OutputFile;
-  } catch (e) {
-    return {
-      epochs: {},
-      metadata: {},
-    };
-  }
-}
-
-function writeOutputFile(
-  fileName: string,
-  fileContent: OutputFile,
-): void {
-  if (!fs.existsSync(FOLDER_NAME)) {
-    fs.mkdirSync(FOLDER_NAME);
-  }
-
-  fs.writeFileSync(
-    fileName,
-    JSON.stringify(fileContent),
-    { encoding: 'utf8', flag: 'w' },
-  );
 }
 
 start()

@@ -1,32 +1,30 @@
-import fs from 'fs';
-import { getLatestBlockNumberByTimestamp } from '../src/clients/blocks';
 import './lib/env-reader';
+import { MineralConfigEpoch, MineralConfigFile } from './calculate-mineral-season-config';
+import { EpochConfig, getNextConfigIfNeeded } from './lib/config-helper';
+import { readFileFromGitHub, writeLargeFileToGitHub } from './lib/file-helpers';
 
-interface OutputFile {
+interface OTokenEpochConfig extends EpochConfig {
+  oTokenAmount: string;
+  rewardWeights: Record<string, string>;
+}
+
+export interface OTokenConfigFile {
   epochs: {
-    [epoch: string]: {
-      epoch: number;
-      startTimestamp: number;
-      endTimestamp: number;
-      startBlockNumber: number;
-      endBlockNumber: number;
-      oTokenAmount: string;
-      rewardWeights: Record<string, string>;
-      isFinalized: boolean;
-    }
+    [epoch: string]: OTokenEpochConfig
   };
 }
 
-const FOLDER_NAME = `${__dirname}/config`;
-const FILE_NAME = `${FOLDER_NAME}/oarb-season-0.json`;
-const ONE_WEEK = 604_800;
+/**
+ * path cannot start with a "/"
+ */
+const FILE_NAME_WITH_PATH = `config/oarb-season-0.json`;
 
 async function start() {
-  const outputFile = readOutputFile(FILE_NAME);
+  const oTokenConfigFile = await readFileFromGitHub<OTokenConfigFile>(FILE_NAME_WITH_PATH);
   const selectedEpoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   let maxKey = selectedEpoch
   if (isNaN(selectedEpoch)) {
-    maxKey = Object.keys(outputFile.epochs).reduce((max, key) => {
+    maxKey = Object.keys(oTokenConfigFile.epochs).reduce((max, key) => {
       const value = parseInt(key, 10);
       if (value >= 900) {
         return max
@@ -35,59 +33,39 @@ async function start() {
     }, 0);
   }
 
-  const oldEpoch = outputFile.epochs[maxKey];
-  const { startTimestamp, startBlockNumber, endBlockNumber, endTimestamp, oTokenAmount, rewardWeights } = oldEpoch;
+  const oldEpoch = oTokenConfigFile.epochs[maxKey];
+  const nextEpochData = await getNextConfigIfNeeded(oldEpoch);
 
-  const newEpoch = oldEpoch.isFinalized ? maxKey + 1 : maxKey;
-  const newStartTimestamp = oldEpoch.isFinalized ? endTimestamp : startTimestamp;
-  const newStartBlockNumber = oldEpoch.isFinalized ? endBlockNumber : startBlockNumber;
-  const newEndTimestamp = Math.min(newStartTimestamp + ONE_WEEK, Math.floor(Date.now() / 1000))
-  const blockResult = await getLatestBlockNumberByTimestamp(newEndTimestamp);
-  const isFinalized = newEndTimestamp === blockResult.timestamp;
+  const epochData: OTokenEpochConfig = {
+    epoch: nextEpochData.isReadyForNext ? maxKey + 1 : maxKey,
+    startBlockNumber: nextEpochData.newStartBlockNumber,
+    startTimestamp: nextEpochData.newStartTimestamp,
+    endBlockNumber: nextEpochData.actualEndBlockNumber,
+    endTimestamp: nextEpochData.actualEndTimestamp,
+    isTimeElapsed: nextEpochData.newEndTimestamp === nextEpochData.actualEndTimestamp,
+    oTokenAmount: oldEpoch.oTokenAmount,
+    rewardWeights: oldEpoch.rewardWeights,
+    isMerkleRootGenerated: false,
+    isMerkleRootWrittenOnChain: false
+  };
 
-  writeOutputFile(FILE_NAME, {
-    epochs: {
-      ...outputFile.epochs,
-      [newEpoch]: {
-        epoch: newEpoch,
-        startBlockNumber: newStartBlockNumber,
-        startTimestamp: newStartTimestamp,
-        endBlockNumber: blockResult.blockNumber,
-        endTimestamp: blockResult.timestamp,
-        oTokenAmount,
-        rewardWeights,
-        isFinalized,
-      },
-    },
-  });
+  await writeMineralConfigToGitHub(oTokenConfigFile, epochData);
 
   return true;
 }
 
-function readOutputFile(fileName: string): OutputFile {
-  try {
-    return JSON.parse(fs.readFileSync(fileName, 'utf8')) as OutputFile;
-  } catch (e) {
-    return {
-      epochs: {},
-    };
-  }
-}
-
-function writeOutputFile(
-  fileName: string,
-  fileContent: OutputFile,
-): void {
-  if (!fs.existsSync(FOLDER_NAME)) {
-    fs.mkdirSync(FOLDER_NAME);
-  }
-
-  fs.writeFileSync(
-    fileName,
-    JSON.stringify(fileContent, null, 2),
-    { encoding: 'utf8', flag: 'w' },
+export async function writeMineralConfigToGitHub(
+  configFile: MineralConfigFile,
+  epochData: MineralConfigEpoch,
+): Promise<void> {
+  configFile.epochs[epochData.epoch] = epochData;
+  await writeLargeFileToGitHub(
+    FILE_NAME_WITH_PATH,
+    configFile,
+    true,
   );
 }
+
 
 start()
   .then(() => {

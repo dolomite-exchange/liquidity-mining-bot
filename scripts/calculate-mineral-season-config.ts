@@ -1,18 +1,9 @@
-import { getLatestBlockNumberByTimestamp } from '../src/clients/blocks';
 import Logger from '../src/lib/logger';
 import './lib/env-reader';
+import { EpochConfig, getNextConfigIfNeeded } from './lib/config-helper';
 import { readFileFromGitHub, writeLargeFileToGitHub } from './lib/file-helpers';
 
-export interface MineralConfigEpoch {
-  epoch: number;
-  startTimestamp: number;
-  endTimestamp: number;
-  startBlockNumber: number;
-  endBlockNumber: number;
-  isTimeElapsed: boolean;
-  isMerkleRootGenerated: boolean;
-  isMerkleRootWrittenOnChain: boolean;
-}
+export interface MineralConfigEpoch extends EpochConfig {}
 
 export interface MineralConfigFile {
   epochs: {
@@ -24,7 +15,6 @@ export interface MineralConfigFile {
  * path cannot start with a "/"
  */
 const FILE_NAME_WITH_PATH = `config/mineral-season-0.json`;
-const ONE_WEEK = 604_800;
 
 export async function calculateMineralSeasonConfig(skipConfigUpdate: boolean = false): Promise<number> {
   const configFile = await readFileFromGitHub<MineralConfigFile>(FILE_NAME_WITH_PATH);
@@ -55,20 +45,15 @@ export async function calculateMineralSeasonConfig(skipConfigUpdate: boolean = f
   }
 
   const oldEpoch = configFile.epochs[maxKey];
-
-  const isReadyForNext = oldEpoch.isTimeElapsed && oldEpoch.isMerkleRootGenerated;
-  const newStartBlockNumber = isReadyForNext ? oldEpoch.endBlockNumber : oldEpoch.startBlockNumber;
-  const newStartTimestamp = isReadyForNext ? oldEpoch.endTimestamp : oldEpoch.startTimestamp;
-  const newEndTimestamp = newStartTimestamp + ONE_WEEK
-  const newEndBlockNumberResult = await getLatestBlockNumberByTimestamp(newEndTimestamp);
+  const nextEpochData = await getNextConfigIfNeeded(oldEpoch);
 
   const epochData: MineralConfigEpoch = {
-    epoch: isReadyForNext ? maxKey + 1 : maxKey,
-    startBlockNumber: newStartBlockNumber,
-    startTimestamp: newStartTimestamp,
-    endBlockNumber: newEndBlockNumberResult.blockNumber,
-    endTimestamp: newEndBlockNumberResult.timestamp,
-    isTimeElapsed: newEndTimestamp === newEndBlockNumberResult.timestamp,
+    epoch: nextEpochData.isReadyForNext ? maxKey + 1 : maxKey,
+    startBlockNumber: nextEpochData.newStartBlockNumber,
+    startTimestamp: nextEpochData.newStartTimestamp,
+    endBlockNumber: nextEpochData.actualEndBlockNumber,
+    endTimestamp: nextEpochData.actualEndTimestamp,
+    isTimeElapsed: nextEpochData.newEndTimestamp === nextEpochData.actualEndTimestamp,
     isMerkleRootGenerated: false,
     isMerkleRootWrittenOnChain: false
   };
