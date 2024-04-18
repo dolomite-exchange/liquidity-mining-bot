@@ -1,13 +1,13 @@
 import { default as axios } from 'axios';
 
-const FOLDER_URL = 'https://api.github.com/repos/dolomite-exchange/liquidity-mining-bot/contents';
+const FOLDER_URL = 'https://api.github.com/repos/dolomite-exchange/liquidity-mining-data';
 
 export async function readFileFromGitHub<T>(filePath: string): Promise<T> {
   const headers = {
     Accept: 'application/vnd.github.v3.raw',
     Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
   };
-  const response = await axios.get(`${FOLDER_URL}/${filePath}`, { headers });
+  const response = await axios.get(`${FOLDER_URL}/contents/${filePath}`, { headers });
   return response.data;
 }
 
@@ -21,10 +21,6 @@ export async function writeLargeFileToGitHub(
   }
 
   try {
-    const githubApiUrl = 'https://api.github.com';
-    const owner = 'dolomite-exchange';
-    const repo = 'liquidity-mining-bot';
-
     const headers = {
       headers: {
         Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
@@ -34,14 +30,14 @@ export async function writeLargeFileToGitHub(
     const fileContentEncoded = Buffer.from(JSON.stringify(fileContent, null, prettyPrint ? 2 : undefined))
       .toString('base64');
 
-    const blob = await axios.post(`${githubApiUrl}/repos/${owner}/${repo}/git/blobs`, {
+    const blob = await axios.post(`${FOLDER_URL}/git/blobs`, {
       content: fileContentEncoded,
       encoding: 'base64',
     }, headers);
 
-    const baseTree = await axios.get(`${githubApiUrl}/repos/${owner}/${repo}/git/trees/master`, headers);
+    const baseTree = await axios.get(`${FOLDER_URL}/git/trees/master`, headers);
 
-    const newTree = await axios.post(`${githubApiUrl}/repos/${owner}/${repo}/git/trees`, {
+    const newTree = await axios.post(`${FOLDER_URL}/git/trees`, {
       base_tree: baseTree.data.sha,
       tree: [
         {
@@ -74,13 +70,13 @@ export async function writeLargeFileToGitHub(
       message = 'Add large file';
     }
 
-    const commit = await axios.post(`${githubApiUrl}/repos/${owner}/${repo}/git/commits`, {
+    const commit = await axios.post(`${FOLDER_URL}/git/commits`, {
       message,
       parents: [baseTree.data.sha],
       tree: newTree.data.sha,
     }, headers);
 
-    await axios.patch(`${githubApiUrl}/repos/${owner}/${repo}/git/refs/heads/master`, {
+    await axios.patch(`${FOLDER_URL}/git/refs/heads/master`, {
       sha: commit.data.sha,
     }, headers);
 

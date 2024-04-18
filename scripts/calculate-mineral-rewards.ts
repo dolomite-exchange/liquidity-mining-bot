@@ -80,7 +80,7 @@ const VALID_REWARD_MULTIPLIERS_MAP = {
 const MAX_MULTIPLIER = new BigNumber('5');
 
 export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)): Promise<void> {
-  const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>('scripts/config/mineral-season-0.json');
+  const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>('config/mineral-season-0.json');
   if (Number.isNaN(epoch) || !liquidityMiningConfig.epochs[epoch]) {
     return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
   }
@@ -257,7 +257,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     // TODO: write merkle root to chain
     // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds for an update)
 
-    const metadataFilePath = 'scripts/finalized/minerals/metadata.json';
+    const metadataFilePath = 'finalized/minerals/metadata.json';
     const metadata = await readFileFromGitHub<MineralMetadata>(metadataFilePath);
 
     // Once the merkle root is written, update the metadata to the new highest epoch that is finalized

@@ -23,7 +23,7 @@ export interface MineralConfigFile {
 /**
  * path cannot start with a "/"
  */
-const FILE_NAME_WITH_PATH = `scripts/config/mineral-season-0.json`;
+const FILE_NAME_WITH_PATH = `config/mineral-season-0.json`;
 const ONE_WEEK = 604_800;
 
 export async function calculateMineralSeasonConfig(skipConfigUpdate: boolean = false): Promise<number> {
