@@ -19,7 +19,7 @@ export interface MineralConfigFile {
   };
 }
 
-const FOLDER_URL = 'https://raw.githubusercontent.com/dolomite-exchange/liquidity-mining-bot/master';
+const FOLDER_URL = 'https://api.github.com/repos/dolomite-exchange/liquidity-mining-bot/contents';
 
 export function writeFileLocally(
   filePath: string,
@@ -31,8 +31,12 @@ export function writeFileLocally(
 }
 
 export async function readFileFromGitHub<T>(filePath: string): Promise<T> {
-  const response = await axios.get(`${FOLDER_URL}/${filePath}`);
-  return response.data as T;
+  const headers = {
+    Accept: 'application/vnd.github.v3.raw',
+    Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+  };
+  const response = await axios.get(`${FOLDER_URL}/${filePath}`, { headers });
+  return response.data;
 }
 
 export async function writeLargeFileToGitHub(

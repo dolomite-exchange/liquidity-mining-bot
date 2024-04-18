@@ -2,6 +2,10 @@ import { getLatestBlockNumberByTimestamp } from '../src/clients/blocks';
 import './lib/env-reader';
 import { MineralConfigFile, readFileFromGitHub, writeLargeFileToGitHub } from './lib/file-helpers';
 
+export interface MineralConfig {
+
+}
+
 /**
  * path cannot start with a "/"
  */
@@ -23,12 +27,11 @@ export async function calculateMineralSeasonConfig(): Promise<number> {
   }
 
   const oldEpoch = outputFile.epochs[maxKey];
-  const { startTimestamp, startBlockNumber, endBlockNumber, endTimestamp, oTokenAmount, rewardWeights } = oldEpoch;
 
   const newEpoch = oldEpoch.isFinalized ? maxKey + 1 : maxKey;
-  const newStartTimestamp = oldEpoch.isFinalized ? endTimestamp : startTimestamp;
-  const newStartBlockNumber = oldEpoch.isFinalized ? endBlockNumber : startBlockNumber;
-  const newEndTimestamp = Math.min(newStartTimestamp + ONE_WEEK, Math.floor(Date.now() / 1000))
+  const newStartTimestamp = oldEpoch.isFinalized ? oldEpoch.endTimestamp : oldEpoch.startTimestamp;
+  const newStartBlockNumber = oldEpoch.isFinalized ? oldEpoch.endBlockNumber : oldEpoch.startBlockNumber;
+  const newEndTimestamp = newStartTimestamp + ONE_WEEK
   const blockResult = await getLatestBlockNumberByTimestamp(newEndTimestamp);
   const isFinalized = newEndTimestamp === blockResult.timestamp;
 
@@ -43,8 +46,6 @@ export async function calculateMineralSeasonConfig(): Promise<number> {
           startTimestamp: newStartTimestamp,
           endBlockNumber: blockResult.blockNumber,
           endTimestamp: blockResult.timestamp,
-          oTokenAmount,
-          rewardWeights,
           isFinalized,
         },
       },
