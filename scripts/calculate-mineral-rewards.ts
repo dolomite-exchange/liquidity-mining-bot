@@ -14,11 +14,12 @@ import {
   getArbVestingLiquidityPositionAndEvents,
   getBalanceChangingEvents,
 } from './lib/event-parser';
-import { MineralConfigFile, readFileFromGitHub, writeFileLocally } from './lib/file-helpers';
+import { MineralConfigFile, readFileFromGitHub, writeLargeFileToGitHub } from './lib/file-helpers';
 import {
   ARB_VESTER_PROXY,
   calculateFinalPoints,
-  calculateLiquidityPoints, calculateMerkleRootAndProofs,
+  calculateLiquidityPoints,
+  calculateMerkleRootAndProofs,
   calculateTotalRewardPoints,
   ETH_USDC_POOL,
   InterestOperation,
@@ -26,6 +27,18 @@ import {
 } from './lib/rewards';
 
 /* eslint-enable */
+
+interface EpochStatus {
+  merkleRootGenerated: boolean;
+  merkleRootWrittenOnChain: boolean;
+}
+
+interface MineralMetadata {
+  maxEpochNumber: number;
+  epochStatuses: {
+    [epochNumber: string]: EpochStatus;
+  };
+}
 
 interface UserMineralAllocation {
   minerals: Integer; // big int
@@ -40,17 +53,17 @@ interface UserMineralAllocationForFile {
 
 interface MineralOutputFile {
   users: {
-    [walletAddressLowercase: string]: UserMineralAllocationForFile
+    [walletAddressLowercase: string]: UserMineralAllocationForFile;
   };
   metadata: {
-    merkleRoot: string;
-    marketIds: number[]
-    marketNames: string[]
-    totalPoints: string // big int
-    startBlock: number
-    endBlock: number
-    startTimestamp: number
-    endTimestamp: number
+    merkleRoot: string | null;
+    marketIds: number[];
+    marketNames: string[];
+    totalPoints: string; // big int
+    startBlock: number;
+    endBlock: number;
+    startTimestamp: number;
+    endTimestamp: number;
   };
 }
 
@@ -65,7 +78,7 @@ const VALID_REWARD_MULTIPLIERS_MAP = {
 };
 const MAX_MULTIPLIER = new BigNumber('5');
 
-async function start(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)) {
+export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)): Promise<void> {
   const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>('scripts/config/mineral-season-0.json');
   if (Number.isNaN(epoch) || !liquidityMiningConfig.epochs[epoch]) {
     return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
@@ -94,7 +107,7 @@ async function start(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)) {
   }
 
   Logger.info({
-    message: 'DolomiteMargin data',
+    message: 'Mineral rewards data',
     blockRewardStart: startBlockNumber,
     blockRewardStartTimestamp: startTimestamp,
     blockRewardEnd: endBlockNumber,
@@ -174,19 +187,39 @@ async function start(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)) {
   );
 
   const userToMineralsDataMap = await calculateFinalMinerals(userToPointsMap, epoch);
-  const userToAmountMap = Object.keys(userToMineralsDataMap).reduce((memo, k) => {
-    memo[k] = userToMineralsDataMap[k].minerals;
-    return memo;
-  }, {})
-  const { merkleRoot, walletAddressToLeavesMap } = calculateMerkleRootAndProofs(userToAmountMap);
-  const userToMineralsMapForFile = Object.keys(walletAddressToLeavesMap).reduce((memo, k) => {
-    memo[k] = {
-      minerals: walletAddressToLeavesMap[k].amount,
-      multiplier: userToMineralsDataMap[k].multiplier.toFixed(2),
-      proofs: walletAddressToLeavesMap[k].proofs,
-    }
-    return memo;
-  }, {});
+
+  let merkleRoot: string | null;
+  let userToMineralsMapForFile: any;
+  if (isFinalized) {
+    const userToAmountMap = Object.keys(userToMineralsDataMap).reduce((memo, k) => {
+      memo[k] = userToMineralsDataMap[k].minerals;
+      return memo;
+    }, {});
+    const {
+      merkleRoot: calculatedMerkleRoot,
+      walletAddressToLeavesMap,
+    } = calculateMerkleRootAndProofs(userToAmountMap);
+
+    merkleRoot = calculatedMerkleRoot;
+    userToMineralsMapForFile = Object.keys(walletAddressToLeavesMap).reduce((memo, k) => {
+      memo[k] = {
+        minerals: walletAddressToLeavesMap[k].amount,
+        multiplier: userToMineralsDataMap[k].multiplier.toFixed(2),
+        proofs: walletAddressToLeavesMap[k].proofs,
+      }
+      return memo;
+    }, {});
+  } else {
+    merkleRoot = null;
+    userToMineralsMapForFile = Object.keys(userToMineralsDataMap).reduce((memo, k) => {
+      memo[k] = {
+        minerals: userToMineralsDataMap[k].minerals.toFixed(),
+        multiplier: userToMineralsDataMap[k].multiplier.toFixed(2),
+        proofs: [],
+      }
+      return memo;
+    }, {});
+  }
 
   const validMarketIds = Object.keys(VALID_REWARD_MULTIPLIERS_MAP).map(m => parseInt(m));
   const marketNames = await Promise.all(
@@ -212,14 +245,25 @@ async function start(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)) {
       endTimestamp: endTimestamp,
     },
   };
-  // writeLargeFileToGitHub(fileName, dataToWrite);
-  writeFileLocally(`${__dirname}/${fileName}`, JSON.stringify(mineralOutputFile));
+  await writeLargeFileToGitHub(fileName, mineralOutputFile, false);
 
-  if (isFinalized) {
-    // TODO: write merkle root to chain
+  const metadataFilePath = 'scripts/finalized/minerals/metadata.json';
+  const metadata = await readFileFromGitHub<MineralMetadata>(metadataFilePath);
+  let epochStatus: EpochStatus = metadata.epochStatuses[epoch];
+  if (!epochStatus) {
+    epochStatus = {
+      merkleRootWrittenOnChain: false,
+      merkleRootGenerated: isFinalized,
+    };
+    metadata.epochStatuses[epoch] = epochStatus;
   }
 
-  return true;
+  epochStatus.merkleRootGenerated = isFinalized;
+  await writeLargeFileToGitHub(metadataFilePath, metadata, true)
+
+  if (epochStatus.merkleRootGenerated && !epochStatus.merkleRootWrittenOnChain) {
+    // TODO: write merkle root to chain
+  }
 }
 
 async function calculateFinalMinerals(
@@ -263,7 +307,7 @@ function getFileNameByEpoch(epoch: number): string {
 }
 
 if (process.env.MINERALS_ENABLED !== 'true') {
-  start()
+  calculateMineralRewards()
     .then(() => {
       console.log('Finished executing script!');
     })

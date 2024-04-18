@@ -1,3 +1,5 @@
 {
-  "maxEpochNumber": 0
+  "maxEpochNumber": 0,
+  "epochStatuses": {
+  }
 }
