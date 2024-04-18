@@ -3,7 +3,7 @@ import { calculateMineralSeasonConfig } from '../../scripts/calculate-mineral-se
 import { delay } from './delay';
 import Logger from './logger';
 
-const SHORT_WAIT_DURATION = 30 * 1_000; // 30 seconds in millis
+const SHORT_WAIT_DURATION = 60 * 1_000; // 60 seconds in millis
 const LONG_WAIT_DURATION = 3_540 * 1_000; // 59 minutes in millis
 
 export default class MineralsUpdater {
