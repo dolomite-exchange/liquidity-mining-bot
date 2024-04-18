@@ -38,6 +38,7 @@ checkBigNumber('INITIAL_GAS_PRICE_WEI');
 checkBooleanValue('LEVEL_REQUESTS_ENABLED');
 checkDuration('LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS', 1, false);
 checkDuration('LEVEL_REQUESTS_POLL_INTERVAL_MS', 1000, true);
+checkBooleanValue('MINERALS_ENABLED');
 checkJsNumber('NETWORK_ID');
 checkDuration('SEQUENTIAL_TRANSACTION_DELAY_MS', 100);
 checkExists('SUBGRAPH_URL');
@@ -98,6 +99,7 @@ async function start() {
     levelRequestsEnabled: process.env.LEVEL_REQUESTS_ENABLED,
     levelRequestsKeyExpirationSeconds: process.env.LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS,
     levelRequestsPollIntervalMillis: process.env.LEVEL_REQUESTS_POLL_INTERVAL_MS,
+    mineralsEnabled: process.env.MINERALS_ENABLED,
     networkId,
     sequentialTransactionDelayMillis: process.env.SEQUENTIAL_TRANSACTION_DELAY_MS,
     subgraphUrl: process.env.SUBGRAPH_URL,

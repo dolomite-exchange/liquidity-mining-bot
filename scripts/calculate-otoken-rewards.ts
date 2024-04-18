@@ -23,7 +23,7 @@ import {
   calculateLiquidityPoints,
   calculateMerkleRootAndProofs,
   calculateTotalRewardPoints,
-  ETH_USDC_POOL,
+  ETH_USDC_POOL, InterestOperation,
   LiquidityPositionsAndEvents,
 } from './lib/rewards';
 
@@ -49,7 +49,9 @@ interface OutputFile {
 
 const FOLDER_NAME = `${__dirname}/output`;
 
-const MINIMUM_OARB_AMOUNT_WEI = new BigNumber(ethers.utils.parseEther('0.01').toString());
+const MINIMUM_O_TOKEN_AMOUNT_WEI = new BigNumber(ethers.utils.parseEther('0.01').toString());
+
+const REWARD_MULTIPLIERS_MAP = {};
 
 async function start() {
   const epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
@@ -72,7 +74,7 @@ async function start() {
 
   const totalOARbAmount = new BigNumber(liquidityMiningConfig.epochs[epoch].oArbAmount);
   const rewardWeights = liquidityMiningConfig.epochs[epoch].rewardWeights as Record<string, string>;
-  const [oArbRewardWeiMap, sumOfWeights] = Object.keys(rewardWeights)
+  const [oTokenRewardWeiMap, sumOfWeights] = Object.keys(rewardWeights)
     .reduce<[Record<string, BigNumber>, BigNumber]>(([acc, sum], key) => {
       acc[key] = new BigNumber(parseEther(rewardWeights[key]).toString());
       return [acc, sum.plus(rewardWeights[key])];
@@ -112,25 +114,30 @@ async function start() {
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
 
-  await marketStore._update();
+  await marketStore._update(startBlockNumber);
+  const startMarketMap = marketStore.getMarketMap();
+  const startMarketIndexMap = await marketStore.getMarketIndexMap(startMarketMap, { blockNumber: startBlockNumber });
 
-  const marketMap = marketStore.getMarketMap();
-  const marketIndexMap = await marketStore.getMarketIndexMap(marketMap);
+  await marketStore._update(endBlockNumber);
+  const endMarketMap = marketStore.getMarketMap();
+  const endMarketIndexMap = await marketStore.getMarketIndexMap(endMarketMap, { blockNumber: endBlockNumber });
 
   const apiAccounts = await Pageable.getPageableValues(async (lastId) => {
-    const result = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, startBlockNumber, lastId);
+    const result = await getAllDolomiteAccountsWithSupplyValue(startMarketIndexMap, startBlockNumber, lastId);
     return result.accounts;
   });
 
-  const accountToDolomiteBalanceMap = getAccountBalancesByMarket(apiAccounts, startTimestamp);
+  const accountToDolomiteBalanceMap = getAccountBalancesByMarket(apiAccounts, startTimestamp, REWARD_MULTIPLIERS_MAP);
 
   const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
 
   const totalPointsPerMarket = calculateTotalRewardPoints(
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
-    startTimestamp,
+    endMarketIndexMap,
+    REWARD_MULTIPLIERS_MAP,
     endTimestamp,
+    InterestOperation.NOTHING,
   );
 
   const ammLiquidityBalancesAndEvents = await getAmmLiquidityPositionAndEvents(
@@ -156,16 +163,16 @@ async function start() {
     endTimestamp,
   );
 
-  const userToOArbRewards = calculateFinalRewards(
+  const userToOTokenRewards = calculateFinalRewards(
     accountToDolomiteBalanceMap,
     poolToVirtualLiquidityPositionsAndEvents,
     totalPointsPerMarket,
     poolToTotalSubLiquidityPoints,
-    oArbRewardWeiMap,
-    MINIMUM_OARB_AMOUNT_WEI,
+    oTokenRewardWeiMap,
+    MINIMUM_O_TOKEN_AMOUNT_WEI,
   );
 
-  const { merkleRoot, walletAddressToLeavesMap } = calculateMerkleRootAndProofs(userToOArbRewards);
+  const { merkleRoot, walletAddressToLeavesMap } = calculateMerkleRootAndProofs(userToOTokenRewards);
 
   const fileName = `${FOLDER_NAME}/oarb-season-0-epoch-${epoch}-output.json`;
   const dataToWrite = readOutputFile(fileName);

@@ -78,7 +78,7 @@ async function start() {
     'total DONE non-free oToken',
     result.otherDone.reduce((acc, p) => acc.plus(p.oTokenAmount), INTEGERS.ZERO),
     '\n\tETH spent',
-    result.otherDone.reduce((acc, p) => acc.plus(p.ethSpent), INTEGERS.ZERO),
+    result.otherDone.reduce((acc, p) => acc.plus(p.otherTokenSpent), INTEGERS.ZERO),
   );
   const nonFreeNotDoneOToken = result.otherNotDone.reduce((acc, p) => acc.plus(p.oTokenAmount), INTEGERS.ZERO);
   console.log(

@@ -1,4 +1,4 @@
-import { BigNumber } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import fs from 'fs';
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue } from '../src/clients/dolomite';
@@ -8,21 +8,23 @@ import { ONE_ETH_WEI } from '../src/lib/constants';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
+import TokenAbi from './abis/isolation-mode-factory.json';
 import liquidityMiningConfig from './config/oarb-season-0.json';
 import './lib/env-reader';
 import {
   getAccountBalancesByMarket,
+  getAmmLiquidityPositionAndEvents,
+  getArbVestingLiquidityPositionAndEvents,
   getBalanceChangingEvents,
-  getAmmLiquidityPositionAndEvents, getArbVestingLiquidityPositionAndEvents,
 } from './lib/event-parser';
 import {
   ARB_VESTER_PROXY,
   calculateFinalPoints,
   calculateLiquidityPoints,
-  calculateTotalRewardPoints, ETH_USDC_POOL,
+  calculateTotalRewardPoints,
+  ETH_USDC_POOL, InterestOperation,
   LiquidityPositionsAndEvents,
 } from './lib/rewards';
-import TokenAbi from './abis/isolation-mode-factory.json';
 
 /* eslint-enable */
 
@@ -54,6 +56,10 @@ async function start() {
     return Promise.reject(new Error(`Invalid MARKET_ID, found: ${process.env.MARKET_ID}`));
   } else if (validMarketId >= maxMarketId) {
     return Promise.reject(new Error(`MARKET_ID contains an element that is too large, found: ${validMarketId}`));
+  }
+
+  const validRewardMultipliersMap = {
+    [validMarketId]: INTEGERS.ONE,
   }
 
   const blockStore = new BlockStore();
@@ -89,25 +95,30 @@ async function start() {
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
 
-  await marketStore._update();
+  await marketStore._update(startBlockNumber);
+  const startMarketMap = marketStore.getMarketMap();
+  const startMarketIndexMap = await marketStore.getMarketIndexMap(startMarketMap, { blockNumber: startBlockNumber });
 
-  const marketMap = marketStore.getMarketMap();
-  const marketIndexMap = await marketStore.getMarketIndexMap(marketMap);
+  await marketStore._update(endBlockNumber);
+  const endMarketMap = marketStore.getMarketMap();
+  const endMarketIndexMap = await marketStore.getMarketIndexMap(endMarketMap, { blockNumber: endBlockNumber });
 
   const apiAccounts = await Pageable.getPageableValues(async (lastId) => {
-    const result = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, startBlockNumber, lastId);
+    const result = await getAllDolomiteAccountsWithSupplyValue(startMarketIndexMap, startBlockNumber, lastId);
     return result.accounts;
   });
 
-  const accountToDolomiteBalanceMap = getAccountBalancesByMarket(apiAccounts, startTimestamp);
+  const accountToDolomiteBalanceMap = getAccountBalancesByMarket(apiAccounts, startTimestamp, validRewardMultipliersMap);
 
   const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
 
   const totalPointsPerMarket = calculateTotalRewardPoints(
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
-    startTimestamp,
+    endMarketIndexMap,
+    validRewardMultipliersMap,
     endTimestamp,
+    InterestOperation.NOTHING,
   );
   const allMarketIds = Object.keys(totalPointsPerMarket);
   allMarketIds.forEach(marketId => {
@@ -141,7 +152,7 @@ async function start() {
 
   const userToPointsMap = calculateFinalPoints(
     accountToDolomiteBalanceMap,
-    validMarketId,
+    validRewardMultipliersMap,
     poolToVirtualLiquidityPositionsAndEvents,
     poolToTotalSubLiquidityPoints,
   );

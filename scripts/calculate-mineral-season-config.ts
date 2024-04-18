@@ -1,31 +1,18 @@
-import fs from 'fs';
 import { getLatestBlockNumberByTimestamp } from '../src/clients/blocks';
 import './lib/env-reader';
+import { MineralConfigFile, readFileFromGitHub, writeLargeFileToGitHub } from './lib/file-helpers';
 
-interface OutputFile {
-  epochs: {
-    [epoch: string]: {
-      epoch: number;
-      startTimestamp: number;
-      endTimestamp: number;
-      startBlockNumber: number;
-      endBlockNumber: number;
-      oTokenAmount: string;
-      rewardWeights: Record<string, string>;
-      isFinalized: boolean;
-    }
-  };
-}
-
-const FOLDER_NAME = `${__dirname}/config`;
-const FILE_NAME = `${FOLDER_NAME}/oarb-season-0.json`;
+/**
+ * path cannot start with a "/"
+ */
+const FILE_NAME_WITH_PATH = `scripts/config/mineral-season-0.json`;
 const ONE_WEEK = 604_800;
 
-async function start() {
-  const outputFile = readOutputFile(FILE_NAME);
-  const selectedEpoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
-  let maxKey = selectedEpoch
-  if (isNaN(selectedEpoch)) {
+export async function calculateMineralSeasonConfig(): Promise<number> {
+  const outputFile = await readFileFromGitHub<MineralConfigFile>(FILE_NAME_WITH_PATH);
+  const epochNumber: number = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
+  let maxKey = epochNumber
+  if (isNaN(epochNumber)) {
     maxKey = Object.keys(outputFile.epochs).reduce((max, key) => {
       const value = parseInt(key, 10);
       if (value >= 900) {
@@ -45,55 +32,36 @@ async function start() {
   const blockResult = await getLatestBlockNumberByTimestamp(newEndTimestamp);
   const isFinalized = newEndTimestamp === blockResult.timestamp;
 
-  writeOutputFile(FILE_NAME, {
-    epochs: {
-      ...outputFile.epochs,
-      [newEpoch]: {
-        epoch: newEpoch,
-        startBlockNumber: newStartBlockNumber,
-        startTimestamp: newStartTimestamp,
-        endBlockNumber: blockResult.blockNumber,
-        endTimestamp: blockResult.timestamp,
-        oTokenAmount,
-        rewardWeights,
-        isFinalized,
+  await writeLargeFileToGitHub(
+    FILE_NAME_WITH_PATH,
+    {
+      epochs: {
+        ...outputFile.epochs,
+        [newEpoch]: {
+          epoch: newEpoch,
+          startBlockNumber: newStartBlockNumber,
+          startTimestamp: newStartTimestamp,
+          endBlockNumber: blockResult.blockNumber,
+          endTimestamp: blockResult.timestamp,
+          oTokenAmount,
+          rewardWeights,
+          isFinalized,
+        },
       },
     },
-  });
-
-  return true;
-}
-
-function readOutputFile(fileName: string): OutputFile {
-  try {
-    return JSON.parse(fs.readFileSync(fileName, 'utf8')) as OutputFile;
-  } catch (e) {
-    return {
-      epochs: {},
-    };
-  }
-}
-
-function writeOutputFile(
-  fileName: string,
-  fileContent: OutputFile,
-): void {
-  if (!fs.existsSync(FOLDER_NAME)) {
-    fs.mkdirSync(FOLDER_NAME);
-  }
-
-  fs.writeFileSync(
-    fileName,
-    JSON.stringify(fileContent, null, 2),
-    { encoding: 'utf8', flag: 'w' },
+    true,
   );
+
+  return maxKey;
 }
 
-start()
-  .then(() => {
-    console.log('Finished executing script!');
-  })
-  .catch(error => {
-    console.error(`Found error while starting: ${error.toString()}`, error);
-    process.exit(1);
-  });
+if (process.env.MINERALS_ENABLED !== 'true') {
+  calculateMineralSeasonConfig()
+    .then(() => {
+      console.log('Finished executing script!');
+    })
+    .catch(error => {
+      console.error(`Found error while starting: ${error.toString()}`, error);
+      process.exit(1);
+    });
+}

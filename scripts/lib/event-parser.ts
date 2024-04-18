@@ -1,4 +1,4 @@
-import { BigNumber } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Decimal, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import {
   getDeposits,
   getLiquidations,
@@ -10,7 +10,15 @@ import {
   getVestingPositionTransfers,
   getWithdrawals,
 } from '../../src/clients/dolomite';
-import { ApiAccount, ApiDeposit, ApiLiquidation, ApiTrade, ApiTransfer, ApiWithdrawal } from '../../src/lib/api-types';
+import {
+  ApiAccount,
+  ApiDeposit,
+  ApiLiquidation,
+  ApiMarginAccount,
+  ApiTrade,
+  ApiTransfer,
+  ApiWithdrawal,
+} from '../../src/lib/api-types';
 import Pageable from '../../src/lib/pageable';
 import {
   AccountSubAccountToMarketToBalanceMap,
@@ -21,15 +29,18 @@ import {
   BalanceChangeEvent,
   BalanceChangeType,
   LiquidityPositionsAndEvents,
+  VirtualBalanceAndRewardPoints,
   VirtualLiquidityPosition,
   VirtualLiquiditySnapshotBalance,
   VirtualLiquiditySnapshotDeltaPar,
 } from './rewards';
 
-const ZERO = new BigNumber('0');
+const TEN = new BigNumber(10);
+
 export function getAccountBalancesByMarket(
   accounts: ApiAccount[],
-  blockRewardStartTimestamp: number,
+  startTimestamp: number,
+  rewardMultipliersMap: Record<string, Decimal>,
 ): AccountSubAccountToMarketToBalanceMap {
   const accountToDolomiteBalanceMap: AccountSubAccountToMarketToBalanceMap = {};
   accounts.forEach(account => {
@@ -41,9 +52,11 @@ export function getAccountBalancesByMarket(
 
     Object.values(account.balances).forEach(balance => {
       accountToDolomiteBalanceMap[accountOwner]![accountNumber]![balance.marketId] = new BalanceAndRewardPoints(
-        blockRewardStartTimestamp,
         account.effectiveUser,
-        balance.par.dividedBy(new BigNumber(10).pow(balance.tokenDecimals)),
+        rewardMultipliersMap[balance.marketId] ?? INTEGERS.ONE,
+        balance.marketId,
+        startTimestamp,
+        balance.par.dividedBy(TEN.pow(balance.tokenDecimals)), // convert to Decimals from "BigInt" format
       );
     });
   });
@@ -51,37 +64,37 @@ export function getAccountBalancesByMarket(
 }
 
 export async function getBalanceChangingEvents(
-  rewardsStartBlockNumber: number,
-  rewardsEndBlockNumber: number,
+  startBlockNumber: number,
+  endBlockNumber: number,
 ): Promise<AccountToSubAccountMarketToBalanceChangeMap> {
   const accountToAssetToEventsMap: AccountToSubAccountMarketToBalanceChangeMap = {};
 
   const deposits = await Pageable.getPageableValues((async (lastId) => {
-    const results = await getDeposits(rewardsStartBlockNumber, rewardsEndBlockNumber, lastId);
+    const results = await getDeposits(startBlockNumber, endBlockNumber, lastId);
     return results.deposits;
   }));
   parseDeposits(accountToAssetToEventsMap, deposits);
 
   const withdrawals = await Pageable.getPageableValues((async (lastId) => {
-    const results = await getWithdrawals(rewardsStartBlockNumber, rewardsEndBlockNumber, lastId);
+    const results = await getWithdrawals(startBlockNumber, endBlockNumber, lastId);
     return results.withdrawals;
   }));
   parseWithdrawals(accountToAssetToEventsMap, withdrawals);
 
   const transfers = await Pageable.getPageableValues((async (lastId) => {
-    const results = await getTransfers(rewardsStartBlockNumber, rewardsEndBlockNumber, lastId);
+    const results = await getTransfers(startBlockNumber, endBlockNumber, lastId);
     return results.transfers;
   }));
   parseTransfers(accountToAssetToEventsMap, transfers);
 
   const trades = await Pageable.getPageableValues((async (lastId) => {
-    const results = await getTrades(rewardsStartBlockNumber, rewardsEndBlockNumber, lastId);
+    const results = await getTrades(startBlockNumber, endBlockNumber, lastId);
     return results.trades;
   }));
   parseTrades(accountToAssetToEventsMap, trades);
 
   const liquidations = await Pageable.getPageableValues((async (lastId) => {
-    const results = await getLiquidations(rewardsStartBlockNumber, rewardsEndBlockNumber, lastId);
+    const results = await getLiquidations(startBlockNumber, endBlockNumber, lastId);
     return results.liquidations;
   }));
   parseLiquidations(accountToAssetToEventsMap, liquidations);
@@ -92,28 +105,29 @@ export async function getBalanceChangingEvents(
 type VirtualLiquiditySnapshotInternal = VirtualLiquiditySnapshotBalance | VirtualLiquiditySnapshotDeltaPar;
 
 export async function getAmmLiquidityPositionAndEvents(
-  rewardsStartBlockNumber: number,
-  blockRewardStartTimestamp: number,
-  blockRewardEndTimestamp: number,
+  startBlockNumber: number,
+  startTimestamp: number,
+  endTimestamp: number,
 ): Promise<LiquidityPositionsAndEvents> {
   const virtualLiquidityBalances: AccountToVirtualLiquidityBalanceMap = {};
   const userToLiquiditySnapshots: AccountToVirtualLiquiditySnapshotsMap = {};
   const virtualLiquidityPositions = await Pageable.getPageableValues<VirtualLiquidityPosition>((async (lastId) => {
-    const results = await getLiquidityPositions(rewardsStartBlockNumber - 1, lastId);
-    return results.ammLiquidityPositions.map(position => ({
+    const results = await getLiquidityPositions(startBlockNumber - 1, lastId);
+    return results.ammLiquidityPositions.map<VirtualLiquidityPosition>(position => ({
       id: position.id,
       effectiveUser: position.effectiveUser,
-      balance: new BigNumber(position.balance),
+      marketId: -1,
+      balancePar: position.balance,
     }));
   }));
   parseVirtualLiquidityPositions(
     virtualLiquidityBalances,
     virtualLiquidityPositions,
-    blockRewardStartTimestamp,
+    startTimestamp,
   );
 
   const ammLiquiditySnapshots = await Pageable.getPageableValues<VirtualLiquiditySnapshotInternal>((async (lastId) => {
-    const { snapshots } = await getLiquiditySnapshots(blockRewardStartTimestamp, blockRewardEndTimestamp, lastId);
+    const { snapshots } = await getLiquiditySnapshots(startTimestamp, endTimestamp, lastId);
     return snapshots.map<VirtualLiquiditySnapshotInternal>(snapshot => ({
       id: snapshot.id,
       effectiveUser: snapshot.effectiveUser,
@@ -127,31 +141,32 @@ export async function getAmmLiquidityPositionAndEvents(
 }
 
 export async function getArbVestingLiquidityPositionAndEvents(
-  rewardsStartBlockNumber: number,
-  blockRewardStartTimestamp: number,
-  blockRewardEndTimestamp: number,
+  startBlockNumber: number,
+  startTimestamp: number,
+  endTimestamp: number,
 ): Promise<LiquidityPositionsAndEvents> {
   const virtualLiquidityBalances: AccountToVirtualLiquidityBalanceMap = {};
   const userToLiquiditySnapshots: AccountToVirtualLiquiditySnapshotsMap = {};
   const vestingPositions = await Pageable.getPageableValues<VirtualLiquidityPosition>((async (lastId) => {
-    const results = await getLiquidityMiningVestingPositions(rewardsStartBlockNumber - 1, lastId);
+    const results = await getLiquidityMiningVestingPositions(startBlockNumber - 1, lastId);
     return results.liquidityMiningVestingPositions.map<VirtualLiquidityPosition>(position => ({
       id: position.id,
       effectiveUser: position.effectiveUser,
-      balance: position.amountPar,
+      marketId: position.marketId,
+      balancePar: position.amountPar,
     }));
   }));
   parseVirtualLiquidityPositions(
     virtualLiquidityBalances,
     vestingPositions,
-    blockRewardStartTimestamp,
+    startTimestamp,
   );
 
   const vestingPositionSnapshots = await Pageable.getPageableValues<VirtualLiquiditySnapshotInternal>(
     (async (lastId) => {
       const { vestingPositionTransfers } = await getVestingPositionTransfers(
-        blockRewardStartTimestamp,
-        blockRewardEndTimestamp,
+        startTimestamp,
+        endTimestamp,
         lastId,
       );
       return vestingPositionTransfers.reduce<VirtualLiquiditySnapshotInternal[]>((acc, transfer) => {
@@ -161,7 +176,7 @@ export async function getArbVestingLiquidityPositionAndEvents(
             id: transfer.id,
             effectiveUser: transfer.fromEffectiveUser,
             timestamp: transfer.timestamp,
-            deltaPar: ZERO.minus(transfer.amount),
+            deltaPar: transfer.amount.negated(),
           });
         }
         if (transfer.toEffectiveUser) {
@@ -188,6 +203,7 @@ export function parseDeposits(
   deposits.forEach((deposit) => {
     const event: BalanceChangeEvent = {
       amountDeltaPar: deposit.amountDeltaPar,
+      interestIndex: deposit.interestIndex,
       timestamp: deposit.timestamp,
       serialId: deposit.serialId,
       effectiveUser: deposit.effectiveUser,
@@ -195,8 +211,7 @@ export function parseDeposits(
     };
     addEventToUser(
       accountToAssetToEventsMap,
-      deposit.marginAccount.user,
-      deposit.marginAccount.accountNumber,
+      deposit.marginAccount,
       deposit.marketId,
       event,
     );
@@ -210,6 +225,7 @@ export function parseWithdrawals(
   withdrawals.forEach(withdrawal => {
     const event: BalanceChangeEvent = {
       amountDeltaPar: withdrawal.amountDeltaPar,
+      interestIndex: withdrawal.interestIndex,
       timestamp: withdrawal.timestamp,
       serialId: withdrawal.serialId,
       effectiveUser: withdrawal.effectiveUser,
@@ -217,8 +233,7 @@ export function parseWithdrawals(
     };
     addEventToUser(
       accountToAssetToEventsMap,
-      withdrawal.marginAccount.user,
-      withdrawal.marginAccount.accountNumber,
+      withdrawal.marginAccount,
       withdrawal.marketId,
       event,
     );
@@ -232,6 +247,7 @@ export function parseTransfers(
   transfers.forEach(transfer => {
     const fromEvent: BalanceChangeEvent = {
       amountDeltaPar: transfer.fromAmountDeltaPar,
+      interestIndex: transfer.interestIndex,
       timestamp: transfer.timestamp,
       serialId: transfer.serialId,
       effectiveUser: transfer.fromEffectiveUser,
@@ -239,14 +255,14 @@ export function parseTransfers(
     };
     addEventToUser(
       accountToAssetToEventsMap,
-      transfer.fromMarginAccount.user,
-      transfer.fromMarginAccount.accountNumber,
+      transfer.fromMarginAccount,
       transfer.marketId,
       fromEvent,
     );
 
     const toEvent: BalanceChangeEvent = {
       amountDeltaPar: transfer.toAmountDeltaPar,
+      interestIndex: transfer.interestIndex,
       timestamp: transfer.timestamp,
       serialId: transfer.serialId,
       effectiveUser: transfer.toEffectiveUser,
@@ -254,8 +270,7 @@ export function parseTransfers(
     };
     addEventToUser(
       accountToAssetToEventsMap,
-      transfer.toMarginAccount.user,
-      transfer.toMarginAccount.accountNumber,
+      transfer.toMarginAccount,
       transfer.marketId,
       toEvent,
     );
@@ -272,6 +287,7 @@ export function parseTrades(
     // Taker events
     const takerEventMinus: BalanceChangeEvent = {
       amountDeltaPar: trade.takerInputTokenDeltaPar,
+      interestIndex: trade.takerInterestIndex,
       timestamp: trade.timestamp,
       serialId: trade.serialId,
       effectiveUser: trade.takerEffectiveUser,
@@ -279,13 +295,13 @@ export function parseTrades(
     };
     addEventToUser(
       accountToAssetToEventsMap,
-      trade.takerMarginAccount.user,
-      trade.takerMarginAccount.accountNumber,
+      trade.takerMarginAccount,
       trade.takerMarketId,
       takerEventMinus,
     );
     const takerEventPlus: BalanceChangeEvent = {
       amountDeltaPar: trade.takerOutputTokenDeltaPar,
+      interestIndex: trade.makerInterestIndex,
       timestamp: trade.timestamp,
       serialId: trade.serialId,
       effectiveUser: trade.takerEffectiveUser,
@@ -293,8 +309,7 @@ export function parseTrades(
     };
     addEventToUser(
       accountToAssetToEventsMap,
-      trade.takerMarginAccount.user,
-      trade.takerMarginAccount.accountNumber,
+      trade.takerMarginAccount,
       trade.makerMarketId,
       takerEventPlus,
     );
@@ -304,7 +319,8 @@ export function parseTrades(
       return;
     }
     const makerEventMinus: BalanceChangeEvent = {
-      amountDeltaPar: ZERO.minus(trade.takerOutputTokenDeltaPar),
+      amountDeltaPar: trade.makerInputTokenDeltaPar,
+      interestIndex: trade.makerInterestIndex,
       timestamp: trade.timestamp,
       serialId: trade.serialId,
       effectiveUser: trade.makerEffectiveUser,
@@ -313,13 +329,13 @@ export function parseTrades(
 
     addEventToUser(
       accountToAssetToEventsMap,
-      trade.makerMarginAccount.user,
-      trade.makerMarginAccount.accountNumber,
+      trade.makerMarginAccount,
       trade.makerMarketId,
       makerEventMinus,
     );
     const makerEventPlus: BalanceChangeEvent = {
-      amountDeltaPar: ZERO.minus(trade.takerInputTokenDeltaPar),
+      amountDeltaPar: trade.makerOutputTokenDeltaPar,
+      interestIndex: trade.takerInterestIndex,
       timestamp: trade.timestamp,
       serialId: trade.serialId,
       effectiveUser: trade.makerEffectiveUser,
@@ -327,8 +343,7 @@ export function parseTrades(
     };
     addEventToUser(
       accountToAssetToEventsMap,
-      trade.makerMarginAccount.user,
-      trade.makerMarginAccount.accountNumber,
+      trade.makerMarginAccount,
       trade.takerMarketId,
       makerEventPlus,
     );
@@ -342,6 +357,7 @@ export function parseLiquidations(
   liquidations.forEach(liquidation => {
     const liquidUserCollateralEvent: BalanceChangeEvent = {
       amountDeltaPar: liquidation.liquidHeldTokenAmountDeltaPar,
+      interestIndex: liquidation.heldInterestIndex,
       timestamp: liquidation.timestamp,
       serialId: liquidation.serialId,
       effectiveUser: liquidation.liquidEffectiveUser,
@@ -349,14 +365,14 @@ export function parseLiquidations(
     };
     addEventToUser(
       accountToAssetToEventsMap,
-      liquidation.liquidMarginAccount.user,
-      liquidation.liquidMarginAccount.accountNumber,
+      liquidation.liquidMarginAccount,
       liquidation.heldMarketId,
       liquidUserCollateralEvent,
     );
 
-    const liquidUserDebtEvent: BalanceChangeEvent = {
+    const liquidUserBorrowedEvent: BalanceChangeEvent = {
       amountDeltaPar: liquidation.liquidBorrowedTokenAmountDeltaPar,
+      interestIndex: liquidation.borrowedInterestIndex,
       timestamp: liquidation.timestamp,
       serialId: liquidation.serialId,
       effectiveUser: liquidation.liquidEffectiveUser,
@@ -364,14 +380,14 @@ export function parseLiquidations(
     };
     addEventToUser(
       accountToAssetToEventsMap,
-      liquidation.liquidMarginAccount.user,
-      liquidation.liquidMarginAccount.accountNumber,
+      liquidation.liquidMarginAccount,
       liquidation.borrowedMarketId,
-      liquidUserDebtEvent,
+      liquidUserBorrowedEvent,
     );
 
     const solidUserCollateralEvent: BalanceChangeEvent = {
       amountDeltaPar: liquidation.solidHeldTokenAmountDeltaPar,
+      interestIndex: liquidation.heldInterestIndex,
       timestamp: liquidation.timestamp,
       serialId: liquidation.serialId,
       effectiveUser: liquidation.solidEffectiveUser,
@@ -379,14 +395,14 @@ export function parseLiquidations(
     };
     addEventToUser(
       accountToAssetToEventsMap,
-      liquidation.solidMarginAccount.user,
-      liquidation.solidMarginAccount.accountNumber,
+      liquidation.solidMarginAccount,
       liquidation.heldMarketId,
       solidUserCollateralEvent,
     );
 
-    const solidUserDebtEvent: BalanceChangeEvent = {
+    const solidUserBorrowedEvent: BalanceChangeEvent = {
       amountDeltaPar: liquidation.solidBorrowedTokenAmountDeltaPar,
+      interestIndex: liquidation.borrowedInterestIndex,
       timestamp: liquidation.timestamp,
       serialId: liquidation.serialId,
       effectiveUser: liquidation.solidEffectiveUser,
@@ -394,10 +410,9 @@ export function parseLiquidations(
     };
     addEventToUser(
       accountToAssetToEventsMap,
-      liquidation.solidMarginAccount.user,
-      liquidation.solidMarginAccount.accountNumber,
+      liquidation.solidMarginAccount,
       liquidation.borrowedMarketId,
-      solidUserDebtEvent,
+      solidUserBorrowedEvent,
     );
   });
 }
@@ -409,14 +424,14 @@ export function parseVirtualLiquidityPositions(
 ): void {
   virtualLiquidityPositions.forEach(position => {
     if (!userToVirtualLiquidityBalances[position.effectiveUser]) {
-      userToVirtualLiquidityBalances[position.effectiveUser] = new BalanceAndRewardPoints(
-        blockRewardStartTimestamp,
+      userToVirtualLiquidityBalances[position.effectiveUser] = new VirtualBalanceAndRewardPoints(
         position.effectiveUser,
-        new BigNumber(position.balance),
+        blockRewardStartTimestamp,
+        new BigNumber(position.balancePar),
       );
     } else {
       const balanceStruct = userToVirtualLiquidityBalances[position.effectiveUser]!;
-      balanceStruct!.balance = balanceStruct.balance.plus(position.balance);
+      balanceStruct!.balancePar = balanceStruct.balancePar.plus(position.balancePar);
     }
 
     // if (!userToLiquiditySnapshots[virtualLiquidityPosition.effectiveUser]) {
@@ -458,7 +473,7 @@ function addLiquiditySnapshotToUser(
     const userSnapshots = userToLiquiditySnapshots[user]!;
     let balanceParBefore: BigNumber;
     if (userSnapshots.length === 0 && virtualLiquidityBalanceMap[user]) {
-      balanceParBefore = virtualLiquidityBalanceMap[user]!.balance;
+      balanceParBefore = virtualLiquidityBalanceMap[user]!.balancePar;
     } else if (userSnapshots.length > 0) {
       balanceParBefore = userSnapshots[userSnapshots.length - 1].balancePar;
     } else {
@@ -478,11 +493,12 @@ function addLiquiditySnapshotToUser(
 
 function addEventToUser(
   accountToAssetToEventsMap: AccountToSubAccountMarketToBalanceChangeMap,
-  user: string,
-  accountNumber: string,
+  marginAccount: ApiMarginAccount,
   marketId: number,
   event: BalanceChangeEvent,
 ): void {
+  const user = marginAccount.user;
+  const accountNumber = marginAccount.accountNumber;
   accountToAssetToEventsMap[user] = accountToAssetToEventsMap[user] ?? {};
   accountToAssetToEventsMap[user]![accountNumber] = accountToAssetToEventsMap[user]![accountNumber] ?? {};
   if (accountToAssetToEventsMap[user]![accountNumber]![marketId]) {

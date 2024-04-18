@@ -131,7 +131,7 @@ describe('rewards', () => {
     it('should process one event properly if user already has balance', async () => {
       const points = new BalanceAndRewardPoints(0, user1, new BigNumber(5));
       points.processEvent(DEPOSIT_EVENT);
-      expect(points.balance).toEqual(new BigNumber(25));
+      expect(points.balancePar).toEqual(new BigNumber(25));
       expect(points.lastUpdated).toEqual(10);
       expect(points.rewardPoints).toEqual(new BigNumber(50));
     });
@@ -139,7 +139,7 @@ describe('rewards', () => {
     it('should process one event properly if user has no balance', async () => {
       const points = new BalanceAndRewardPoints(0, user1);
       points.processEvent(DEPOSIT_EVENT);
-      expect(points.balance).toEqual(new BigNumber(20));
+      expect(points.balancePar).toEqual(new BigNumber(20));
       expect(points.lastUpdated).toEqual(10);
       expect(points.rewardPoints).toEqual(new BigNumber(0));
     });
@@ -148,12 +148,12 @@ describe('rewards', () => {
       const points = new BalanceAndRewardPoints(0, user1, new BigNumber(5));
 
       points.processEvent(DEPOSIT_EVENT);
-      expect(points.balance).toEqual(new BigNumber(25));
+      expect(points.balancePar).toEqual(new BigNumber(25));
       expect(points.lastUpdated).toEqual(10);
       expect(points.rewardPoints).toEqual(new BigNumber(50));
 
       points.processEvent(WITHDRAWAL_EVENT);
-      expect(points.balance).toEqual(new BigNumber(15));
+      expect(points.balancePar).toEqual(new BigNumber(15));
       expect(points.lastUpdated).toEqual(15);
       expect(points.rewardPoints).toEqual(new BigNumber(175));
     });
@@ -162,7 +162,7 @@ describe('rewards', () => {
       const points = new BalanceAndRewardPoints(0, user1, new BigNumber(5));
 
       points.processEvent(FINAL_EVENT);
-      expect(points.balance).toEqual(new BigNumber(5));
+      expect(points.balancePar).toEqual(new BigNumber(5));
       expect(points.lastUpdated).toEqual(20);
       expect(points.rewardPoints).toEqual(new BigNumber(100));
     });
@@ -171,17 +171,17 @@ describe('rewards', () => {
       const points = new BalanceAndRewardPoints(0, user1, new BigNumber(5));
 
       points.processEvent(DEPOSIT_EVENT);
-      expect(points.balance).toEqual(new BigNumber(25));
+      expect(points.balancePar).toEqual(new BigNumber(25));
       expect(points.lastUpdated).toEqual(10);
       expect(points.rewardPoints).toEqual(new BigNumber(50));
 
       points.processEvent(WITHDRAWAL_EVENT);
-      expect(points.balance).toEqual(new BigNumber(15));
+      expect(points.balancePar).toEqual(new BigNumber(15));
       expect(points.lastUpdated).toEqual(15);
       expect(points.rewardPoints).toEqual(new BigNumber(175));
 
       points.processEvent(FINAL_EVENT);
-      expect(points.balance).toEqual(new BigNumber(15));
+      expect(points.balancePar).toEqual(new BigNumber(15));
       expect(points.lastUpdated).toEqual(20);
       expect(points.rewardPoints).toEqual(new BigNumber(250));
     });

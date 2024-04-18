@@ -1,1 +1,4 @@
 **/node_modules
+scripts/finalized
+scripts/output
+.env.*.local

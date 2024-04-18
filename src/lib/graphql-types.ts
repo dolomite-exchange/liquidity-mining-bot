@@ -33,6 +33,18 @@ export interface GraphqlAccount {
   tokenValues: GraphqlTokenValue[]
 }
 
+interface GraphqlMarginAccount {
+  user: {
+    id: string
+  }
+  accountNumber: string
+}
+
+interface InterestIndexSnapshot {
+  supplyIndex: string
+  borrowIndex: string
+}
+
 export interface GraphqlDeposit {
   id: string
   serialId: string
@@ -46,6 +58,9 @@ export interface GraphqlDeposit {
   token: {
     marketId: string
   }
+  marginAccount: GraphqlMarginAccount
+  amountDeltaWei: string
+  interestIndex: InterestIndexSnapshot
 }
 
 export interface GraphqlDepositsResult extends GraphqlResult {
@@ -96,11 +111,13 @@ export interface GraphqlLiquidation {
   liquidEffectiveUser: {
     id: string
   }
+  solidMarginAccount: GraphqlMarginAccount
+  liquidMarginAccount: GraphqlMarginAccount
   heldToken: {
     marketId: string
   }
-  heldTokenAmountDeltaWei
-  heldTokenLiquidationRewardWei
+  heldTokenAmountDeltaWei: string
+  heldTokenLiquidationRewardWei: string
   borrowedToken: {
     marketId: string
   }
@@ -109,6 +126,8 @@ export interface GraphqlLiquidation {
   liquidHeldTokenAmountDeltaPar: string
   solidBorrowedTokenAmountDeltaPar: string
   liquidBorrowedTokenAmountDeltaPar: string
+  heldInterestIndex: InterestIndexSnapshot
+  borrowedInterestIndex: InterestIndexSnapshot
 }
 
 export interface GraphqlLiquidationsResult extends GraphqlResult {
@@ -129,16 +148,18 @@ export interface GraphqlTrade {
   takerToken: {
     marketId: string
   }
-  takerTokenDeltaWei: string;
-  takerInputTokenDeltaPar: string;
-  takerOutputTokenDeltaPar: string;
+  takerTokenDeltaWei: string
+  takerInputTokenDeltaPar: string
+  takerOutputTokenDeltaPar: string
   makerEffectiveUser: {
     id: string
   }
   makerToken: {
     marketId: string
   }
-  makerTokenDeltaWei: string;
+  makerTokenDeltaWei: string
+  takerInterestIndex: InterestIndexSnapshot
+  makerInterestIndex: InterestIndexSnapshot
 }
 
 export interface GraphqlTradesResult extends GraphqlResult {
@@ -161,9 +182,13 @@ export interface GraphqlTransfer {
   toEffectiveUser: {
     id: string
   }
+  fromMarginAccount: GraphqlMarginAccount
+  toMarginAccount: GraphqlMarginAccount
   token: {
     marketId: string
   }
+  amountDeltaWei: string
+  interestIndex: InterestIndexSnapshot
 }
 
 export interface GraphqlTransfersResult extends GraphqlResult {
@@ -177,7 +202,7 @@ export interface GraphqlLiquidityMiningVestingPosition {
   owner: {
     id: string
   }
-  oARBAmount: string
+  oTokenAmount: string
 }
 
 export interface GraphqlLiquidityMiningLevelUpdateRequests {
@@ -213,6 +238,9 @@ export interface GraphqlWithdrawal {
   token: {
     marketId: string
   }
+  marginAccount: GraphqlMarginAccount
+  amountDeltaWei: string
+  interestIndex: InterestIndexSnapshot
 }
 
 export interface GraphqlWithdrawalsResult extends GraphqlResult {
@@ -298,7 +326,10 @@ export interface GraphqlVestingPositionTransfer {
     id: string
   }
   vestingPosition: {
-    arbAmountPar: string
+    pairToken: {
+      marketId: string
+    }
+    pairAmountPar: string
   }
 }
 

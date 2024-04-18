@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-import { address, BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
 import { DETONATION_WINDOW_SECONDS } from '../helpers/dolomite-helpers';
@@ -22,14 +22,11 @@ import {
   ApiWithdrawal,
   MarketIndex,
 } from '../lib/api-types';
+import { ONE_ETH_WEI } from '../lib/constants';
 import {
-  GraphqlAccountResult,
-  GraphqlAmmDataForUserResult,
-  GraphqlAmmLiquidityPosition,
+  GraphqlAccountResult, GraphqlAmmLiquidityPositionSnapshotsResult,
   GraphqlAmmLiquidityPositionsResult,
-  GraphqlAmmPairData,
   GraphqlDepositsResult,
-  GraphqlInterestRate,
   GraphqlLiquidationsResult,
   GraphqlLiquidityMiningLevelUpdateRequestsResult,
   GraphqlLiquidityMiningVestingPositionsResult,
@@ -61,7 +58,7 @@ async function getAccounts(
   blockNumber: number,
   lastId: string | undefined,
 ): Promise<{ accounts: ApiAccount[] }> {
-  const decimalBase = new BigNumber('1000000000000000000');
+  const indexBase = ONE_ETH_WEI;
   const accounts: ApiAccount[] = await axios.post(
     subgraphUrl,
     {
@@ -86,7 +83,7 @@ async function getAccounts(
         const tokenBase = new BigNumber('10').pow(value.token.decimals);
         const valuePar = new BigNumber(value.valuePar).times(tokenBase);
         const indexObject = marketIndexMap[value.token.marketId];
-        const index = (new BigNumber(valuePar).lt('0') ? indexObject.borrow : indexObject.supply).times(decimalBase);
+        const index = (new BigNumber(valuePar).lt('0') ? indexObject.borrow : indexObject.supply).times(indexBase);
         memo[value.token.marketId] = {
           marketId: Number(value.token.marketId),
           tokenName: value.token.name,
@@ -94,9 +91,7 @@ async function getAccounts(
           tokenDecimals: Number.parseInt(value.token.decimals, 10),
           tokenAddress: value.token.id,
           par: valuePar,
-          wei: new BigNumber(valuePar).times(index)
-            .div(decimalBase)
-            .integerValue(BigNumber.ROUND_HALF_UP),
+          wei: new BigNumber(valuePar).times(index).dividedToIntegerBy(indexBase, BigNumber.ROUND_HALF_UP),
           expiresAt: value.expirationTimestamp ? new BigNumber(value.expirationTimestamp) : null,
           expiryAddress: value.expiryAddress,
         };
@@ -104,7 +99,7 @@ async function getAccounts(
       }, {});
       return {
         id: `${account.user.id}-${account.accountNumber}`,
-        owner: account.user?.id.toLowerCase(),
+        owner: account.user.id.toLowerCase(),
         number: new BigNumber(account.accountNumber),
         effectiveUser: account.user?.effectiveUser?.id.toLowerCase(),
         balances,
@@ -122,7 +117,7 @@ export async function getDeposits(
   const query = `
   query getDeposits($startBlock: BigInt, $endBlock: Int, $lastId: ID) {
     deposits(
-      first: 1000,
+      first: ${Pageable.MAX_PAGE_SIZE},
       orderBy: id
       where: { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } id_gt: $lastId }
     ) {
@@ -131,6 +126,7 @@ export async function getDeposits(
       transaction {
         timestamp
       }
+      amountDeltaWei
       amountDeltaPar
       token {
         marketId
@@ -144,10 +140,14 @@ export async function getDeposits(
       effectiveUser {
         id
       }
+      interestIndex {
+        supplyIndex
+        borrowIndex
+      }
     }
   }
   `;
-  const result: any = await axios.post(
+  const result = await axios.post(
     subgraphUrl,
     {
       query,
@@ -166,7 +166,7 @@ export async function getDeposits(
     return Promise.reject(result.errors[0]);
   }
 
-  const deposits = (result.data.deposits as any[]).map<ApiDeposit>(deposit => {
+  const deposits = ((result as GraphqlDepositsResult).data.deposits).map<ApiDeposit>(deposit => {
     return {
       id: deposit.id,
       serialId: parseInt(deposit.serialId, 10),
@@ -178,44 +178,16 @@ export async function getDeposits(
       effectiveUser: deposit.effectiveUser.id.toLowerCase(),
       marketId: new BigNumber(deposit.token.marketId).toNumber(),
       amountDeltaPar: new BigNumber(deposit.amountDeltaPar),
+      amountDeltaWei: new BigNumber(deposit.amountDeltaWei),
+      interestIndex: {
+        marketId: new BigNumber(deposit.token.marketId).toNumber(),
+        borrow: new BigNumber(deposit.interestIndex.borrowIndex),
+        supply: new BigNumber(deposit.interestIndex.supplyIndex),
+      },
     }
   });
 
   return { deposits };
-}
-
-export async function getLiquidatableDolomiteAccounts(
-  marketIndexMap: { [marketId: string]: MarketIndex },
-  blockNumber: number,
-  lastId: string | undefined,
-): Promise<{ accounts: ApiAccount[] }> {
-  const query = `
-            query getActiveMarginAccounts($blockNumber: Int, $lastId: ID) {
-                marginAccounts(
-                  where: { hasBorrowValue: true id_gt: $lastId  }
-                  block: { number: $blockNumber }
-                  orderBy: id
-                  first: ${Pageable.MAX_PAGE_SIZE}
-                ) {
-                  id
-                  user {
-                    id
-                  }
-                  accountNumber
-                  tokenValues {
-                    token {
-                      id
-                      marketId
-                      decimals
-                      symbol
-                    }
-                    valuePar
-                    expirationTimestamp
-                    expiryAddress
-                  }
-                }
-              }`;
-  return getAccounts(marketIndexMap, query, blockNumber, lastId);
 }
 
 export async function getLiquidations(
@@ -226,7 +198,7 @@ export async function getLiquidations(
   const query = `
     query getLiquidations($startBlock: Int, $endBlock: Int, $lastId: ID) {
       liquidations(
-        first: 1000,
+        first: ${Pageable.MAX_PAGE_SIZE},
         orderBy: id
         where: { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } id_gt: $lastId }
       ) {
@@ -266,10 +238,18 @@ export async function getLiquidations(
         liquidHeldTokenAmountDeltaPar
         solidBorrowedTokenAmountDeltaPar
         liquidBorrowedTokenAmountDeltaPar
+        heldInterestIndex {
+          supplyIndex
+          borrowIndex
+        }
+        borrowedInterestIndex {
+          supplyIndex
+          borrowIndex
+        }
       }
     }
   `;
-  const result: any = await axios.post(
+  const result = await axios.post(
     subgraphUrl,
     {
       query,
@@ -291,7 +271,7 @@ export async function getLiquidations(
   if (result.data.liquidations.length === 0) {
     return { liquidations: [] };
   }
-  const liquidations = (result.data.liquidations as any[]).map<ApiLiquidation>(liquidation => {
+  const liquidations = (result as GraphqlLiquidationsResult).data.liquidations.map<ApiLiquidation>(liquidation => {
     return {
       id: liquidation.id,
       serialId: parseInt(liquidation.serialId, 10),
@@ -308,10 +288,27 @@ export async function getLiquidations(
       },
       heldMarketId: new BigNumber(liquidation.heldToken.marketId).toNumber(),
       borrowedMarketId: new BigNumber(liquidation.borrowedToken.marketId).toNumber(),
-      solidHeldTokenAmountDeltaPar: liquidation.solidHeldTokenAmountDeltaPar,
-      liquidHeldTokenAmountDeltaPar: liquidation.liquidHeldTokenAmountDeltaPar,
-      solidBorrowedTokenAmountDeltaPar: liquidation.solidBorrowedTokenAmountDeltaPar,
-      liquidBorrowedTokenAmountDeltaPar: liquidation.liquidBorrowedTokenAmountDeltaPar,
+      heldTokenAmountDeltaWei: new BigNumber(liquidation.heldTokenAmountDeltaWei),
+      borrowedTokenAmountDeltaWei: new BigNumber(liquidation.borrowedTokenAmountDeltaWei),
+      solidHeldTokenAmountDeltaPar: new BigNumber(liquidation.solidHeldTokenAmountDeltaPar),
+      liquidHeldTokenAmountDeltaPar: new BigNumber(liquidation.liquidHeldTokenAmountDeltaPar),
+      solidBorrowedTokenAmountDeltaPar: new BigNumber(liquidation.solidBorrowedTokenAmountDeltaPar),
+      liquidBorrowedTokenAmountDeltaPar: new BigNumber(liquidation.liquidBorrowedTokenAmountDeltaPar),
+      heldSupplyIndex: new BigNumber(liquidation.heldTokenAmountDeltaWei).div(liquidation.liquidHeldTokenAmountDeltaPar)
+        .abs(),
+      borrowedSupplyIndex: new BigNumber(liquidation.borrowedTokenAmountDeltaWei)
+        .div(liquidation.solidBorrowedTokenAmountDeltaPar)
+        .abs(),
+      heldInterestIndex: {
+        marketId: new BigNumber(liquidation.heldToken.marketId).toNumber(),
+        borrow: new BigNumber(liquidation.heldInterestIndex.borrowIndex),
+        supply: new BigNumber(liquidation.heldInterestIndex.supplyIndex),
+      },
+      borrowedInterestIndex: {
+        marketId: new BigNumber(liquidation.borrowedToken.marketId).toNumber(),
+        borrow: new BigNumber(liquidation.borrowedInterestIndex.borrowIndex),
+        supply: new BigNumber(liquidation.borrowedInterestIndex.supplyIndex),
+      },
     }
   });
 
@@ -325,7 +322,7 @@ export async function getLiquidityMiningVestingPositions(
   const query = `
     query getLiquidityMiningVestingPositions($blockNumber: Int, $lastId: ID) {
       liquidityMiningVestingPositions(
-        first: 1000
+        first: ${Pageable.MAX_PAGE_SIZE}
         orderBy: id
         where: { id_gt: $lastId }
         block: { number_gte: $blockNumber }
@@ -334,9 +331,12 @@ export async function getLiquidityMiningVestingPositions(
         owner {
           id
         }
-        arbAmountPar
-        ethSpent
-        oARBAmount
+        pairToken {
+          marketId
+        }
+        pairAmountPar
+        tokenSpent
+        oTokenAmount
         status
         startTimestamp
         endTimestamp
@@ -344,7 +344,7 @@ export async function getLiquidityMiningVestingPositions(
       }
     }
   `;
-  const result: any = await axios.post(
+  const result = await axios.post(
     subgraphUrl,
     {
       query,
@@ -363,17 +363,18 @@ export async function getLiquidityMiningVestingPositions(
   }
 
   const liquidityMiningVestingPositions = (result.data.liquidityMiningVestingPositions as any[]).map<ApiLiquidityMiningVestingPosition>(
-    liquidityMiningVestingPosition => {
+    position => {
       return {
-        id: liquidityMiningVestingPosition.id,
-        effectiveUser: liquidityMiningVestingPosition.owner.id.toLowerCase(),
-        amountPar: new BigNumber(liquidityMiningVestingPosition.arbAmountPar),
-        oTokenAmount: new BigNumber(liquidityMiningVestingPosition.oARBAmount),
-        ethSpent: new BigNumber(liquidityMiningVestingPosition.ethSpent),
-        startTimestamp: liquidityMiningVestingPosition.startTimestamp,
-        endTimestamp: liquidityMiningVestingPosition.endTimestamp,
-        duration: parseInt(liquidityMiningVestingPosition.duration, 10),
-        status: liquidityMiningVestingPosition.status,
+        id: position.id,
+        effectiveUser: position.owner.id.toLowerCase(),
+        amountPar: new BigNumber(position.pairAmountPar),
+        marketId: new BigNumber(position.pairToken.marketId).toNumber(),
+        oTokenAmount: new BigNumber(position.oTokenAmount),
+        otherTokenSpent: new BigNumber(position.tokenSpent),
+        startTimestamp: position.startTimestamp,
+        endTimestamp: position.endTimestamp,
+        duration: parseInt(position.duration, 10),
+        status: position.status,
       };
     },
   );
@@ -388,7 +389,7 @@ export async function getExpiredLiquidityMiningVestingPositions(
   const query = `
     query getExpiredLiquidityMiningVestingPositions($blockNumber: Int, $timestamp: BigInt!) {
       liquidityMiningVestingPositions(
-        first: 1000
+        first: ${Pageable.MAX_PAGE_SIZE}
         orderBy: endTimestamp
         orderDirection: asc
         where: { endTimestamp_lt: $timestamp, status: "${ApiLiquidityMiningVestingPositionStatus.ACTIVE}" }
@@ -398,8 +399,11 @@ export async function getExpiredLiquidityMiningVestingPositions(
         owner {
           id
         }
-        arbAmountPar
-        ethSpent
+        pairToken {
+          marketId
+        }
+        pairAmountPar
+        tokenSpent
         startTimestamp
         duration
         endTimestamp
@@ -407,7 +411,7 @@ export async function getExpiredLiquidityMiningVestingPositions(
       }
     }
   `;
-  const result: any = await axios.post(
+  const result = await axios.post(
     subgraphUrl,
     {
       query,
@@ -426,16 +430,17 @@ export async function getExpiredLiquidityMiningVestingPositions(
   }
 
   const liquidityMiningVestingPositions = (result.data.liquidityMiningVestingPositions as any[]).map<ApiLiquidityMiningVestingPosition>(
-    liquidityMiningVestingPosition => {
+    position => {
       return {
-        id: liquidityMiningVestingPosition.id,
-        effectiveUser: liquidityMiningVestingPosition.owner.id.toLowerCase(),
-        amountPar: new BigNumber(liquidityMiningVestingPosition.arbAmountPar),
-        oTokenAmount: new BigNumber(liquidityMiningVestingPosition.oARBAmount),
-        ethSpent: new BigNumber(liquidityMiningVestingPosition.ethSpent),
-        startTimestamp: liquidityMiningVestingPosition.startTimestamp,
-        duration: parseInt(liquidityMiningVestingPosition.duration, 10),
-        endTimestamp: liquidityMiningVestingPosition.endTimestamp,
+        id: position.id,
+        effectiveUser: position.owner.id.toLowerCase(),
+        amountPar: new BigNumber(position.pairAmountPar),
+        marketId: new BigNumber(position.pairToken.marketId).toNumber(),
+        oTokenAmount: new BigNumber(position.oTokenAmount),
+        otherTokenSpent: new BigNumber(position.tokenSpent),
+        startTimestamp: position.startTimestamp,
+        duration: parseInt(position.duration, 10),
+        endTimestamp: position.endTimestamp,
         status: ApiLiquidityMiningVestingPositionStatus.ACTIVE,
       };
     },
@@ -450,7 +455,7 @@ export async function getUnfulfilledLevelUpdateRequests(
   const query = `
     query getActiveLevelUpdateRequests($blockNumber: Int!) {
       liquidityMiningLevelUpdateRequests(
-        first: 1000
+        first: ${Pageable.MAX_PAGE_SIZE}
         orderBy: id
         orderDirection: asc
         block: { number_gte: $blockNumber }
@@ -499,7 +504,7 @@ export async function getLiquidityPositions(
   const query = `
     query getLiquidityPositions($blockNumber: Int, $lastId: ID) {
       ammLiquidityPositions(
-        first: 1000
+        first: ${Pageable.MAX_PAGE_SIZE}
         orderBy: id
         where: { id_gt: $lastId }
         block: { number: $blockNumber }
@@ -512,7 +517,7 @@ export async function getLiquidityPositions(
       }
     }
   `;
-  const result: any = await axios.post(
+  const result = await axios.post(
     subgraphUrl,
     {
       query,
@@ -534,7 +539,7 @@ export async function getLiquidityPositions(
     return {
       id: ammLiquidityPosition.id,
       effectiveUser: ammLiquidityPosition.effectiveUser.id.toLowerCase(),
-      balance: ammLiquidityPosition.liquidityTokenBalance,
+      balance: new BigNumber(ammLiquidityPosition.liquidityTokenBalance),
     }
   });
 
@@ -549,7 +554,7 @@ export async function getLiquiditySnapshots(
   const query = `
     query getAmmLiquidityPositionSnapshots($startTimestamp: Int, $endTimestamp: Int, $lastId: ID) {
       ammLiquidityPositionSnapshots(
-        first: 1000,
+        first: ${Pageable.MAX_PAGE_SIZE},
         orderBy: id
         where: { timestamp_gte:  $startTimestamp timestamp_lt: $endTimestamp id_gt: $lastId }
       ) {
@@ -564,7 +569,7 @@ export async function getLiquiditySnapshots(
     }
   `;
 
-  const result: any = await axios.post(
+  const result = await axios.post(
     subgraphUrl,
     {
       query,
@@ -577,7 +582,7 @@ export async function getLiquiditySnapshots(
     defaultAxiosConfig,
   )
     .then(response => response.data)
-    .then(json => json as GraphqlWithdrawalsResult);
+    .then(json => json as GraphqlAmmLiquidityPositionSnapshotsResult);
 
   if (result.errors && typeof result.errors === 'object') {
     return Promise.reject(result.errors[0]);
@@ -604,7 +609,7 @@ export async function getTrades(
   const query = `
     query getTrades($startBlock: Int, $endBlock: Int, $lastId: ID) {
       trades(
-        first: 1000,
+        first: ${Pageable.MAX_PAGE_SIZE},
         orderBy: id
         where: { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } id_gt: $lastId }
       ) {
@@ -625,8 +630,12 @@ export async function getTrades(
         takerToken {
           marketId
         }
+        makerTokenDeltaWei
+        takerTokenDeltaWei
         takerInputTokenDeltaPar
         takerOutputTokenDeltaPar
+        makerInputTokenDeltaPar
+        makerOutputTokenDeltaPar
         makerEffectiveUser {
           id
         }
@@ -639,10 +648,18 @@ export async function getTrades(
         makerToken {
           marketId
         }
+        takerInterestIndex {
+          supplyIndex
+          borrowIndex
+        }
+        makerInterestIndex {
+          supplyIndex
+          borrowIndex
+        }
       }
     }
   `;
-  const result: any = await axios.post(
+  const result = await axios.post(
     subgraphUrl,
     {
       query,
@@ -672,14 +689,28 @@ export async function getTrades(
         accountNumber: trade.takerMarginAccount.accountNumber,
       },
       takerMarketId: new BigNumber(trade.takerToken.marketId).toNumber(),
-      takerInputTokenDeltaPar: trade.takerInputTokenDeltaPar,
-      takerOutputTokenDeltaPar: trade.takerOutputTokenDeltaPar,
+      takerTokenDeltaWei: new BigNumber(trade.takerTokenDeltaWei),
+      makerTokenDeltaWei: new BigNumber(trade.makerTokenDeltaWei),
+      takerInputTokenDeltaPar: new BigNumber(trade.takerInputTokenDeltaPar),
+      takerOutputTokenDeltaPar: new BigNumber(trade.takerOutputTokenDeltaPar),
+      makerInputTokenDeltaPar: new BigNumber(trade.makerInputTokenDeltaPar),
+      makerOutputTokenDeltaPar: new BigNumber(trade.makerOutputTokenDeltaPar),
       makerEffectiveUser: trade.makerEffectiveUser ? trade.makerEffectiveUser.id.toLowerCase() : null,
       makerMarginAccount: trade.makerMarginAccount ? {
         user: trade.makerMarginAccount.user.id.toLowerCase(),
         accountNumber: trade.makerMarginAccount.accountNumber,
       } : undefined,
       makerMarketId: new BigNumber(trade.makerToken.marketId).toNumber(),
+      makerInterestIndex: {
+        marketId: new BigNumber(trade.makerToken.marketId).toNumber(),
+        borrow: new BigNumber(trade.makerInterestIndex.borrowIndex),
+        supply: new BigNumber(trade.makerInterestIndex.supplyIndex),
+      },
+      takerInterestIndex: {
+        marketId: new BigNumber(trade.takerToken.marketId).toNumber(),
+        borrow: new BigNumber(trade.takerInterestIndex.borrowIndex),
+        supply: new BigNumber(trade.takerInterestIndex.supplyIndex),
+      },
     }
   });
 
@@ -694,7 +725,7 @@ export async function getTransfers(
   const query = `
     query getTransfers($startBlock: Int, $endBlock: Int, $lastId: ID) {
       transfers(
-        first: 1000,
+        first: ${Pageable.MAX_PAGE_SIZE},
         orderBy: id
         where: { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } id_gt: $lastId }
       ) {
@@ -703,6 +734,7 @@ export async function getTransfers(
         transaction {
           timestamp
         }
+        amountDeltaWei
         fromAmountDeltaPar
         toAmountDeltaPar
         fromEffectiveUser {
@@ -726,10 +758,14 @@ export async function getTransfers(
         token {
           marketId
         }
+        interestIndex {
+          supplyIndex
+          borrowIndex
+        }
       }
     }
   `;
-  const result: any = await axios.post(
+  const result = await axios.post(
     subgraphUrl,
     {
       query,
@@ -748,7 +784,7 @@ export async function getTransfers(
     return Promise.reject(result.errors[0]);
   }
 
-  const transfers = (result.data.transfers as any[]).map<ApiTransfer>(transfer => {
+  const transfers = result.data.transfers.map<ApiTransfer>(transfer => {
     return {
       id: transfer.id,
       serialId: parseInt(transfer.serialId, 10),
@@ -764,8 +800,14 @@ export async function getTransfers(
         accountNumber: transfer.toMarginAccount.accountNumber,
       },
       marketId: new BigNumber(transfer.token.marketId).toNumber(),
+      amountDeltaWei: new BigNumber(transfer.amountDeltaWei),
       fromAmountDeltaPar: new BigNumber(transfer.fromAmountDeltaPar),
       toAmountDeltaPar: new BigNumber(transfer.toAmountDeltaPar),
+      interestIndex: {
+        marketId: new BigNumber(transfer.token.marketId).toNumber(),
+        borrow: new BigNumber(transfer.interestIndex.borrowIndex),
+        supply: new BigNumber(transfer.interestIndex.supplyIndex),
+      },
     }
   });
 
@@ -780,7 +822,7 @@ export async function getVestingPositionTransfers(
   const query = `
     query getLiquidityMiningVestingPositionTransfers($startTimestamp: BigInt, $endTimestamp: BigInt, $lastId: ID) {
       liquidityMiningVestingPositionTransfers(
-        first: 1000
+        first: ${Pageable.MAX_PAGE_SIZE}
         orderBy: id
         where: { transaction_: { timestamp_gte: $startTimestamp timestamp_lt: $endTimestamp } id_gt: $lastId }
       ) {
@@ -796,7 +838,7 @@ export async function getVestingPositionTransfers(
           id
         }
         vestingPosition {
-          arbAmountPar
+          pairAmountPar
         }
       }
     }
@@ -828,7 +870,7 @@ export async function getVestingPositionTransfers(
         timestamp: parseInt(vestingPositionTransfer.transaction.timestamp, 10),
         fromEffectiveUser: vestingPositionTransfer.fromEffectiveUser?.id?.toLowerCase(),
         toEffectiveUser: vestingPositionTransfer.toEffectiveUser?.id?.toLowerCase(),
-        amount: new BigNumber(vestingPositionTransfer.vestingPosition.arbAmountPar),
+        amount: new BigNumber(vestingPositionTransfer.vestingPosition.pairAmountPar),
       }
     },
   )
@@ -845,14 +887,16 @@ export async function getWithdrawals(
   const query = `
     query getWithdrawals($startBlock: Int, $endBlock: Int, $lastId: ID) {
     withdrawals(
-      first: 1000,
+      first: ${Pageable.MAX_PAGE_SIZE},
       orderBy: id
-      where: { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } id_gt: $lastId }) {
+      where: { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } id_gt: $lastId }
+    ) {
         id
         serialId
         transaction {
           timestamp
         }
+        amountDeltaWei
         amountDeltaPar
         token {
           marketId
@@ -866,10 +910,14 @@ export async function getWithdrawals(
         effectiveUser {
           id
         }
+        interestIndex {
+          supplyIndex
+          borrowIndex
+        }
       }
     }
   `;
-  const result: any = await axios.post(
+  const result = await axios.post(
     subgraphUrl,
     {
       query,
@@ -888,7 +936,7 @@ export async function getWithdrawals(
     return Promise.reject(result.errors[0]);
   }
 
-  const withdrawals = (result.data.withdrawals as any[]).map<ApiWithdrawal>(withdrawal => {
+  const withdrawals = ((result as GraphqlWithdrawalsResult).data.withdrawals).map<ApiWithdrawal>(withdrawal => {
     return {
       id: withdrawal.id,
       serialId: parseInt(withdrawal.serialId, 10),
@@ -900,6 +948,12 @@ export async function getWithdrawals(
       },
       marketId: new BigNumber(withdrawal.token.marketId).toNumber(),
       amountDeltaPar: new BigNumber(withdrawal.amountDeltaPar),
+      amountDeltaWei: new BigNumber(withdrawal.amountDeltaWei),
+      interestIndex: {
+        marketId: new BigNumber(withdrawal.token.marketId).toNumber(),
+        borrow: new BigNumber(withdrawal.interestIndex.borrowIndex),
+        supply: new BigNumber(withdrawal.interestIndex.supplyIndex),
+      },
     }
   });
 
@@ -933,41 +987,6 @@ export async function getAllDolomiteAccountsWithSupplyValue(
                       marketId
                       decimals
                       symbol
-                    }
-                    valuePar
-                    expirationTimestamp
-                    expiryAddress
-                  }
-                }
-              }`;
-  return getAccounts(marketIndexMap, query, blockNumber, lastId);
-}
-
-export async function getExpiredAccounts(
-  marketIndexMap: { [marketId: string]: MarketIndex },
-  blockNumber: number,
-  lastId: string | undefined,
-): Promise<{ accounts: ApiAccount[] }> {
-  const query = `
-            query getActiveMarginAccounts($blockNumber: Int, $lastId: ID) {
-                marginAccounts(
-                  where: { hasBorrowValue: true hasExpiration: true id_gt: $lastId }
-                  block: { number: $blockNumber }
-                  orderBy: id
-                  first: ${Pageable.MAX_PAGE_SIZE}
-                ) {
-                  id
-                  user {
-                    id
-                  }
-                  accountNumber
-                  tokenValues {
-                    token {
-                      id
-                      marketId
-                      name
-                      symbol
-                      decimals
                     }
                     valuePar
                     expirationTimestamp
@@ -1048,7 +1067,7 @@ export async function getDolomiteMarkets(
 }
 
 export async function getDolomiteRiskParams(blockNumber: number): Promise<{ riskParams: ApiRiskParam }> {
-  const result: any = await axios.post(
+  const result = await axios.post(
     subgraphUrl,
     {
       query: `query getDolomiteMargins($blockNumber: Int) {
@@ -1105,103 +1124,4 @@ export async function getTimestampToBlockNumberMap(timestamps: number[]): Promis
     memo[timestamp.toString()] = result.data[`_${timestamp}`]?.[0]?.number;
     return memo;
   }, {});
-}
-
-export interface TotalYield {
-  totalEntries: number
-  swapYield: Decimal
-  lendingYield: Decimal
-  totalYield: Decimal
-}
-
-export async function getTotalAmmPairYield(blockNumbers: number[], user: address): Promise<TotalYield> {
-  const queryChunks = blockNumbers.reduce<string[]>((memo, blockNumber, i) => {
-    if (!memo[Math.floor(i / 100)]) {
-      memo[Math.floor(i / 100)] = '';
-    }
-    memo[Math.floor(i / 100)] += `
-      ammPair_${blockNumber}:ammPairs(where: { id: "0xb77a493a4950cad1b049e222d62bce14ff423c6f" } block: { number: ${blockNumber} }) {
-        volumeUSD
-        reserveUSD
-        reserve0
-        reserve1
-        totalSupply
-      }
-      wethInterestRate_${blockNumber}:interestRates(where: {id: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1" } block: { number: ${blockNumber} }) {
-        supplyInterestRate
-      }
-      usdcInterestRate_${blockNumber}:interestRates(where: {id: "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8" } block: { number: ${blockNumber} }) {
-        supplyInterestRate
-      }
-      ammLiquidityPosition_${blockNumber}:ammLiquidityPositions(where: { user: "${user}"} block: { number: ${blockNumber} }) {
-        liquidityTokenBalance
-      }
-    `
-    return memo;
-  }, []);
-
-  const totalYield: TotalYield = {
-    totalEntries: 0,
-    swapYield: new BigNumber(0),
-    lendingYield: new BigNumber(0),
-    totalYield: new BigNumber(0),
-  }
-  for (let i = 0; i < queryChunks.length; i += 1) {
-    const result = await axios.post(
-      subgraphUrl,
-      {
-        query: `query getAmmDataForUser {
-        ${queryChunks[i]}
-      }`,
-      },
-      defaultAxiosConfig,
-    )
-      .then(response => response.data)
-      .then(json => json as GraphqlAmmDataForUserResult);
-    const tempTotalYield = reduceResultIntoTotalYield(result, blockNumbers);
-    totalYield.totalEntries += tempTotalYield.totalEntries;
-    totalYield.swapYield = totalYield.swapYield.plus(tempTotalYield.swapYield);
-    totalYield.lendingYield = totalYield.lendingYield.plus(tempTotalYield.lendingYield);
-    totalYield.totalYield = totalYield.totalYield.plus(tempTotalYield.totalYield);
-  }
-
-  return totalYield;
-}
-
-function reduceResultIntoTotalYield(
-  result: GraphqlAmmDataForUserResult,
-  blockNumbers: number[],
-): TotalYield {
-  const blockNumbersAsc = blockNumbers.sort((a, b) => a - b);
-
-  return blockNumbersAsc.reduce<TotalYield>((memo, blockNumber, i) => {
-    const blockNumberYesterday = i === 0 ? undefined : blockNumbersAsc[i - 1];
-    const ammPair = result.data[`ammPair_${blockNumber}`]?.[0] as GraphqlAmmPairData | undefined;
-    const ammPairYesterday = result.data[`ammPair_${blockNumberYesterday}`]?.[0] as GraphqlAmmPairData | undefined;
-    const wethInterestRateStruct = result.data[`wethInterestRate_${blockNumber}`]?.[0] as GraphqlInterestRate | undefined;
-    const usdcInterestRateStruct = result.data[`usdcInterestRate_${blockNumber}`]?.[0] as GraphqlInterestRate | undefined;
-    const ammLiquidityPosition = result.data[`ammLiquidityPosition_${blockNumber}`]?.[0] as GraphqlAmmLiquidityPosition | undefined;
-    if (!ammPair || !ammPairYesterday || !wethInterestRateStruct || !usdcInterestRateStruct || !ammLiquidityPosition) {
-      return memo
-    }
-    const wethInterestRate = new BigNumber(wethInterestRateStruct.supplyInterestRate).div(365);
-    const usdcInterestRate = new BigNumber(usdcInterestRateStruct.supplyInterestRate).div(365);
-
-    const ratio = new BigNumber(ammLiquidityPosition.liquidityTokenBalance).div(ammPair.totalSupply);
-    const lendingYield = wethInterestRate.plus(usdcInterestRate).div(2).times(ratio).times(ammPair.reserveUSD);
-    const volumeUSD = new BigNumber(ammPair.volumeUSD).minus(ammPairYesterday.volumeUSD);
-    const swapYield = volumeUSD.times(ratio).times(0.003);
-    const totalYield = lendingYield.plus(swapYield);
-    return {
-      totalEntries: memo.totalEntries + 1,
-      swapYield: memo.swapYield.plus(swapYield),
-      lendingYield: memo.lendingYield.plus(lendingYield),
-      totalYield: memo.totalYield.plus(totalYield),
-    }
-  }, {
-    totalEntries: 0,
-    swapYield: new BigNumber(0),
-    lendingYield: new BigNumber(0),
-    totalYield: new BigNumber(0),
-  });
 }

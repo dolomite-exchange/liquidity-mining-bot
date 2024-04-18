@@ -1,6 +1,6 @@
 import { address, BigNumber, Decimal, Integer } from '@dolomite-exchange/dolomite-margin';
 
-interface ApiMarginAccount {
+export interface ApiMarginAccount {
   user: string;
   accountNumber: string;
 }
@@ -34,13 +34,15 @@ export interface ApiDeposit {
   effectiveUser: string;
   marginAccount: ApiMarginAccount;
   marketId: number;
-  amountDeltaPar: Integer;
+  amountDeltaPar: Decimal;
+  amountDeltaWei: Decimal;
+  interestIndex: MarketIndex;
 }
 
 export interface ApiAmmLiquidityPosition {
   id: string;
   effectiveUser: string;
-  balance: number;
+  balance: Decimal;
 }
 
 export interface ApiAmmLiquiditySnapshot {
@@ -61,10 +63,14 @@ export interface ApiLiquidation {
   liquidMarginAccount: ApiMarginAccount;
   heldMarketId: number;
   borrowedMarketId: number;
-  solidHeldTokenAmountDeltaPar: Integer;
-  liquidHeldTokenAmountDeltaPar: Integer;
-  solidBorrowedTokenAmountDeltaPar: Integer;
-  liquidBorrowedTokenAmountDeltaPar: Integer;
+  heldTokenAmountDeltaWei: Decimal;
+  borrowedTokenAmountDeltaWei: Decimal;
+  solidHeldTokenAmountDeltaPar: Decimal;
+  liquidHeldTokenAmountDeltaPar: Decimal;
+  solidBorrowedTokenAmountDeltaPar: Decimal;
+  liquidBorrowedTokenAmountDeltaPar: Decimal;
+  heldInterestIndex: MarketIndex;
+  borrowedInterestIndex: MarketIndex;
 }
 
 export interface ApiMarket {
@@ -93,8 +99,10 @@ export interface ApiTransfer {
   fromMarginAccount: ApiMarginAccount;
   toMarginAccount: ApiMarginAccount;
   marketId: number;
-  fromAmountDeltaPar: Integer;
-  toAmountDeltaPar: Integer;
+  amountDeltaWei: Decimal;
+  fromAmountDeltaPar: Decimal;
+  toAmountDeltaPar: Decimal;
+  interestIndex: MarketIndex;
 }
 
 export interface ApiTrade {
@@ -104,11 +112,17 @@ export interface ApiTrade {
   takerEffectiveUser: string;
   takerMarginAccount: ApiMarginAccount;
   takerMarketId: number;
-  takerInputTokenDeltaPar: Integer;
-  takerOutputTokenDeltaPar: Integer;
+  makerTokenDeltaWei: Decimal;
+  takerTokenDeltaWei: Decimal;
+  takerInputTokenDeltaPar: Decimal;
+  takerOutputTokenDeltaPar: Decimal;
+  makerInputTokenDeltaPar: Decimal;
+  makerOutputTokenDeltaPar: Decimal;
   makerEffectiveUser: string | undefined;
   makerMarginAccount: ApiMarginAccount | undefined;
   makerMarketId: number;
+  makerInterestIndex: MarketIndex;
+  takerInterestIndex: MarketIndex;
 }
 
 export interface ApiVestingPositionTransfer {
@@ -117,7 +131,7 @@ export interface ApiVestingPositionTransfer {
   timestamp: number;
   fromEffectiveUser: string | undefined;
   toEffectiveUser: string | undefined;
-  amount: Integer;
+  amount: Decimal;
 }
 
 export enum ApiLiquidityMiningVestingPositionStatus {
@@ -130,9 +144,10 @@ export enum ApiLiquidityMiningVestingPositionStatus {
 export interface ApiLiquidityMiningVestingPosition {
   id: string;
   effectiveUser: string;
+  marketId: number;
   amountPar: Decimal;
   oTokenAmount: Decimal;
-  ethSpent: Decimal;
+  otherTokenSpent: Decimal;
   duration: number;
   startTimestamp: number;
   endTimestamp: number;
@@ -151,11 +166,13 @@ export interface ApiWithdrawal {
   effectiveUser: string;
   marginAccount: ApiMarginAccount;
   marketId: number;
-  amountDeltaPar: Integer;
+  amountDeltaPar: Decimal;
+  amountDeltaWei: Decimal;
+  interestIndex: MarketIndex;
 }
 
 export interface MarketIndex {
   marketId: number
-  borrow: Integer
-  supply: Integer
+  borrow: Decimal
+  supply: Decimal
 }

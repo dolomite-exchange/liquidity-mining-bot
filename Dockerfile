@@ -20,9 +20,10 @@ USER dolomite
 WORKDIR /home/dolomite/app
 
 COPY ./.env* ./
-COPY ./package.json ./package-lock.json ./
-RUN npm ci --loglevel warn
+COPY ./package.json ./yarn.lock ./
+RUN yarn install --frozen-lockfile
 
+COPY ./scripts ./scripts
 COPY ./src ./src
 COPY ./__tests__ ./__tests__
 COPY ./tsconfig.json ./tsconfig.json

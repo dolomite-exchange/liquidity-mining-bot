@@ -1,15 +1,12 @@
-import { BigNumber } from '@dolomite-exchange/dolomite-margin';
-import fs from 'fs';
+import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
 import BlockStore from '../src/lib/block-store';
-import { ONE_ETH_WEI } from '../src/lib/constants';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
-import liquidityMiningConfig from './config/oarb-season-0.json';
 import './lib/env-reader';
 import {
   getAccountBalancesByMarket,
@@ -17,25 +14,39 @@ import {
   getArbVestingLiquidityPositionAndEvents,
   getBalanceChangingEvents,
 } from './lib/event-parser';
+import { MineralConfigFile, readFileFromGitHub, writeFileLocally } from './lib/file-helpers';
 import {
   ARB_VESTER_PROXY,
   calculateFinalPoints,
-  calculateLiquidityPoints,
+  calculateLiquidityPoints, calculateMerkleRootAndProofs,
   calculateTotalRewardPoints,
   ETH_USDC_POOL,
+  InterestOperation,
   LiquidityPositionsAndEvents,
 } from './lib/rewards';
 
 /* eslint-enable */
 
-interface OutputFile {
+interface UserMineralAllocation {
+  minerals: Integer; // big int
+  multiplier: Decimal; // decimal
+}
+
+interface UserMineralAllocationForFile {
+  minerals: string; // big int
+  multiplier: string; // decimal
+  proofs: string[];
+}
+
+interface MineralOutputFile {
   users: {
-    [walletAddressLowercase: string]: string // big int
+    [walletAddressLowercase: string]: UserMineralAllocationForFile
   };
   metadata: {
-    marketId: number
-    marketName: string // big int
-    totalPointsForMarket: string // big int
+    merkleRoot: string;
+    marketIds: number[]
+    marketNames: string[]
+    totalPoints: string // big int
     startBlock: number
     endBlock: number
     startTimestamp: number
@@ -43,29 +54,34 @@ interface OutputFile {
   };
 }
 
-const FOLDER_NAME = `${__dirname}/output`;
+const SEASON_NUMBER = 0;
 
-async function start() {
-  const epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
+const SECONDS_PER_WEEK = 86_400 * 7;
+const WETH_MARKET_ID = '0';
+const USDC_MARKET_ID = '17';
+const VALID_REWARD_MULTIPLIERS_MAP = {
+  [WETH_MARKET_ID]: new BigNumber(5000).div(SECONDS_PER_WEEK),
+  [USDC_MARKET_ID]: new BigNumber(1).div(SECONDS_PER_WEEK),
+};
+const MAX_MULTIPLIER = new BigNumber('5');
+
+async function start(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)) {
+  const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>('scripts/config/mineral-season-0.json');
   if (Number.isNaN(epoch) || !liquidityMiningConfig.epochs[epoch]) {
     return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
-  }
-  const maxMarketId = (await dolomite.getters.getNumMarkets()).toNumber();
-  const validMarketId = parseInt(process.env.MARKET_ID ?? 'NaN', 10);
-  if (Number.isNaN(validMarketId)) {
-    return Promise.reject(new Error(`Invalid MARKET_ID, found: ${process.env.MARKET_ID}`));
-  } else if (validMarketId >= maxMarketId) {
-    return Promise.reject(new Error(`MARKET_ID contains an element that is too large, found: ${validMarketId}`));
   }
 
   const blockStore = new BlockStore();
   await blockStore._update();
   const marketStore = new MarketStore(blockStore);
 
-  const startBlockNumber = liquidityMiningConfig.epochs[epoch].startBlockNumber;
-  const startTimestamp = liquidityMiningConfig.epochs[epoch].startTimestamp;
-  const endBlockNumber = liquidityMiningConfig.epochs[epoch].endBlockNumber;
-  const endTimestamp = liquidityMiningConfig.epochs[epoch].endTimestamp;
+  const {
+    startBlockNumber,
+    startTimestamp,
+    endBlockNumber,
+    endTimestamp,
+    isFinalized,
+  } = liquidityMiningConfig.epochs[epoch];
 
   const networkId = await dolomite.web3.eth.net.getId();
 
@@ -87,36 +103,45 @@ async function start() {
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     networkId,
-    marketId: validMarketId,
+    marketIds: Object.keys(VALID_REWARD_MULTIPLIERS_MAP),
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
 
   await marketStore._update(startBlockNumber);
+  const startMarketMap = marketStore.getMarketMap();
+  const startMarketIndexMap = await marketStore.getMarketIndexMap(startMarketMap, { blockNumber: startBlockNumber });
 
-  const marketMap = marketStore.getMarketMap();
-  const marketIndexMap = await marketStore.getMarketIndexMap(marketMap, { blockNumber: startBlockNumber });
+  await marketStore._update(endBlockNumber);
+  const endMarketMap = marketStore.getMarketMap();
+  const endMarketIndexMap = await marketStore.getMarketIndexMap(endMarketMap, { blockNumber: endBlockNumber });
 
   const apiAccounts = await Pageable.getPageableValues(async (lastId) => {
-    const result = await getAllDolomiteAccountsWithSupplyValue(marketIndexMap, startBlockNumber, lastId);
+    const result = await getAllDolomiteAccountsWithSupplyValue(startMarketIndexMap, startBlockNumber, lastId);
     return result.accounts;
   });
 
-  const accountToDolomiteBalanceMap = getAccountBalancesByMarket(apiAccounts, startTimestamp, true);
+  const accountToDolomiteBalanceMap = getAccountBalancesByMarket(
+    apiAccounts,
+    startTimestamp,
+    VALID_REWARD_MULTIPLIERS_MAP,
+  );
 
-  const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber, true);
+  const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
 
-  const totalPointsPerMarket = calculateTotalRewardPoints(
+  const totalPointsToMarketMap = calculateTotalRewardPoints(
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
-    startTimestamp,
+    endMarketIndexMap,
+    VALID_REWARD_MULTIPLIERS_MAP,
     endTimestamp,
+    InterestOperation.ADD_POSITIVE,
   );
-  const allMarketIds = Object.keys(totalPointsPerMarket);
-  allMarketIds.forEach(marketId => {
-    if (marketId !== validMarketId.toString()) {
-      delete totalPointsPerMarket[marketId];
+  const totalPoints = Object.keys(totalPointsToMarketMap).reduce((acc, market) => {
+    if (VALID_REWARD_MULTIPLIERS_MAP[market]) {
+      acc = acc.plus(totalPointsToMarketMap[market])
     }
-  });
+    return acc;
+  }, INTEGERS.ZERO);
 
   const ammLiquidityBalancesAndEvents = await getAmmLiquidityPositionAndEvents(
     startBlockNumber,
@@ -143,71 +168,107 @@ async function start() {
 
   const userToPointsMap = calculateFinalPoints(
     accountToDolomiteBalanceMap,
-    validMarketId,
+    VALID_REWARD_MULTIPLIERS_MAP,
     poolToVirtualLiquidityPositionsAndEvents,
     poolToTotalSubLiquidityPoints,
   );
-  const tokenAddress = await dolomite.getters.getMarketTokenAddress(new BigNumber(validMarketId));
-  const token = new dolomite.web3.eth.Contract(TokenAbi, tokenAddress);
-  const tokenName = await dolomite.contracts.callConstantContractFunction(token.methods.name());
+
+  const userToMineralsDataMap = await calculateFinalMinerals(userToPointsMap, epoch);
+  const userToAmountMap = Object.keys(userToMineralsDataMap).reduce((memo, k) => {
+    memo[k] = userToMineralsDataMap[k].minerals;
+    return memo;
+  }, {})
+  const { merkleRoot, walletAddressToLeavesMap } = calculateMerkleRootAndProofs(userToAmountMap);
+  const userToMineralsMapForFile = Object.keys(walletAddressToLeavesMap).reduce((memo, k) => {
+    memo[k] = {
+      minerals: walletAddressToLeavesMap[k].amount,
+      multiplier: userToMineralsDataMap[k].multiplier.toFixed(2),
+      proofs: walletAddressToLeavesMap[k].proofs,
+    }
+    return memo;
+  }, {});
+
+  const validMarketIds = Object.keys(VALID_REWARD_MULTIPLIERS_MAP).map(m => parseInt(m));
+  const marketNames = await Promise.all(
+    validMarketIds.map<Promise<string>>(async validMarketId => {
+      const tokenAddress = await dolomite.getters.getMarketTokenAddress(new BigNumber(validMarketId));
+      const token = new dolomite.web3.eth.Contract(TokenAbi, tokenAddress);
+      return dolomite.contracts.callConstantContractFunction(token.methods.name())
+    }),
+  );
 
   // eslint-disable-next-line max-len
-  const fileName = `${FOLDER_NAME}/asset-held-${startTimestamp}-${endTimestamp}-${validMarketId}-output.json`;
-  const dataToWrite = readOutputFile(fileName);
-  dataToWrite.users = userToPointsMap;
-  dataToWrite.metadata = {
-    marketId: validMarketId,
-    marketName: tokenName,
-    totalPointsForMarket: totalPointsPerMarket[validMarketId].times(ONE_ETH_WEI).toFixed(0),
-    startBlock: startBlockNumber,
-    endBlock: endBlockNumber,
-    startTimestamp: startTimestamp,
-    endTimestamp: endTimestamp,
+  const fileName = getFileNameByEpoch(epoch);
+  const mineralOutputFile: MineralOutputFile = {
+    users: userToMineralsMapForFile,
+    metadata: {
+      merkleRoot,
+      marketNames,
+      totalPoints: totalPoints.toFixed(),
+      marketIds: validMarketIds,
+      startBlock: startBlockNumber,
+      endBlock: endBlockNumber,
+      startTimestamp: startTimestamp,
+      endTimestamp: endTimestamp,
+    },
+  };
+  // writeLargeFileToGitHub(fileName, dataToWrite);
+  writeFileLocally(`${__dirname}/${fileName}`, JSON.stringify(mineralOutputFile));
+
+  if (isFinalized) {
+    // TODO: write merkle root to chain
   }
-  writeOutputFile(fileName, dataToWrite);
 
   return true;
 }
 
-function readOutputFile(fileName: string): OutputFile {
-  try {
-    return JSON.parse(fs.readFileSync(fileName, 'utf8')) as OutputFile;
-  } catch (e) {
-    return {
-      users: {},
-      metadata: {
-        marketId: 0,
-        marketName: '',
-        totalPointsForMarket: '0',
-        startBlock: 0,
-        endBlock: 0,
-        startTimestamp: 0,
-        endTimestamp: 0,
-      },
+async function calculateFinalMinerals(
+  userToPointsMap: Record<string, string>,
+  epoch: number,
+): Promise<Record<string, UserMineralAllocation>> {
+  if (epoch === 0) {
+    return Object.keys(userToPointsMap).reduce((memo, user) => {
+      memo[user] = {
+        minerals: new BigNumber(userToPointsMap[user]),
+        multiplier: INTEGERS.ONE,
+      };
+      return memo;
+    }, {} as Record<string, UserMineralAllocation>)
+  }
+
+  const previousMinerals = await readFileFromGitHub<MineralOutputFile>(getFileNameByEpoch(epoch - 1));
+  return Object.keys(userToPointsMap).reduce((memo, user) => {
+    const userCurrent = new BigNumber(userToPointsMap[user]);
+    const userPrevious = new BigNumber(previousMinerals.users[user]?.minerals ?? '0');
+    const userPreviousMultiplier = new BigNumber(previousMinerals.users[user]?.multiplier ?? '1');
+    const userPreviousNormalized = userPrevious.dividedToIntegerBy(userPreviousMultiplier);
+    let newMultiplier = INTEGERS.ONE;
+    if (userCurrent.gt(userPreviousNormalized) && userPreviousNormalized.gt(INTEGERS.ZERO)) {
+      newMultiplier = userPreviousMultiplier.plus(0.5);
+      if (newMultiplier.gt(MAX_MULTIPLIER)) {
+        newMultiplier = MAX_MULTIPLIER
+      }
+    }
+
+    memo[user] = {
+      minerals: userCurrent.times(newMultiplier),
+      multiplier: newMultiplier,
     };
-  }
+    return memo;
+  }, {} as Record<string, UserMineralAllocation>)
 }
 
-function writeOutputFile(
-  fileName: string,
-  fileContent: OutputFile,
-): void {
-  if (!fs.existsSync(FOLDER_NAME)) {
-    fs.mkdirSync(FOLDER_NAME);
-  }
-
-  fs.writeFileSync(
-    fileName,
-    JSON.stringify(fileContent),
-    { encoding: 'utf8', flag: 'w' },
-  );
+function getFileNameByEpoch(epoch: number): string {
+  return `finalized/minerals/minerals-season-${SEASON_NUMBER}-epoch-${epoch}-output.json`
 }
 
-start()
-  .then(() => {
-    console.log('Finished executing script!');
-  })
-  .catch(error => {
-    console.error('Caught error while starting:', error);
-    process.exit(1);
-  });
+if (process.env.MINERALS_ENABLED !== 'true') {
+  start()
+    .then(() => {
+      console.log('Finished executing script!');
+    })
+    .catch(error => {
+      console.error('Caught error while starting:', error);
+      process.exit(1);
+    });
+}
