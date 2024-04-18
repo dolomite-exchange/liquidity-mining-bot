@@ -7,22 +7,6 @@
       "endBlockNumber": 202117429,
       "endTimestamp": 1713398400,
       "isFinalized": true
-    },
-    "1": {
-      "epoch": 1,
-      "startBlockNumber": 202117429,
-      "startTimestamp": 1713398400,
-      "endBlockNumber": 202187402,
-      "endTimestamp": 1713416225,
-      "isFinalized": true
-    },
-    "2": {
-      "epoch": 2,
-      "startBlockNumber": 202187402,
-      "startTimestamp": 1713416225,
-      "endBlockNumber": 202188354,
-      "endTimestamp": 1713416466,
-      "isFinalized": false
     }
   }
 }
