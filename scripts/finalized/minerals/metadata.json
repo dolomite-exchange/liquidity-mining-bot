@@ -1,9 +1,3 @@
 {
-  "maxEpochNumber": 0,
-  "epochStatuses": {
-    "0": {
-      "merkleRootWrittenOnChain": false,
-      "merkleRootGenerated": false
-    }
-  }
+  "maxEpochNumber": 0
 }
