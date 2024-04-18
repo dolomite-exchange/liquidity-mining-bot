@@ -14,7 +14,7 @@
       "startTimestamp": 1713398400,
       "endBlockNumber": 202191556,
       "endTimestamp": 1713417281,
-      "isFinalized": true
+      "isFinalized": false
     }
   }
 }
