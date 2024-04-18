@@ -51,6 +51,7 @@ export default class MineralsUpdater {
     });
     try {
       await calculateMineralRewards(epochNumber);
+      this.skipConfigUpdate = false;
     } catch (e: any) {
       this.skipConfigUpdate = true;
       Logger.error({

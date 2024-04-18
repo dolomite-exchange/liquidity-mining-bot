@@ -8,7 +8,7 @@ import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
 import './lib/env-reader';
-import { MineralConfigFile } from './calculate-mineral-season-config';
+import { MineralConfigFile, writeMineralConfigToGitHub } from './calculate-mineral-season-config';
 import {
   getAccountBalancesByMarket,
   getAmmLiquidityPositionAndEvents,
@@ -94,7 +94,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     startTimestamp,
     endBlockNumber,
     endTimestamp,
-    isFinalized,
+    isTimeElapsed,
   } = liquidityMiningConfig.epochs[epoch];
 
   const networkId = await dolomite.web3.eth.net.getId();
@@ -191,7 +191,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
 
   let merkleRoot: string | null;
   let userToMineralsMapForFile: any;
-  if (isFinalized) {
+  if (isTimeElapsed) {
     const userToAmountMap = Object.keys(userToMineralsDataMap).reduce((memo, k) => {
       memo[k] = userToMineralsDataMap[k].minerals;
       return memo;
@@ -248,23 +248,23 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
   };
   await writeLargeFileToGitHub(fileName, mineralOutputFile, false);
 
-  const metadataFilePath = 'scripts/finalized/minerals/metadata.json';
-  const metadata = await readFileFromGitHub<MineralMetadata>(metadataFilePath);
-  let epochStatus: EpochStatus = metadata.epochStatuses[epoch];
-  if (!epochStatus) {
-    epochStatus = {
-      merkleRootWrittenOnChain: false,
-      merkleRootGenerated: isFinalized,
-    };
-    metadata.epochStatuses[epoch] = epochStatus;
+  if (merkleRoot) {
+    liquidityMiningConfig.epochs[epoch].isMerkleRootGenerated = true;
+    await writeMineralConfigToGitHub(liquidityMiningConfig, liquidityMiningConfig.epochs[epoch]);
   }
 
-  epochStatus.merkleRootGenerated = isFinalized;
-  await writeLargeFileToGitHub(metadataFilePath, metadata, true)
-
-  if (epochStatus.merkleRootGenerated && !epochStatus.merkleRootWrittenOnChain) {
+  if (merkleRoot) {
     // TODO: write merkle root to chain
-    // TODO: move this to another that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds for an update)
+    // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds for an update)
+
+    const metadataFilePath = 'scripts/finalized/minerals/metadata.json';
+    const metadata = await readFileFromGitHub<MineralMetadata>(metadataFilePath);
+
+    // Once the merkle root is written, update the metadata to the new highest epoch that is finalized
+    if (metadata.maxEpochNumber === epoch - 1) {
+      metadata.maxEpochNumber = epoch;
+    }
+    await writeLargeFileToGitHub(metadataFilePath, metadata, true)
   }
 }
 
