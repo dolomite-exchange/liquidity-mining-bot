@@ -75,11 +75,6 @@ export default class MarketStore {
   };
 
   _update = async (rawBlockNumber?: number) => {
-    Logger.info({
-      at: 'MarketStore#_update',
-      message: 'Updating markets...',
-    });
-
     let blockNumber: number;
     if (rawBlockNumber === undefined) {
       blockNumber = this.blockStore.getBlockNumber();
@@ -93,6 +88,12 @@ export default class MarketStore {
     } else {
       blockNumber = rawBlockNumber;
     }
+
+    Logger.info({
+      at: 'MarketStore#_update',
+      message: 'Updating markets...',
+      blockNumber,
+    });
 
     const nextDolomiteMarkets = await Pageable.getPageableValues(async (lastId) => {
       const result = await getDolomiteMarkets(blockNumber, lastId);

@@ -4,7 +4,7 @@ import { delay } from './delay';
 import Logger from './logger';
 
 const SHORT_WAIT_DURATION = 30 * 1_000; // 30 seconds in millis
-const WAIT_DURATION = 3_540 * 1_000; // 59 minutes in millis
+const LONG_WAIT_DURATION = 3_540 * 1_000; // 59 minutes in millis
 
 export default class MineralsUpdater {
   start = () => {
@@ -22,7 +22,7 @@ export default class MineralsUpdater {
     for (; ;) {
       try {
         await this._update();
-        await delay(WAIT_DURATION);
+        await delay(LONG_WAIT_DURATION);
       } catch (e) {
         await delay(SHORT_WAIT_DURATION);
       }
@@ -45,7 +45,16 @@ export default class MineralsUpdater {
       at: 'MineralsUpdater#_update',
       message: `Calculating mineral rewards for epoch ${epochNumber}`,
     });
-    await calculateMineralRewards();
+    try {
+      await calculateMineralRewards(epochNumber);
+    } catch (e: any) {
+      Logger.error({
+        at: 'MineralsUpdater#_update',
+        message: `Error calculating mineral rewards: ${e.message}`,
+        e,
+      });
+      throw e;
+    }
 
     Logger.info({
       at: 'MineralsUpdater#_update',
