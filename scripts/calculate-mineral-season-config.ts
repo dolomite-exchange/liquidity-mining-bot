@@ -12,7 +12,7 @@ export interface MineralConfig {
 const FILE_NAME_WITH_PATH = `scripts/config/mineral-season-0.json`;
 const ONE_WEEK = 604_800;
 
-export async function calculateMineralSeasonConfig(): Promise<number> {
+export async function calculateMineralSeasonConfig(skipConfigUpdate: boolean = false): Promise<number> {
   const outputFile = await readFileFromGitHub<MineralConfigFile>(FILE_NAME_WITH_PATH);
   const epochNumber: number = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   let maxKey = epochNumber
@@ -24,6 +24,10 @@ export async function calculateMineralSeasonConfig(): Promise<number> {
       }
       return Math.max(max, parseInt(key, 10))
     }, 0);
+  }
+
+  if (skipConfigUpdate) {
+    return maxKey;
   }
 
   const oldEpoch = outputFile.epochs[maxKey];

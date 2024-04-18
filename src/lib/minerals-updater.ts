@@ -7,6 +7,9 @@ const SHORT_WAIT_DURATION = 60 * 1_000; // 60 seconds in millis
 const LONG_WAIT_DURATION = 3_540 * 1_000; // 59 minutes in millis
 
 export default class MineralsUpdater {
+
+  private skipConfigUpdate = false;
+
   start = () => {
     Logger.info({
       at: 'MineralsUpdater#start',
@@ -23,6 +26,7 @@ export default class MineralsUpdater {
       try {
         await this._update();
         await delay(LONG_WAIT_DURATION);
+        this.skipConfigUpdate = false;
       } catch (e) {
         await delay(SHORT_WAIT_DURATION);
       }
@@ -35,7 +39,7 @@ export default class MineralsUpdater {
       message: 'Starting update...',
     });
 
-    const epochNumber = await calculateMineralSeasonConfig();
+    const epochNumber = await calculateMineralSeasonConfig(this.skipConfigUpdate);
     Logger.info({
       at: 'MineralsUpdater#_update',
       message: `Finished updating season config for epoch ${epochNumber}`,
@@ -48,6 +52,7 @@ export default class MineralsUpdater {
     try {
       await calculateMineralRewards(epochNumber);
     } catch (e: any) {
+      this.skipConfigUpdate = true;
       Logger.error({
         at: 'MineralsUpdater#_update',
         message: `Error calculating mineral rewards: ${e.message}`,
