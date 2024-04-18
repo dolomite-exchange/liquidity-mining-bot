@@ -2,8 +2,8 @@ FROM node:16.15.1-alpine
 
 RUN apk update &&  \
     apk upgrade && \
-    apk -Uuv add --no-cache make g++ git python py-pip jq openssh curl openssh docker python3 &&  \
-    pip3 install -U pip
+    apk -Uuv add --no-cache make g++ git py-pip jq openssh curl openssh docker &&  \
+    pip install --upgrade pip awscli
 
 RUN python3 -m pip install --no-cache-dir --upgrade awscli
 
