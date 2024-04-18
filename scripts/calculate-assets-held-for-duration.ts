@@ -9,14 +9,15 @@ import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
-import liquidityMiningConfig from './config/oarb-season-0.json';
 import './lib/env-reader';
+import { MineralConfigFile } from './calculate-mineral-season-config';
 import {
   getAccountBalancesByMarket,
   getAmmLiquidityPositionAndEvents,
   getArbVestingLiquidityPositionAndEvents,
   getBalanceChangingEvents,
 } from './lib/event-parser';
+import { readFileFromGitHub } from './lib/file-helpers';
 import {
   ARB_VESTER_PROXY,
   calculateFinalPoints,
@@ -46,6 +47,8 @@ interface OutputFile {
 const FOLDER_NAME = `${__dirname}/output`;
 
 async function start() {
+  const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>('config/mineral-season-0.json');
+
   const epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   if (Number.isNaN(epoch) || !liquidityMiningConfig.epochs[epoch]) {
     return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
