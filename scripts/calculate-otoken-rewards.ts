@@ -10,6 +10,7 @@ import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
 import './lib/env-reader';
 import { OTokenConfigFile } from './calculate-otoken-season-config';
+import { getFinalizedOTokenFileNameWithPath, getOTokenConfigFileNameWithPath, OTokenType } from './lib/config-helper';
 import {
   getAccountBalancesByMarket,
   getAmmLiquidityPositionAndEvents,
@@ -49,7 +50,16 @@ const MINIMUM_O_TOKEN_AMOUNT_WEI = new BigNumber(ethers.utils.parseEther('0.01')
 const REWARD_MULTIPLIERS_MAP = {};
 
 async function start() {
-  const oTokenConfig = await readFileFromGitHub<OTokenConfigFile>('config/oarb-season-0');
+  const oTokenType = process.env.OTOKEN_TYPE;
+  const oTokens = Object.values(OTokenType);
+  if (!oTokenType || !oTokens.includes(oTokenType as any)) {
+    return Promise.reject(new Error(`Invalid OTOKEN_TYPE, found: ${oTokenType}, expected one of ${oTokens}`));
+  }
+
+  const networkId = await dolomite.web3.eth.net.getId();
+  const oTokenConfig = await readFileFromGitHub<OTokenConfigFile>(
+    getOTokenConfigFileNameWithPath(networkId, oTokenType as any),
+  );
 
   const epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   if (Number.isNaN(epoch) || !oTokenConfig.epochs[epoch]) {
@@ -81,7 +91,6 @@ async function start() {
   }
 
   const { riskParams } = await getDolomiteRiskParams(startBlockNumber);
-  const networkId = await dolomite.web3.eth.net.getId();
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address;
   if (riskParams.dolomiteMargin !== libraryDolomiteMargin) {
@@ -171,7 +180,7 @@ async function start() {
 
   const { merkleRoot, walletAddressToLeavesMap } = calculateMerkleRootAndProofs(userToOTokenRewards);
 
-  const fileName = `finalized/oarb/oarb-season-0-epoch-${epoch}-output.json`;
+  const fileName = getFinalizedOTokenFileNameWithPath(networkId, OTokenType.oARB, epoch);
   const dataToWrite: OTokenOutputFile = {
     users: walletAddressToLeavesMap,
     metadata: {

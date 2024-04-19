@@ -9,7 +9,11 @@ import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
 import './lib/env-reader';
 import { MineralConfigFile, writeMineralConfigToGitHub } from './calculate-mineral-season-config';
-import { getMineralConfigFileNameWithPath } from './lib/config-helper';
+import {
+  getFinalizedMineralFileNameWithPath,
+  getFinalizedMineralMetadataFileNameWithPath,
+  getMineralConfigFileNameWithPath,
+} from './lib/config-helper';
 import {
   getAccountBalancesByMarket,
   getAmmLiquidityPositionAndEvents,
@@ -69,8 +73,6 @@ export interface MineralOutputFile {
     endTimestamp: number;
   };
 }
-
-const SEASON_NUMBER = 0;
 
 const SECONDS_PER_WEEK = 86_400 * 7;
 const WETH_MARKET_ID = '0';
@@ -189,7 +191,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     poolToTotalSubLiquidityPoints,
   );
 
-  const userToMineralsDataMap = await calculateFinalMinerals(userToPointsMap, epoch);
+  const userToMineralsDataMap = await calculateFinalMinerals(userToPointsMap, networkId, epoch);
 
   let merkleRoot: string | null;
   let userToMineralsMapForFile: any;
@@ -234,7 +236,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
   );
 
   // eslint-disable-next-line max-len
-  const fileName = getFileNameByEpoch(epoch);
+  const fileName = getFinalizedMineralMetadataFileNameWithPath(networkId);
   const mineralOutputFile: MineralOutputFile = {
     users: userToMineralsMapForFile,
     metadata: {
@@ -260,7 +262,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     // TODO: write merkle root to chain
     // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds for an update)
 
-    const metadataFilePath = 'finalized/minerals/metadata.json';
+    const metadataFilePath = getFinalizedMineralMetadataFileNameWithPath(networkId);
     const metadata = await readFileFromGitHub<MineralMetadata>(metadataFilePath);
 
     // Once the merkle root is written, update the metadata to the new highest epoch that is finalized
@@ -273,6 +275,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
 
 async function calculateFinalMinerals(
   userToPointsMap: Record<string, string>,
+  networkId: number,
   epoch: number,
 ): Promise<Record<string, UserMineralAllocation>> {
   if (epoch === 0) {
@@ -285,7 +288,9 @@ async function calculateFinalMinerals(
     }, {} as Record<string, UserMineralAllocation>)
   }
 
-  const previousMinerals = await readFileFromGitHub<MineralOutputFile>(getFileNameByEpoch(epoch - 1));
+  const previousMinerals = await readFileFromGitHub<MineralOutputFile>(
+    getFinalizedMineralFileNameWithPath(networkId, epoch - 1),
+  );
   return Object.keys(userToPointsMap).reduce((memo, user) => {
     const userCurrent = new BigNumber(userToPointsMap[user]);
     const userPrevious = new BigNumber(previousMinerals.users[user]?.minerals ?? '0');
@@ -305,10 +310,6 @@ async function calculateFinalMinerals(
     };
     return memo;
   }, {} as Record<string, UserMineralAllocation>)
-}
-
-function getFileNameByEpoch(epoch: number): string {
-  return `finalized/minerals/minerals-season-${SEASON_NUMBER}-epoch-${epoch}-output.json`
 }
 
 if (process.env.MINERALS_ENABLED !== 'true') {

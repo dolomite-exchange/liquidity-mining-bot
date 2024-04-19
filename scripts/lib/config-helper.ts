@@ -71,16 +71,59 @@ export async function getNextConfigIfNeeded(oldEpoch: EpochConfig): Promise<Next
   };
 }
 
+const MINERAL_SEASON = 0;
+const OARB_SEASON = 0;
+const OMATIC_SEASON = 0;
+
 /**
  * path cannot start with a "/"
  */
 export function getMineralConfigFileNameWithPath(networkId: number): string {
-  return `config/${networkId}/mineral-season-0.json`
+  return `config/${networkId}/mineral-season-${MINERAL_SEASON}.json`
 }
 
 /**
  * path cannot start with a "/"
  */
 export function getOTokenConfigFileNameWithPath(networkId: number, oTokenType: OTokenType): string {
-  return `config/${networkId}/${oTokenType}-season-0.json`
+  return `config/${networkId}/${oTokenType}-season-${getSeasonForOTokenType(oTokenType)}.json`
+}
+
+/**
+ * path cannot start with a "/"
+ */
+export function getFinalizedMineralMetadataFileNameWithPath(networkId: number): string {
+  return `finalized/${networkId}/minerals/metadata.json`
+}
+
+/**
+ * path cannot start with a "/"
+ */
+export function getFinalizedOTokenMetadataFileNameWithPath(networkId: number, oTokenType: OTokenType): string {
+  return `finalized/${networkId}/${oTokenType}/metadata.json`
+}
+
+/**
+ * path cannot start with a "/"
+ */
+export function getFinalizedMineralFileNameWithPath(networkId: number, epoch: number): string {
+  return `finalized/${networkId}/minerals/minerals-season-${MINERAL_SEASON}-epoch-${epoch}.json`
+}
+
+/**
+ * path cannot start with a "/"
+ */
+export function getFinalizedOTokenFileNameWithPath(networkId: number, oTokenType: OTokenType, epoch: number): string {
+  const season = getSeasonForOTokenType(oTokenType);
+  return `finalized/${networkId}/${oTokenType}/${oTokenType}-season-${season}-epoch-${epoch}.json`
+}
+
+function getSeasonForOTokenType(oTokenType: OTokenType): number {
+  if (oTokenType === OTokenType.oARB) {
+    return OARB_SEASON;
+  } else if (oTokenType === OTokenType.oMATIC) {
+    return OMATIC_SEASON;
+  }
+
+  throw new Error(`Invalid oTokenType, found ${oTokenType}`);
 }
