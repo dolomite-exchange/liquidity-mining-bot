@@ -11,6 +11,7 @@ import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
 import './lib/env-reader';
 import { MineralConfigFile } from './calculate-mineral-season-config';
+import { getMineralConfigFileNameWithPath } from './lib/config-helper';
 import {
   getAccountBalancesByMarket,
   getAmmLiquidityPositionAndEvents,
@@ -23,7 +24,8 @@ import {
   calculateFinalPoints,
   calculateLiquidityPoints,
   calculateTotalRewardPoints,
-  ETH_USDC_POOL, InterestOperation,
+  ETH_USDC_POOL,
+  InterestOperation,
   LiquidityPositionsAndEvents,
 } from './lib/rewards';
 
@@ -47,7 +49,9 @@ interface OutputFile {
 const FOLDER_NAME = `${__dirname}/output`;
 
 async function start() {
-  const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>('config/mineral-season-0.json');
+  const networkId = await dolomite.web3.eth.net.getId();
+
+  const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>(getMineralConfigFileNameWithPath(networkId));
 
   const epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   if (Number.isNaN(epoch) || !liquidityMiningConfig.epochs[epoch]) {
@@ -73,8 +77,6 @@ async function start() {
   const startTimestamp = liquidityMiningConfig.epochs[epoch].startTimestamp;
   const endBlockNumber = liquidityMiningConfig.epochs[epoch].endBlockNumber;
   const endTimestamp = liquidityMiningConfig.epochs[epoch].endTimestamp;
-
-  const networkId = await dolomite.web3.eth.net.getId();
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address;
   if (networkId !== Number(process.env.NETWORK_ID)) {
@@ -111,7 +113,11 @@ async function start() {
     return result.accounts;
   });
 
-  const accountToDolomiteBalanceMap = getAccountBalancesByMarket(apiAccounts, startTimestamp, validRewardMultipliersMap);
+  const accountToDolomiteBalanceMap = getAccountBalancesByMarket(
+    apiAccounts,
+    startTimestamp,
+    validRewardMultipliersMap,
+  );
 
   const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
 

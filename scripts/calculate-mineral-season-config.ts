@@ -1,23 +1,23 @@
 import Logger from '../src/lib/logger';
 import './lib/env-reader';
-import { EpochConfig, getNextConfigIfNeeded } from './lib/config-helper';
+import { ConfigFile, EpochConfig, getMineralConfigFileNameWithPath, getNextConfigIfNeeded } from './lib/config-helper';
 import { readFileFromGitHub, writeLargeFileToGitHub } from './lib/file-helpers';
 
-export interface MineralConfigEpoch extends EpochConfig {}
-
-export interface MineralConfigFile {
-  epochs: {
-    [epoch: string]: MineralConfigEpoch
-  };
+export interface MineralConfigEpoch extends EpochConfig {
 }
 
-/**
- * path cannot start with a "/"
- */
-const FILE_NAME_WITH_PATH = `config/mineral-season-0.json`;
+export interface MineralConfigFile extends ConfigFile<MineralConfigEpoch> {
+}
 
-export async function calculateMineralSeasonConfig(skipConfigUpdate: boolean = false): Promise<number> {
-  const configFile = await readFileFromGitHub<MineralConfigFile>(FILE_NAME_WITH_PATH);
+export async function calculateMineralSeasonConfig(
+  skipConfigUpdate: boolean = false,
+  networkId: number = parseInt(process.env.NETWORK_ID),
+): Promise<number> {
+  if (Number.isNaN(networkId)) {
+    return Promise.reject(new Error('Invalid network ID'));
+  }
+
+  const configFile = await readFileFromGitHub<MineralConfigFile>(getMineralConfigFileNameWithPath(networkId));
   const epochNumber: number = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   let maxKey = epochNumber
   if (isNaN(epochNumber)) {
@@ -55,7 +55,7 @@ export async function calculateMineralSeasonConfig(skipConfigUpdate: boolean = f
     endTimestamp: nextEpochData.actualEndTimestamp,
     isTimeElapsed: nextEpochData.newEndTimestamp === nextEpochData.actualEndTimestamp,
     isMerkleRootGenerated: false,
-    isMerkleRootWrittenOnChain: false
+    isMerkleRootWrittenOnChain: false,
   };
   await writeMineralConfigToGitHub(configFile, epochData);
 
@@ -68,7 +68,7 @@ export async function writeMineralConfigToGitHub(
 ): Promise<void> {
   configFile.epochs[epochData.epoch] = epochData;
   await writeLargeFileToGitHub(
-    FILE_NAME_WITH_PATH,
+    getMineralConfigFileNameWithPath(configFile.metadata.networkId),
     configFile,
     true,
   );

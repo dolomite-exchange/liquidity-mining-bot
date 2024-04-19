@@ -1,26 +1,34 @@
 import './lib/env-reader';
-import { MineralConfigEpoch, MineralConfigFile } from './calculate-mineral-season-config';
-import { EpochConfig, getNextConfigIfNeeded } from './lib/config-helper';
+import Logger from '../src/lib/logger';
+import {
+  ConfigFile,
+  EpochConfig,
+  getNextConfigIfNeeded,
+  getOTokenConfigFileNameWithPath,
+  OTokenType,
+} from './lib/config-helper';
 import { readFileFromGitHub, writeLargeFileToGitHub } from './lib/file-helpers';
 
-interface OTokenEpochConfig extends EpochConfig {
+interface OTokenConfigEpoch extends EpochConfig {
   oTokenAmount: string;
   rewardWeights: Record<string, string>;
 }
 
-export interface OTokenConfigFile {
-  epochs: {
-    [epoch: string]: OTokenEpochConfig
-  };
+export interface OTokenConfigFile extends ConfigFile<OTokenConfigEpoch> {
 }
 
-/**
- * path cannot start with a "/"
- */
-const FILE_NAME_WITH_PATH = `config/oarb-season-0.json`;
+async function calculateOTokenSeasonConfig(
+  skipConfigUpdate: boolean = false,
+  networkId: number = parseInt(process.env.NETWORK_ID),
+): Promise<number> {
+  if (Number.isNaN(networkId)) {
+    return Promise.reject(new Error('Invalid network ID'));
+  }
 
-async function start() {
-  const oTokenConfigFile = await readFileFromGitHub<OTokenConfigFile>(FILE_NAME_WITH_PATH);
+  const oTokenConfigFile = await readFileFromGitHub<OTokenConfigFile>(getOTokenConfigFileNameWithPath(
+    networkId,
+    OTokenType.oARB,
+  ));
   const selectedEpoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   let maxKey = selectedEpoch
   if (isNaN(selectedEpoch)) {
@@ -33,10 +41,18 @@ async function start() {
     }, 0);
   }
 
+  if (skipConfigUpdate) {
+    Logger.info({
+      message: 'calculateOTokenSeasonConfig: Skipping config update...',
+      epochNumber: maxKey,
+    });
+    return maxKey;
+  }
+
   const oldEpoch = oTokenConfigFile.epochs[maxKey];
   const nextEpochData = await getNextConfigIfNeeded(oldEpoch);
 
-  const epochData: OTokenEpochConfig = {
+  const epochData: OTokenConfigEpoch = {
     epoch: nextEpochData.isReadyForNext ? maxKey + 1 : maxKey,
     startBlockNumber: nextEpochData.newStartBlockNumber,
     startTimestamp: nextEpochData.newStartTimestamp,
@@ -46,28 +62,31 @@ async function start() {
     oTokenAmount: oldEpoch.oTokenAmount,
     rewardWeights: oldEpoch.rewardWeights,
     isMerkleRootGenerated: false,
-    isMerkleRootWrittenOnChain: false
+    isMerkleRootWrittenOnChain: false,
   };
 
-  await writeMineralConfigToGitHub(oTokenConfigFile, epochData);
+  await writeOTokenConfigToGitHub(oTokenConfigFile, epochData);
 
-  return true;
+  return epochData.epoch;
 }
 
-export async function writeMineralConfigToGitHub(
-  configFile: MineralConfigFile,
-  epochData: MineralConfigEpoch,
+export async function writeOTokenConfigToGitHub(
+  configFile: OTokenConfigFile,
+  epochData: OTokenConfigEpoch,
 ): Promise<void> {
   configFile.epochs[epochData.epoch] = epochData;
   await writeLargeFileToGitHub(
-    FILE_NAME_WITH_PATH,
+    getOTokenConfigFileNameWithPath(
+      configFile.metadata.networkId,
+      OTokenType.oARB,
+    ),
     configFile,
     true,
   );
 }
 
 
-start()
+calculateOTokenSeasonConfig()
   .then(() => {
     console.log('Finished executing script!');
   })

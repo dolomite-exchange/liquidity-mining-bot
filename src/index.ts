@@ -60,7 +60,6 @@ async function start() {
   const requestUpdaterStore = new LevelUpdateRequestStore(blockStore);
   const requestUpdaterCache = new LevelUpdateRequestCache();
   const dolomiteRequestUpdater = new DolomiteLevelRequestUpdater(requestUpdaterStore, requestUpdaterCache, blockStore);
-  const mineralsUpdater = new MineralsUpdater();
   const gasPriceUpdater = new GasPriceUpdater();
 
   await loadAccounts();
@@ -69,6 +68,7 @@ async function start() {
   const subgraphBlockNumber = blockStore.getBlockNumber();
   const { riskParams } = await getDolomiteRiskParams(subgraphBlockNumber);
   const networkId = await dolomite.web3.eth.net.getId();
+  const mineralsUpdater = new MineralsUpdater(networkId);
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address
   if (riskParams.dolomiteMargin !== libraryDolomiteMargin) {

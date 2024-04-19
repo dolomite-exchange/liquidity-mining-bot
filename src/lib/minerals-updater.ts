@@ -10,6 +10,8 @@ export default class MineralsUpdater {
 
   private skipConfigUpdate = false;
 
+  constructor(private readonly networkId) {}
+
   start = () => {
     Logger.info({
       at: 'MineralsUpdater#start',
@@ -39,7 +41,7 @@ export default class MineralsUpdater {
       message: 'Starting update...',
     });
 
-    const epochNumber = await calculateMineralSeasonConfig(this.skipConfigUpdate);
+    const epochNumber = await calculateMineralSeasonConfig(this.skipConfigUpdate, this.networkId);
     Logger.info({
       at: 'MineralsUpdater#_update',
       message: `Finished updating season config for epoch ${epochNumber}`,

@@ -9,6 +9,7 @@ import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
 import './lib/env-reader';
 import { MineralConfigFile, writeMineralConfigToGitHub } from './calculate-mineral-season-config';
+import { getMineralConfigFileNameWithPath } from './lib/config-helper';
 import {
   getAccountBalancesByMarket,
   getAmmLiquidityPositionAndEvents,
@@ -81,7 +82,9 @@ const VALID_REWARD_MULTIPLIERS_MAP = {
 const MAX_MULTIPLIER = new BigNumber('5');
 
 export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)): Promise<void> {
-  const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>('config/mineral-season-0.json');
+  const networkId = await dolomite.web3.eth.net.getId();
+
+  const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>(getMineralConfigFileNameWithPath(networkId));
   if (Number.isNaN(epoch) || !liquidityMiningConfig.epochs[epoch]) {
     return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
   }
@@ -97,8 +100,6 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     endTimestamp,
     isTimeElapsed,
   } = liquidityMiningConfig.epochs[epoch];
-
-  const networkId = await dolomite.web3.eth.net.getId();
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address;
   if (networkId !== Number(process.env.NETWORK_ID)) {

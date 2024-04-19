@@ -1,5 +1,10 @@
 import { getLatestBlockNumberByTimestamp } from '../../src/clients/blocks';
 
+export enum OTokenType {
+  oARB = 'oarb',
+  oMATIC = 'omatic',
+}
+
 export interface EpochConfig {
   epoch: number;
   startTimestamp: number;
@@ -9,6 +14,15 @@ export interface EpochConfig {
   isTimeElapsed: boolean;
   isMerkleRootGenerated: boolean;
   isMerkleRootWrittenOnChain: boolean;
+}
+
+export interface ConfigFile<T> {
+  epochs: {
+    [epoch: string]: T
+  };
+  metadata: {
+    networkId: number;
+  };
 }
 
 interface NextConfig {
@@ -55,4 +69,18 @@ export async function getNextConfigIfNeeded(oldEpoch: EpochConfig): Promise<Next
     actualEndBlockNumber: newEndBlockNumberResult.blockNumber,
     actualEndTimestamp: newEndBlockNumberResult.timestamp,
   };
+}
+
+/**
+ * path cannot start with a "/"
+ */
+export function getMineralConfigFileNameWithPath(networkId: number): string {
+  return `config/${networkId}/mineral-season-0.json`
+}
+
+/**
+ * path cannot start with a "/"
+ */
+export function getOTokenConfigFileNameWithPath(networkId: number, oTokenType: OTokenType): string {
+  return `config/${networkId}/${oTokenType}-season-0.json`
 }
