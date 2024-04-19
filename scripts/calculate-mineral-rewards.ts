@@ -10,6 +10,7 @@ import TokenAbi from './abis/isolation-mode-factory.json';
 import './lib/env-reader';
 import { MineralConfigFile, writeMineralConfigToGitHub } from './calculate-mineral-season-config';
 import {
+  EpochMetadata,
   getFinalizedMineralFileNameWithPath,
   getFinalizedMineralMetadataFileNameWithPath,
   getMineralConfigFileNameWithPath,
@@ -33,18 +34,6 @@ import {
 } from './lib/rewards';
 
 /* eslint-enable */
-
-interface EpochStatus {
-  merkleRootGenerated: boolean;
-  merkleRootWrittenOnChain: boolean;
-}
-
-interface MineralMetadata {
-  maxEpochNumber: number;
-  epochStatuses: {
-    [epochNumber: string]: EpochStatus;
-  };
-}
 
 interface UserMineralAllocation {
   minerals: Integer; // big int
@@ -236,7 +225,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
   );
 
   // eslint-disable-next-line max-len
-  const fileName = getFinalizedMineralMetadataFileNameWithPath(networkId);
+  const fileName = getFinalizedMineralFileNameWithPath(networkId, epoch);
   const mineralOutputFile: MineralOutputFile = {
     users: userToMineralsMapForFile,
     metadata: {
@@ -263,7 +252,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds for an update)
 
     const metadataFilePath = getFinalizedMineralMetadataFileNameWithPath(networkId);
-    const metadata = await readFileFromGitHub<MineralMetadata>(metadataFilePath);
+    const metadata = await readFileFromGitHub<EpochMetadata>(metadataFilePath);
 
     // Once the merkle root is written, update the metadata to the new highest epoch that is finalized
     if (metadata.maxEpochNumber === epoch - 1) {

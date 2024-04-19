@@ -9,8 +9,15 @@ import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
 import './lib/env-reader';
-import { OTokenConfigFile } from './calculate-otoken-season-config';
-import { getFinalizedOTokenFileNameWithPath, getOTokenConfigFileNameWithPath, OTokenType } from './lib/config-helper';
+import { OTokenConfigFile, writeOTokenConfigToGitHub } from './calculate-otoken-season-config';
+import {
+  EpochMetadata,
+  getFinalizedOTokenFileNameWithPath,
+  getFinalizedOTokenMetadataFileNameWithPath,
+  getOTokenConfigFileNameWithPath,
+  getOTokenTypeFromEnvironment,
+  OTokenType,
+} from './lib/config-helper';
 import {
   getAccountBalancesByMarket,
   getAmmLiquidityPositionAndEvents,
@@ -50,11 +57,7 @@ const MINIMUM_O_TOKEN_AMOUNT_WEI = new BigNumber(ethers.utils.parseEther('0.01')
 const REWARD_MULTIPLIERS_MAP = {};
 
 async function start() {
-  const oTokenType = process.env.OTOKEN_TYPE;
-  const oTokens = Object.values(OTokenType);
-  if (!oTokenType || !oTokens.includes(oTokenType as any)) {
-    return Promise.reject(new Error(`Invalid OTOKEN_TYPE, found: ${oTokenType}, expected one of ${oTokens}`));
-  }
+  const oTokenType = getOTokenTypeFromEnvironment();
 
   const networkId = await dolomite.web3.eth.net.getId();
   const oTokenConfig = await readFileFromGitHub<OTokenConfigFile>(
@@ -195,6 +198,25 @@ async function start() {
     },
   };
   await writeLargeFileToGitHub(fileName, dataToWrite, false);
+
+  if (merkleRoot) {
+    oTokenConfig.epochs[epoch].isMerkleRootGenerated = true;
+    await writeOTokenConfigToGitHub(oTokenConfig, oTokenConfig.epochs[epoch]);
+  }
+
+  if (merkleRoot) {
+    // TODO: write merkle root to chain
+    // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds for an update)
+
+    const metadataFilePath = getFinalizedOTokenMetadataFileNameWithPath(networkId, oTokenType);
+    const metadata = await readFileFromGitHub<EpochMetadata>(metadataFilePath);
+
+    // Once the merkle root is written, update the metadata to the new highest epoch that is finalized
+    if (metadata.maxEpochNumber === epoch - 1) {
+      metadata.maxEpochNumber = epoch;
+    }
+    await writeLargeFileToGitHub(metadataFilePath, metadata, true)
+  }
 
   return true;
 }

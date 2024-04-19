@@ -25,6 +25,10 @@ export interface ConfigFile<T> {
   };
 }
 
+export interface EpochMetadata {
+  maxEpochNumber: number;
+}
+
 interface NextConfig {
   /**
    * True if the old epoch has elapsed and the merkle root was generated
@@ -116,6 +120,15 @@ export function getFinalizedMineralFileNameWithPath(networkId: number, epoch: nu
 export function getFinalizedOTokenFileNameWithPath(networkId: number, oTokenType: OTokenType, epoch: number): string {
   const season = getSeasonForOTokenType(oTokenType);
   return `finalized/${networkId}/${oTokenType}/${oTokenType}-season-${season}-epoch-${epoch}.json`
+}
+
+export function getOTokenTypeFromEnvironment(): OTokenType {
+  const oTokenType = process.env.OTOKEN_TYPE;
+  const oTokens = Object.values(OTokenType);
+  if (!oTokenType || !oTokens.includes(oTokenType as any)) {
+    throw new Error(`Invalid OTOKEN_TYPE, found: ${oTokenType}, expected one of ${oTokens}`);
+  }
+  return oTokenType as OTokenType;
 }
 
 function getSeasonForOTokenType(oTokenType: OTokenType): number {
