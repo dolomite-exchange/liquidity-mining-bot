@@ -53,32 +53,32 @@ export async function writeLargeFileToGitHub(
     let message: string;
     if (filePath.includes('config')) {
       if (filePath.includes('mineral')) {
-        message = 'Updated mineral config';
+        message = 'AUTOMATED: Updated mineral config';
       } else if (filePath.includes('oarb')) {
-        message = 'Updated oARB config';
+        message = 'AUTOMATED: Updated oARB config';
       } else {
-        message = 'Updated config';
+        message = 'AUTOMATED: Updated config';
       }
     } else if (filePath.includes('finalized')) {
       if (filePath.includes('mineral')) {
         const mineralData = fileContent as MineralOutputFile;
         if (fileContent.metadata.merkleRoot) {
-          message = `Added finalized minerals for epoch ${mineralData.metadata.epoch}`;
+          message = `AUTOMATED: Added finalized minerals for epoch ${mineralData.metadata.epoch}`;
         } else {
-          message = `Updated minerals for epoch ${mineralData.metadata.epoch}`;
+          message = `AUTOMATED: Updated minerals for epoch ${mineralData.metadata.epoch}`;
         }
       } else if (filePath.includes('oarb')) {
         const oArbData = fileContent as MineralOutputFile;
         if (fileContent.metadata.merkleRoot) {
-          message = `Added finalized oARB for epoch ${oArbData.metadata.epoch}`;
+          message = `AUTOMATED: Added finalized oARB for epoch ${oArbData.metadata.epoch}`;
         } else {
-          message = `Updated oARB for epoch ${oArbData.metadata.epoch}`;
+          message = `AUTOMATED: Updated oARB for epoch ${oArbData.metadata.epoch}`;
         }
       } else {
-        message = 'Added finalized data';
+        message = 'AUTOMATED: Added finalized data';
       }
     } else {
-      message = 'Add large file';
+      message = 'AUTOMATED: Add large file';
     }
 
     const commit = await axios.post(`${FOLDER_URL}/git/commits`, {
