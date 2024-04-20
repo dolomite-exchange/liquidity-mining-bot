@@ -11,7 +11,7 @@ export interface MineralConfigFile extends ConfigFile<MineralConfigEpoch> {
 
 export async function calculateMineralSeasonConfig(
   skipConfigUpdate: boolean = false,
-  networkId: number = parseInt(process.env.NETWORK_ID),
+  networkId: number = parseInt(process.env.NETWORK_ID ?? ''),
 ): Promise<number> {
   if (Number.isNaN(networkId)) {
     return Promise.reject(new Error('Invalid network ID'));

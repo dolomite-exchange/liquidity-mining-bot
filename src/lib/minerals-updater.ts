@@ -29,7 +29,11 @@ export default class MineralsUpdater {
         await this._update();
         await delay(LONG_WAIT_DURATION);
         this.skipConfigUpdate = false;
-      } catch (e) {
+      } catch (e: any) {
+        Logger.error({
+          message: `Could not update minerals due to error: ${e.message}`,
+          error: e,
+        })
         await delay(SHORT_WAIT_DURATION);
       }
     }

@@ -83,7 +83,7 @@ const OMATIC_SEASON = 0;
  * path cannot start with a "/"
  */
 export function getMineralConfigFileNameWithPath(networkId: number): string {
-  return getConfigFilePath(networkId, 'minerals', MINERAL_SEASON);
+  return getConfigFilePath(networkId, 'mineral', MINERAL_SEASON);
 }
 
 /**
@@ -97,7 +97,7 @@ export function getOTokenConfigFileNameWithPath(networkId: number, oTokenType: O
  * path cannot start with a "/"
  */
 export function getMineralMetadataFileNameWithPath(networkId: number): string {
-  return getMetadataFilePath(networkId, 'minerals');
+  return getMetadataFilePath(networkId, 'mineral');
 }
 
 /**
@@ -111,7 +111,7 @@ export function getOTokenMetadataFileNameWithPath(networkId: number, oTokenType:
  * path cannot start with a "/"
  */
 export function getMineralFinalizedFileNameWithPath(networkId: number, epoch: number): string {
-  return getFinalizedFilePath(networkId, 'minerals', MINERAL_SEASON, epoch);
+  return getFinalizedFilePath(networkId, 'mineral', MINERAL_SEASON, epoch);
 }
 
 /**
@@ -141,14 +141,14 @@ function getSeasonForOTokenType(oTokenType: OTokenType): number {
   throw new Error(`Invalid oTokenType, found ${oTokenType}`);
 }
 
-function getConfigFilePath(networkId: number, type: OTokenType | 'minerals', season: number): string {
+function getConfigFilePath(networkId: number, type: OTokenType | 'mineral', season: number): string {
   return `config/${networkId}/${type}-season-${season}.json`
 }
 
-function getMetadataFilePath(networkId: number, type: OTokenType | 'minerals'): string {
+function getMetadataFilePath(networkId: number, type: OTokenType | 'mineral'): string {
   return `finalized/${networkId}/${type}/metadata.json`;
 }
 
-function getFinalizedFilePath(networkId: number, type: OTokenType | 'minerals', season: number, epoch: number): string {
+function getFinalizedFilePath(networkId: number, type: OTokenType | 'mineral', season: number, epoch: number): string {
   return `finalized/${networkId}/${type}/${type}-season-${season}-epoch-${epoch}-output.json`;
 }
