@@ -83,43 +83,43 @@ const OMATIC_SEASON = 0;
  * path cannot start with a "/"
  */
 export function getMineralConfigFileNameWithPath(networkId: number): string {
-  return `config/${networkId}/mineral-season-${MINERAL_SEASON}.json`
+  return getConfigFilePath(networkId, 'minerals', MINERAL_SEASON);
 }
 
 /**
  * path cannot start with a "/"
  */
 export function getOTokenConfigFileNameWithPath(networkId: number, oTokenType: OTokenType): string {
-  return `config/${networkId}/${oTokenType}-season-${getSeasonForOTokenType(oTokenType)}.json`
+  return getConfigFilePath(networkId, oTokenType, getSeasonForOTokenType(oTokenType));
 }
 
 /**
  * path cannot start with a "/"
  */
-export function getFinalizedMineralMetadataFileNameWithPath(networkId: number): string {
-  return `finalized/${networkId}/minerals/metadata.json`
+export function getMineralMetadataFileNameWithPath(networkId: number): string {
+  return getMetadataFilePath(networkId, 'minerals');
 }
 
 /**
  * path cannot start with a "/"
  */
-export function getFinalizedOTokenMetadataFileNameWithPath(networkId: number, oTokenType: OTokenType): string {
-  return `finalized/${networkId}/${oTokenType}/metadata.json`
+export function getOTokenMetadataFileNameWithPath(networkId: number, oTokenType: OTokenType): string {
+  return getMetadataFilePath(networkId, oTokenType);
 }
 
 /**
  * path cannot start with a "/"
  */
-export function getFinalizedMineralFileNameWithPath(networkId: number, epoch: number): string {
-  return `finalized/${networkId}/minerals/minerals-season-${MINERAL_SEASON}-epoch-${epoch}.json`
+export function getMineralFinalizedFileNameWithPath(networkId: number, epoch: number): string {
+  return getFinalizedFilePath(networkId, 'minerals', MINERAL_SEASON, epoch);
 }
 
 /**
  * path cannot start with a "/"
  */
-export function getFinalizedOTokenFileNameWithPath(networkId: number, oTokenType: OTokenType, epoch: number): string {
+export function getOTokenFinalizedFileNameWithPath(networkId: number, oTokenType: OTokenType, epoch: number): string {
   const season = getSeasonForOTokenType(oTokenType);
-  return `finalized/${networkId}/${oTokenType}/${oTokenType}-season-${season}-epoch-${epoch}.json`
+  return getFinalizedFilePath(networkId, oTokenType, season, epoch);
 }
 
 export function getOTokenTypeFromEnvironment(): OTokenType {
@@ -139,4 +139,16 @@ function getSeasonForOTokenType(oTokenType: OTokenType): number {
   }
 
   throw new Error(`Invalid oTokenType, found ${oTokenType}`);
+}
+
+function getConfigFilePath(networkId: number, type: OTokenType | 'minerals', season: number): string {
+  return `config/${networkId}/${type}-season-${season}.json`
+}
+
+function getMetadataFilePath(networkId: number, type: OTokenType | 'minerals'): string {
+  return `finalized/${networkId}/${type}/metadata.json`;
+}
+
+function getFinalizedFilePath(networkId: number, type: OTokenType | 'minerals', season: number, epoch: number): string {
+  return `finalized/${networkId}/${type}/${type}-season-${season}-epoch-${epoch}-output.json`;
 }

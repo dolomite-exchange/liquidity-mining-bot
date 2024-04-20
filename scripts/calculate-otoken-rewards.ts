@@ -12,8 +12,8 @@ import './lib/env-reader';
 import { OTokenConfigFile, writeOTokenConfigToGitHub } from './calculate-otoken-season-config';
 import {
   EpochMetadata,
-  getFinalizedOTokenFileNameWithPath,
-  getFinalizedOTokenMetadataFileNameWithPath,
+  getOTokenFinalizedFileNameWithPath,
+  getOTokenMetadataFileNameWithPath,
   getOTokenConfigFileNameWithPath,
   getOTokenTypeFromEnvironment,
   OTokenType,
@@ -183,7 +183,7 @@ async function start() {
 
   const { merkleRoot, walletAddressToLeavesMap } = calculateMerkleRootAndProofs(userToOTokenRewards);
 
-  const fileName = getFinalizedOTokenFileNameWithPath(networkId, OTokenType.oARB, epoch);
+  const fileName = getOTokenFinalizedFileNameWithPath(networkId, OTokenType.oARB, epoch);
   const dataToWrite: OTokenOutputFile = {
     users: walletAddressToLeavesMap,
     metadata: {
@@ -208,7 +208,7 @@ async function start() {
     // TODO: write merkle root to chain
     // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds for an update)
 
-    const metadataFilePath = getFinalizedOTokenMetadataFileNameWithPath(networkId, oTokenType);
+    const metadataFilePath = getOTokenMetadataFileNameWithPath(networkId, oTokenType);
     const metadata = await readFileFromGitHub<EpochMetadata>(metadataFilePath);
 
     // Once the merkle root is written, update the metadata to the new highest epoch that is finalized
