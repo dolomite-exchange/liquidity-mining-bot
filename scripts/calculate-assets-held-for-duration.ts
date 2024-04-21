@@ -9,7 +9,7 @@ import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
-import './lib/env-reader';
+import '../src/lib/env'
 import { MineralConfigFile } from './calculate-mineral-season-config';
 import { getMineralConfigFileNameWithPath } from './lib/config-helper';
 import {

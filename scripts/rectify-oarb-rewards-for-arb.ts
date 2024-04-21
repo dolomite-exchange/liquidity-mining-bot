@@ -1,7 +1,7 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { ethers } from 'ethers';
 import fs from 'fs';
-import './lib/env-reader';
+import '../src/lib/env'
 import { calculateMerkleRootAndProofs } from './lib/rewards';
 
 interface OutputFile {

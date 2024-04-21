@@ -1,20 +1,19 @@
 import Logger from '../src/lib/logger';
-import './lib/env-reader';
-import { ConfigFile, EpochConfig, getMineralConfigFileNameWithPath, getNextConfigIfNeeded } from './lib/config-helper';
-import { isScript } from './lib/env-reader';
-import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
+import {
+  getMineralConfigFileNameWithPath,
+  getNextConfigIfNeeded,
+  MineralConfigEpoch,
+  MineralConfigFile,
+  writeMineralConfigToGitHub,
+} from './lib/config-helper';
+import { isScript } from '../src/lib/env';
+import { readFileFromGitHub } from './lib/file-helpers';
 
 export const MAX_MINERALS_KEY_BEFORE_MIGRATIONS = 900
 
-export interface MineralConfigEpoch extends EpochConfig {
-}
-
-export interface MineralConfigFile extends ConfigFile<MineralConfigEpoch> {
-}
-
 export async function calculateMineralSeasonConfig(
   skipConfigUpdate: boolean = false,
-  networkId: number = parseInt(process.env.NETWORK_ID ?? ''),
+  networkId: number = parseInt(process.env.NETWORK_ID ?? '', 10),
 ): Promise<number> {
   if (Number.isNaN(networkId)) {
     return Promise.reject(new Error('Invalid network ID'));
@@ -23,7 +22,7 @@ export async function calculateMineralSeasonConfig(
   const configFile = await readFileFromGitHub<MineralConfigFile>(getMineralConfigFileNameWithPath(networkId));
   const epochNumber: number = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   let maxKey = epochNumber
-  if (isNaN(epochNumber)) {
+  if (Number.isNaN(epochNumber)) {
     maxKey = Object.keys(configFile.epochs).reduce((max, key) => {
       const value = parseInt(key, 10);
       if (value >= MAX_MINERALS_KEY_BEFORE_MIGRATIONS) {
@@ -62,18 +61,6 @@ export async function calculateMineralSeasonConfig(
   await writeMineralConfigToGitHub(configFile, epochData);
 
   return maxKey;
-}
-
-export async function writeMineralConfigToGitHub(
-  configFile: MineralConfigFile,
-  epochData: MineralConfigEpoch,
-): Promise<void> {
-  configFile.epochs[epochData.epoch] = epochData;
-  await writeFileToGitHub(
-    getMineralConfigFileNameWithPath(configFile.metadata.networkId),
-    configFile,
-    true,
-  );
 }
 
 if (isScript()) {

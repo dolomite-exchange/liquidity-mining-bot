@@ -7,7 +7,7 @@ import BlockStore from '../src/lib/block-store';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
-import './lib/env-reader';
+import '../src/lib/env'
 
 function getDiscountToDolomite(p: ApiLiquidityMiningVestingPosition): BigNumber {
   return new BigNumber(1).minus(new BigNumber(p.duration / 86_400 / 7).times(0.025));

@@ -8,17 +8,16 @@ import BlockStore from '../src/lib/block-store';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
-import './lib/env-reader';
+import { isScript } from '../src/lib/env'
 import { OTokenConfigFile, writeOTokenConfigToGitHub } from './calculate-otoken-season-config';
 import {
   EpochMetadata,
+  getOTokenConfigFileNameWithPath,
   getOTokenFinalizedFileNameWithPath,
   getOTokenMetadataFileNameWithPath,
-  getOTokenConfigFileNameWithPath,
   getOTokenTypeFromEnvironment,
   OTokenType,
 } from './lib/config-helper';
-import { isScript } from './lib/env-reader';
 import {
   getAccountBalancesByMarket,
   getAmmLiquidityPositionAndEvents,
@@ -89,11 +88,13 @@ async function start() {
 
   const totalOARbAmount = new BigNumber(oTokenConfig.epochs[epoch].oTokenAmount);
   const rewardWeights = oTokenConfig.epochs[epoch].rewardWeights as Record<string, string>;
-  const [oTokenRewardWeiMap, sumOfWeights] = Object.keys(rewardWeights)
-    .reduce<[Record<string, BigNumber>, BigNumber]>(([acc, sum], key) => {
-      acc[key] = new BigNumber(parseEther(rewardWeights[key]).toString());
-      return [acc, sum.plus(rewardWeights[key])];
-    }, [{}, new BigNumber(0)]);
+  const [
+    oTokenRewardWeiMap,
+    sumOfWeights,
+  ] = Object.keys(rewardWeights).reduce<[Record<string, BigNumber>, BigNumber]>(([acc, sum], key) => {
+    acc[key] = new BigNumber(parseEther(rewardWeights[key]).toString());
+    return [acc, sum.plus(rewardWeights[key])];
+  }, [{}, new BigNumber(0)]);
   if (!totalOARbAmount.eq(sumOfWeights)) {
     return Promise.reject(new Error(`Invalid reward weights sum, found: ${sumOfWeights.toString()}`));
   }
@@ -211,7 +212,8 @@ async function start() {
 
   if (merkleRoot) {
     // TODO: write merkle root to chain
-    // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds for an update)
+    // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds
+    //  for an update)
 
     const metadataFilePath = getOTokenMetadataFileNameWithPath(networkId, oTokenType);
     const metadata = await readFileFromGitHub<OTokenEpochMetadata>(metadataFilePath);
@@ -232,7 +234,7 @@ if (isScript()) {
       console.log('Finished executing script!');
     })
     .catch(error => {
-      console.error(`Caught error while running:`, error);
+      console.error('Caught error while running:', error);
       process.exit(1);
     });
 }

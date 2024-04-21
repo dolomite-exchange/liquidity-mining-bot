@@ -1,4 +1,4 @@
-import './lib/env-reader';
+import '../src/lib/env'
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { dolomite } from '../src/helpers/web3';
 import TokenAbi from './abis/isolation-mode-factory.json';
@@ -26,7 +26,7 @@ interface OldFinalizedOutputFile {
 }
 
 async function migrateOArbFinalizedAmounts(): Promise<void> {
-  const networkId = dolomite.networkId;
+  const { networkId } = dolomite;
   if (Number.isNaN(networkId)) {
     return Promise.reject(new Error('Invalid network ID'));
   }
@@ -37,7 +37,7 @@ async function migrateOArbFinalizedAmounts(): Promise<void> {
   ));
   const selectedEpoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   let maxKey = selectedEpoch
-  if (isNaN(selectedEpoch)) {
+  if (Number.isNaN(selectedEpoch)) {
     maxKey = Object.keys(oTokenConfigFile.epochs).reduce((max, key) => {
       const value = parseInt(key, 10);
       if (value >= MAX_OARB_KEY_BEFORE_MIGRATIONS) {
@@ -48,17 +48,19 @@ async function migrateOArbFinalizedAmounts(): Promise<void> {
   }
 
   const marketIdToNameMap = {};
-  for (let i = 0; i <= maxKey; i++) {
+  for (let i = 0; i <= maxKey; i += 1) {
     await migrateData(networkId, i, oTokenConfigFile, marketIdToNameMap);
   }
 
   const metadataFile = await readFileFromGitHub<OTokenEpochMetadata>(
     getOTokenMetadataFileNameWithPath(networkId, OTokenType.oARB),
   );
-  for (let i = 0; i < metadataFile.deltas.length; i++) {
+  for (let i = 0; i < metadataFile.deltas.length; i += 1) {
     const epoch = metadataFile.deltas[i];
     await migrateData(networkId, epoch, oTokenConfigFile, marketIdToNameMap);
   }
+
+  return undefined;
 }
 
 async function migrateData(
@@ -67,7 +69,7 @@ async function migrateData(
   oTokenConfigFile: OTokenConfigFile,
   marketIdToNameMap: Record<string, string>,
 ): Promise<void> {
-  console.log(`Performing migration on epoch:`, epoch);
+  console.log('Performing migration on epoch:', epoch);
   const outputFilePath = getOTokenFinalizedFileNameWithPath(networkId, OTokenType.oARB, epoch);
   const oldOutputFile = await readFileFromGitHub<OldFinalizedOutputFile>(outputFilePath);
   const epochConfig = oTokenConfigFile.epochs[epoch];
@@ -84,13 +86,13 @@ async function migrateData(
     }),
   );
   oldOutputFile.metadata = {
-    epoch: epoch,
+    epoch,
     merkleRoot: oldOutputFile.metadata.merkleRoot,
-    marketNames: marketNames,
+    marketNames,
+    marketIds,
+    startBlockNumber: epochConfig.startBlockNumber,
+    endBlockNumber: epochConfig.endBlockNumber,
     marketTotalPointsForEpoch: (oldOutputFile as any).marketTotalPointsForEpoch,
-    marketIds: marketIds,
-    startBlock: epochConfig.startBlockNumber,
-    endBlock: epochConfig.endBlockNumber,
     startTimestamp: epochConfig.startTimestamp,
     endTimestamp: epochConfig.endTimestamp,
   } as any;

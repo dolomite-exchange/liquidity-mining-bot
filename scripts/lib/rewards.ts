@@ -40,6 +40,7 @@ interface AmountAndProof {
   proofs: string[];
 
 }
+
 export type VirtualLiquiditySnapshot = VirtualLiquiditySnapshotBalance;
 
 type AccountOwner = string;

@@ -23,3 +23,6 @@ if (ENV_FILENAME || (NETWORK_TO_ENV_FILE_MAP[NETWORK] && fs.existsSync(NETWORK_T
   require('dotenv').config();
 }
 
+export function isScript() {
+  return process.env.SCRIPT === 'true';
+}
