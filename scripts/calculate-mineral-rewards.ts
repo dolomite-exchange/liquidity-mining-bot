@@ -36,7 +36,13 @@ import {
 /* eslint-enable */
 
 interface UserMineralAllocation {
-  minerals: Integer; // big int
+  /**
+   * The amount of minerals earned by the user
+   */
+  amount: Integer; // big int
+  /**
+   * The user's multiplier to apply. Scales from 1x to 5x, with 0.5x being gained each week
+   */
   multiplier: Decimal; // decimal
 }
 
@@ -186,7 +192,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
   let userToMineralsMapForFile: any;
   if (isTimeElapsed) {
     const userToAmountMap = Object.keys(userToMineralsDataMap).reduce((memo, k) => {
-      memo[k] = userToMineralsDataMap[k].minerals;
+      memo[k] = userToMineralsDataMap[k].amount;
       return memo;
     }, {});
     const {
@@ -197,7 +203,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     merkleRoot = calculatedMerkleRoot;
     userToMineralsMapForFile = Object.keys(walletAddressToLeavesMap).reduce((memo, k) => {
       memo[k] = {
-        minerals: walletAddressToLeavesMap[k].amount,
+        amount: walletAddressToLeavesMap[k].amount,
         multiplier: userToMineralsDataMap[k].multiplier.toFixed(2),
         proofs: walletAddressToLeavesMap[k].proofs,
       }
@@ -207,7 +213,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     merkleRoot = null;
     userToMineralsMapForFile = Object.keys(userToMineralsDataMap).reduce((memo, k) => {
       memo[k] = {
-        minerals: userToMineralsDataMap[k].minerals.toFixed(),
+        amount: userToMineralsDataMap[k].amount.toFixed(),
         multiplier: userToMineralsDataMap[k].multiplier.toFixed(2),
         proofs: [],
       }
@@ -270,7 +276,7 @@ async function calculateFinalMinerals(
   if (epoch === 0) {
     return Object.keys(userToPointsMap).reduce((memo, user) => {
       memo[user] = {
-        minerals: new BigNumber(userToPointsMap[user]),
+        amount: new BigNumber(userToPointsMap[user]),
         multiplier: INTEGERS.ONE,
       };
       return memo;
@@ -294,7 +300,7 @@ async function calculateFinalMinerals(
     }
 
     memo[user] = {
-      minerals: userCurrent.times(newMultiplier),
+      amount: userCurrent.times(newMultiplier),
       multiplier: newMultiplier,
     };
     return memo;
