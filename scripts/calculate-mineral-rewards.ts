@@ -3,6 +3,7 @@ import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
 import BlockStore from '../src/lib/block-store';
+import { ONE_ETH_WEI } from '../src/lib/constants';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
@@ -61,7 +62,7 @@ export interface MineralOutputFile {
     merkleRoot: string | null;
     marketIds: number[];
     marketNames: string[];
-    totalPoints: string; // big int
+    totalAmount: string; // big int
     startBlock: number;
     endBlock: number;
     startTimestamp: number;
@@ -149,7 +150,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     endTimestamp,
     InterestOperation.ADD_POSITIVE,
   );
-  const totalPoints = Object.keys(totalPointsToMarketMap).reduce((acc, market) => {
+  const totalMinerals = Object.keys(totalPointsToMarketMap).reduce((acc, market) => {
     if (VALID_REWARD_MULTIPLIERS_MAP[market]) {
       acc = acc.plus(totalPointsToMarketMap[market])
     }
@@ -238,7 +239,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
       epoch,
       merkleRoot,
       marketNames,
-      totalPoints: totalPoints.toFixed(),
+      totalAmount: totalMinerals.times(ONE_ETH_WEI).toFixed(0),
       marketIds: validMarketIds,
       startBlock: startBlockNumber,
       endBlock: endBlockNumber,
@@ -246,7 +247,13 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
       endTimestamp: endTimestamp,
     },
   };
-  await writeLargeFileToGitHub(fileName, mineralOutputFile, false);
+  if (process.env.SCRIPT !== 'true') {
+    await writeLargeFileToGitHub(fileName, mineralOutputFile, false);
+  } else {
+    Logger.info({
+      message: 'Skipping file upload due to script execution',
+    });
+  }
 
   if (merkleRoot) {
     liquidityMiningConfig.epochs[epoch].isMerkleRootGenerated = true;
@@ -307,7 +314,7 @@ async function calculateFinalMinerals(
   }, {} as Record<string, UserMineralAllocation>)
 }
 
-if (process.env.MINERALS_ENABLED !== 'true') {
+if (process.env.SCRIPT === 'true') {
   calculateMineralRewards()
     .then(() => {
       console.log('Finished executing script!');

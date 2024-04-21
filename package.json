@@ -14,14 +14,14 @@
     "compose-clean": "docker-compose rm -f",
     "migrate": "echo 'Nothing to migrate'",
     "seed": "echo 'Nothing to seed'",
-    "execute:arbitrum:calculate-asset-rewards": "ENV_FILENAME=.env.arbitrum.local npx ts-node scripts/calculate-otoken-rewards.ts",
-    "execute:arbitrum:calculate-asset-season-config": "ENV_FILENAME=.env.arbitrum.local npx ts-node scripts/calculate-otoken-season-config.ts",
-    "execute:arbitrum:calculate-assets-held-for-duration": "ENV_FILENAME=.env.arbitrum.local npx ts-node scripts/calculate-assets-held-for-duration.ts",
-    "execute:arbitrum:calculate-mineral-rewards": "ENV_FILENAME=.env.arbitrum.local npx ts-node scripts/calculate-mineral-rewards.ts",
-    "execute:arbitrum:calculate-mineral-season-config": "ENV_FILENAME=.env.arbitrum.local npx ts-node scripts/calculate-mineral-season-config.ts",
-    "execute:arbitrum:get-global-otoken-data": "ENV_FILENAME=.env.arbitrum.local npx ts-node scripts/get-global-otoken-vesting-data.ts",
-    "execute:arbitrum:rectify-oarb-rewards-for-arb": "ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node scripts/rectify-oarb-rewards-for-arb.ts",
-    "execute:arbitrum:rectify-oarb-rewards-for-deltas": "ENV_FILENAME=liquidator.arbitrum-one.production.env npx ts-node scripts/rectify-oarb-rewards-for-deltas.ts"
+    "execute:arbitrum:calculate-asset-rewards": "SCRIPT=true ENV_FILENAME=detonator.arbitrum-one.production.env npx ts-node scripts/calculate-otoken-rewards.ts",
+    "execute:arbitrum:calculate-asset-season-config": "SCRIPT=true ENV_FILENAME=detonator.arbitrum-one.production.env npx ts-node scripts/calculate-otoken-season-config.ts",
+    "execute:arbitrum:calculate-assets-held-for-duration": "SCRIPT=true ENV_FILENAME=detonator.arbitrum-one.production.env npx ts-node scripts/calculate-assets-held-for-duration.ts",
+    "execute:arbitrum:calculate-mineral-rewards": "SCRIPT=true ENV_FILENAME=detonator.arbitrum-one.production.env npx ts-node scripts/calculate-mineral-rewards.ts",
+    "execute:arbitrum:calculate-mineral-season-config": "SCRIPT=true ENV_FILENAME=detonator.arbitrum-one.production.env npx ts-node scripts/calculate-mineral-season-config.ts",
+    "execute:arbitrum:get-global-otoken-data": "SCRIPT=true ENV_FILENAME=detonator.arbitrum-one.production.env npx ts-node scripts/get-global-otoken-vesting-data.ts",
+    "execute:arbitrum:rectify-oarb-rewards-for-arb": "SCRIPT=true ENV_FILENAME=detonator.arbitrum-one.production.env npx ts-node scripts/rectify-oarb-rewards-for-arb.ts",
+    "execute:arbitrum:rectify-oarb-rewards-for-deltas": "SCRIPT=true ENV_FILENAME=detonator.arbitrum-one.production.env npx ts-node scripts/rectify-oarb-rewards-for-deltas.ts"
   },
   "repository": {
     "type": "git",

@@ -221,11 +221,13 @@ async function start() {
   return true;
 }
 
-start()
-  .then(() => {
-    console.log('Finished executing script!');
-  })
-  .catch(error => {
-    console.error(`Caught error while running:`, error);
-    process.exit(1);
-  });
+if (process.env.SCRIPT === 'true') {
+  start()
+    .then(() => {
+      console.log('Finished executing script!');
+    })
+    .catch(error => {
+      console.error(`Caught error while running:`, error);
+      process.exit(1);
+    });
+}
