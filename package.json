@@ -20,6 +20,7 @@
     "execute:arbitrum:calculate-mineral-rewards": "SCRIPT=true ENV_FILENAME=detonator.arbitrum-one.production.env npx ts-node scripts/calculate-mineral-rewards.ts",
     "execute:arbitrum:calculate-mineral-season-config": "SCRIPT=true ENV_FILENAME=detonator.arbitrum-one.production.env npx ts-node scripts/calculate-mineral-season-config.ts",
     "execute:arbitrum:get-global-otoken-data": "SCRIPT=true ENV_FILENAME=detonator.arbitrum-one.production.env npx ts-node scripts/get-global-otoken-vesting-data.ts",
+    "execute:arbitrum:migrate-oarb-finalized-outputs": "SCRIPT=true ENV_FILENAME=detonator.arbitrum-one.production.env npx ts-node scripts/migrate-oarb-finalized-output.ts",
     "execute:arbitrum:rectify-oarb-rewards-for-arb": "SCRIPT=true ENV_FILENAME=detonator.arbitrum-one.production.env npx ts-node scripts/rectify-oarb-rewards-for-arb.ts",
     "execute:arbitrum:rectify-oarb-rewards-for-deltas": "SCRIPT=true ENV_FILENAME=detonator.arbitrum-one.production.env npx ts-node scripts/rectify-oarb-rewards-for-deltas.ts"
   },
