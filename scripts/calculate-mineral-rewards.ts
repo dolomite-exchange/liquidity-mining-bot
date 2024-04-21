@@ -16,13 +16,14 @@ import {
   getMineralMetadataFileNameWithPath,
   getMineralConfigFileNameWithPath,
 } from './lib/config-helper';
+import { isScript } from './lib/env-reader';
 import {
   getAccountBalancesByMarket,
   getAmmLiquidityPositionAndEvents,
   getArbVestingLiquidityPositionAndEvents,
   getBalanceChangingEvents,
 } from './lib/event-parser';
-import { readFileFromGitHub, writeLargeFileToGitHub } from './lib/file-helpers';
+import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
 import {
   ARB_VESTER_PROXY,
   calculateFinalPoints,
@@ -248,7 +249,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     },
   };
   if (process.env.SCRIPT !== 'true') {
-    await writeLargeFileToGitHub(fileName, mineralOutputFile, false);
+    await writeFileToGitHub(fileName, mineralOutputFile, false);
   } else {
     Logger.info({
       message: 'Skipping file upload due to script execution',
@@ -271,7 +272,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     if (metadata.maxEpochNumber === epoch - 1) {
       metadata.maxEpochNumber = epoch;
     }
-    await writeLargeFileToGitHub(metadataFilePath, metadata, true)
+    await writeFileToGitHub(metadataFilePath, metadata, true)
   }
 }
 
@@ -314,7 +315,7 @@ async function calculateFinalMinerals(
   }, {} as Record<string, UserMineralAllocation>)
 }
 
-if (process.env.SCRIPT === 'true') {
+if (isScript()) {
   calculateMineralRewards()
     .then(() => {
       console.log('Finished executing script!');

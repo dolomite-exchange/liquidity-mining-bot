@@ -18,13 +18,14 @@ import {
   getOTokenTypeFromEnvironment,
   OTokenType,
 } from './lib/config-helper';
+import { isScript } from './lib/env-reader';
 import {
   getAccountBalancesByMarket,
   getAmmLiquidityPositionAndEvents,
   getArbVestingLiquidityPositionAndEvents,
   getBalanceChangingEvents,
 } from './lib/event-parser';
-import { readFileFromGitHub, writeLargeFileToGitHub } from './lib/file-helpers';
+import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
 import {
   ARB_VESTER_PROXY,
   calculateFinalRewards,
@@ -35,6 +36,10 @@ import {
   InterestOperation,
   LiquidityPositionsAndEvents,
 } from './lib/rewards';
+
+export interface OTokenEpochMetadata extends EpochMetadata {
+  deltas: number[]
+}
 
 export interface OTokenOutputFile {
   users: {
@@ -197,7 +202,7 @@ async function start() {
       },
     },
   };
-  await writeLargeFileToGitHub(fileName, dataToWrite, false);
+  await writeFileToGitHub(fileName, dataToWrite, false);
 
   if (merkleRoot) {
     oTokenConfig.epochs[epoch].isMerkleRootGenerated = true;
@@ -209,19 +214,19 @@ async function start() {
     // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds for an update)
 
     const metadataFilePath = getOTokenMetadataFileNameWithPath(networkId, oTokenType);
-    const metadata = await readFileFromGitHub<EpochMetadata>(metadataFilePath);
+    const metadata = await readFileFromGitHub<OTokenEpochMetadata>(metadataFilePath);
 
     // Once the merkle root is written, update the metadata to the new highest epoch that is finalized
     if (metadata.maxEpochNumber === epoch - 1) {
       metadata.maxEpochNumber = epoch;
     }
-    await writeLargeFileToGitHub(metadataFilePath, metadata, true)
+    await writeFileToGitHub(metadataFilePath, metadata, true)
   }
 
   return true;
 }
 
-if (process.env.SCRIPT === 'true') {
+if (isScript()) {
   start()
     .then(() => {
       console.log('Finished executing script!');

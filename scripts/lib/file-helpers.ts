@@ -12,7 +12,7 @@ export async function readFileFromGitHub<T>(filePath: string): Promise<T> {
   return response.data;
 }
 
-export async function writeLargeFileToGitHub(
+export async function writeFileToGitHub(
   filePath: string,
   fileContent: any,
   prettyPrint: boolean,

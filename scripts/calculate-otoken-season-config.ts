@@ -1,4 +1,5 @@
 import './lib/env-reader';
+import { dolomite } from '../src/helpers/web3';
 import Logger from '../src/lib/logger';
 import {
   ConfigFile,
@@ -7,7 +8,10 @@ import {
   getOTokenConfigFileNameWithPath,
   OTokenType,
 } from './lib/config-helper';
-import { readFileFromGitHub, writeLargeFileToGitHub } from './lib/file-helpers';
+import { isScript } from './lib/env-reader';
+import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
+
+export const MAX_OARB_KEY_BEFORE_MIGRATIONS = 701;
 
 interface OTokenConfigEpoch extends EpochConfig {
   oTokenAmount: string;
@@ -19,8 +23,8 @@ export interface OTokenConfigFile extends ConfigFile<OTokenConfigEpoch> {
 
 async function calculateOTokenSeasonConfig(
   skipConfigUpdate: boolean = false,
-  networkId: number = parseInt(process.env.NETWORK_ID),
 ): Promise<number> {
+  const networkId = dolomite.networkId;
   if (Number.isNaN(networkId)) {
     return Promise.reject(new Error('Invalid network ID'));
   }
@@ -34,7 +38,7 @@ async function calculateOTokenSeasonConfig(
   if (isNaN(selectedEpoch)) {
     maxKey = Object.keys(oTokenConfigFile.epochs).reduce((max, key) => {
       const value = parseInt(key, 10);
-      if (value >= 900) {
+      if (value >= MAX_OARB_KEY_BEFORE_MIGRATIONS) {
         return max
       }
       return Math.max(max, parseInt(key, 10))
@@ -75,7 +79,7 @@ export async function writeOTokenConfigToGitHub(
   epochData: OTokenConfigEpoch,
 ): Promise<void> {
   configFile.epochs[epochData.epoch] = epochData;
-  await writeLargeFileToGitHub(
+  await writeFileToGitHub(
     getOTokenConfigFileNameWithPath(
       configFile.metadata.networkId,
       OTokenType.oARB,
@@ -85,12 +89,15 @@ export async function writeOTokenConfigToGitHub(
   );
 }
 
+if (isScript()) {
+  calculateOTokenSeasonConfig()
+    .then(() => {
+      console.log('Finished executing script!');
+      process.exit(0);
+    })
+    .catch(error => {
+      console.error(`Found error while starting: ${error.toString()}`, error);
+      process.exit(1);
+    });
 
-calculateOTokenSeasonConfig()
-  .then(() => {
-    console.log('Finished executing script!');
-  })
-  .catch(error => {
-    console.error(`Found error while starting: ${error.toString()}`, error);
-    process.exit(1);
-  });
+}

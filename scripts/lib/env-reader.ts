@@ -11,3 +11,7 @@ if (ENV_FILENAME) {
   // eslint-disable-next-line
   require('dotenv').config();
 }
+
+export function isScript(): boolean {
+  return process.env.SCRIPT === 'true';
+}

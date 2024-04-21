@@ -1,7 +1,10 @@
 import Logger from '../src/lib/logger';
 import './lib/env-reader';
 import { ConfigFile, EpochConfig, getMineralConfigFileNameWithPath, getNextConfigIfNeeded } from './lib/config-helper';
-import { readFileFromGitHub, writeLargeFileToGitHub } from './lib/file-helpers';
+import { isScript } from './lib/env-reader';
+import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
+
+export const MAX_MINERALS_KEY_BEFORE_MIGRATIONS = 900
 
 export interface MineralConfigEpoch extends EpochConfig {
 }
@@ -23,8 +26,7 @@ export async function calculateMineralSeasonConfig(
   if (isNaN(epochNumber)) {
     maxKey = Object.keys(configFile.epochs).reduce((max, key) => {
       const value = parseInt(key, 10);
-      if (value >= 900) {
-        // 900+ is used for revisions and should be ignored
+      if (value >= MAX_MINERALS_KEY_BEFORE_MIGRATIONS) {
         return max
       }
       if (configFile.epochs[key].isTimeElapsed && configFile.epochs[key].isMerkleRootGenerated) {
@@ -67,14 +69,14 @@ export async function writeMineralConfigToGitHub(
   epochData: MineralConfigEpoch,
 ): Promise<void> {
   configFile.epochs[epochData.epoch] = epochData;
-  await writeLargeFileToGitHub(
+  await writeFileToGitHub(
     getMineralConfigFileNameWithPath(configFile.metadata.networkId),
     configFile,
     true,
   );
 }
 
-if (process.env.MINERALS_ENABLED !== 'true') {
+if (isScript()) {
   calculateMineralSeasonConfig()
     .then(() => {
       console.log('Finished executing script!');
