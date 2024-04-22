@@ -31,8 +31,11 @@ export default class MineralsUpdater {
     // noinspection InfiniteLoopJS
     for (; ;) {
       try {
-        await this._update();
-        await delay(this._getDelayTimeMillis());
+        const isEpochElapsed = await this._update();
+        await delay(this._getDelayTimeMillis(isEpochElapsed));
+        if (isEpochElapsed) {
+          await this._update();
+        }
         this.skipConfigUpdate = false;
       } catch (e: any) {
         Logger.error({
@@ -44,13 +47,13 @@ export default class MineralsUpdater {
     }
   };
 
-  _update = async () => {
+  _update = async (): Promise<boolean> => {
     Logger.info({
       at: 'MineralsUpdater#_update',
       message: 'Starting update...',
     });
 
-    const epochNumber = await calculateMineralSeasonConfig(this.skipConfigUpdate, this.networkId);
+    const { epochNumber, isEpochElapsed } = await calculateMineralSeasonConfig(this.skipConfigUpdate, this.networkId);
     Logger.info({
       at: 'MineralsUpdater#_update',
       message: `Finished updating season config for epoch ${epochNumber}`,
@@ -77,9 +80,16 @@ export default class MineralsUpdater {
       at: 'MineralsUpdater#_update',
       message: `Finished calculating mineral rewards for epoch ${epochNumber}`,
     });
+
+    return isEpochElapsed;
   };
 
-  private _getDelayTimeMillis(): number {
+  private _getDelayTimeMillis(isEpochElapsed: boolean): number {
+    if (isEpochElapsed) {
+      // We don't want to wait too long for the next epoch's calculation
+      return SHORT_WAIT_DURATION_MILLIS;
+    }
+
     const currentTimestamp = this.blockStore.getBlockTimestamp();
     if (currentTimestamp === 0) {
       return LONG_WAIT_DURATION_MILLIS;

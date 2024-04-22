@@ -87,13 +87,13 @@ interface NextConfig {
   actualEndTimestamp: number;
 }
 
-const ONE_WEEK = 86_400 * 7;
+const ONE_WEEK_SECONDS = 86_400 * 7;
 
 export async function getNextConfigIfNeeded(oldEpoch: EpochConfig): Promise<NextConfig> {
   const isReadyForNext = oldEpoch.isTimeElapsed && oldEpoch.isMerkleRootGenerated;
   const newStartBlockNumber = isReadyForNext ? oldEpoch.endBlockNumber : oldEpoch.startBlockNumber;
   const newStartTimestamp = isReadyForNext ? oldEpoch.endTimestamp : oldEpoch.startTimestamp;
-  const newEndTimestamp = newStartTimestamp + ONE_WEEK
+  const newEndTimestamp = newStartTimestamp + ONE_WEEK_SECONDS;
   const newEndBlockNumberResult = await getLatestBlockNumberByTimestamp(newEndTimestamp);
 
   return {

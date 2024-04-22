@@ -14,7 +14,7 @@ export const MAX_MINERALS_KEY_BEFORE_MIGRATIONS = 900
 export async function calculateMineralSeasonConfig(
   skipConfigUpdate: boolean = false,
   networkId: number = parseInt(process.env.NETWORK_ID ?? '', 10),
-): Promise<number> {
+): Promise<{ epochNumber: number; isEpochElapsed: boolean }> {
   if (Number.isNaN(networkId)) {
     return Promise.reject(new Error('Invalid network ID'));
   }
@@ -42,11 +42,13 @@ export async function calculateMineralSeasonConfig(
       message: 'calculateMineralSeasonConfig: Skipping config update...',
       epochNumber: maxKey,
     });
-    return maxKey;
+    return { epochNumber: maxKey, isEpochElapsed: configFile.epochs[maxKey].isTimeElapsed };
   }
 
   const oldEpoch = configFile.epochs[maxKey];
   const nextEpochData = await getNextConfigIfNeeded(oldEpoch);
+
+  const isTimeElapsed = nextEpochData.newEndTimestamp === nextEpochData.actualEndTimestamp;
 
   const epochData: MineralConfigEpoch = {
     epoch: nextEpochData.isReadyForNext ? maxKey + 1 : maxKey,
@@ -54,13 +56,13 @@ export async function calculateMineralSeasonConfig(
     startTimestamp: nextEpochData.newStartTimestamp,
     endBlockNumber: nextEpochData.actualEndBlockNumber,
     endTimestamp: nextEpochData.actualEndTimestamp,
-    isTimeElapsed: nextEpochData.newEndTimestamp === nextEpochData.actualEndTimestamp,
+    isTimeElapsed,
     isMerkleRootGenerated: false,
     isMerkleRootWrittenOnChain: false,
   };
   await writeMineralConfigToGitHub(configFile, epochData);
 
-  return maxKey;
+  return { epochNumber: maxKey, isEpochElapsed: isTimeElapsed };
 }
 
 if (isScript()) {
