@@ -3,21 +3,26 @@ import { calculateMineralSeasonConfig } from '../../scripts/calculate-mineral-se
 import { delay } from './delay';
 import Logger from './logger';
 
-const SHORT_WAIT_DURATION = 60 * 1_000; // 60 seconds in millis
-const LONG_WAIT_DURATION = 3_540 * 1_000; // 59 minutes in millis
+const SHORT_WAIT_DURATION_MILLIS = 60 * 1_000; // 60 seconds in millis
+const LONG_WAIT_DURATION_MILLIS = 3_540 * 1_000; // 59 minutes in millis
+const ONE_WEEK_SECONDS = 86_400 * 7;
+const FOUR_MINUTES_SECONDS = 240;
 
 export default class MineralsUpdater {
-
   private skipConfigUpdate = false;
 
-  constructor(private readonly networkId) {}
+  constructor(
+    private readonly networkId,
+    private readonly blockStore,
+  ) {
+  }
 
   start = () => {
     Logger.info({
       at: 'MineralsUpdater#start',
       message: 'Starting minerals updater',
     });
-    delay(Number(SHORT_WAIT_DURATION))
+    delay(Number(SHORT_WAIT_DURATION_MILLIS))
       .then(() => this._poll())
       .catch(() => this._poll());
   };
@@ -27,14 +32,14 @@ export default class MineralsUpdater {
     for (; ;) {
       try {
         await this._update();
-        await delay(LONG_WAIT_DURATION);
+        await delay(this._getDelayTimeMillis());
         this.skipConfigUpdate = false;
       } catch (e: any) {
         Logger.error({
           message: `Could not update minerals due to error: ${e.message}`,
           error: e,
         })
-        await delay(SHORT_WAIT_DURATION);
+        await delay(SHORT_WAIT_DURATION_MILLIS);
       }
     }
   };
@@ -73,4 +78,17 @@ export default class MineralsUpdater {
       message: `Finished calculating mineral rewards for epoch ${epochNumber}`,
     });
   };
+
+  private _getDelayTimeMillis(): number {
+    const currentTimestamp = this.blockStore.getBlockTimestamp();
+    if (currentTimestamp === 0) {
+      return LONG_WAIT_DURATION_MILLIS;
+    }
+
+    // Add 5 minutes as a buffer to wait for any syncing to occur after seconds
+    const currentWeek = Math.floor(currentTimestamp / ONE_WEEK_SECONDS) * ONE_WEEK_SECONDS;
+    const nextWeek = currentWeek + ONE_WEEK_SECONDS + FOUR_MINUTES_SECONDS;
+    const timeDeltaMillis = (nextWeek - currentTimestamp) * 1_000;
+    return Math.min(timeDeltaMillis, LONG_WAIT_DURATION_MILLIS);
+  }
 }

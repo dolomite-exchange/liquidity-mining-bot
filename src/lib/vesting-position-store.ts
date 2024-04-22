@@ -49,11 +49,11 @@ export default class VestingPositionStore {
     });
 
     const blockNumber = this.blockStore.getBlockNumber();
-    const blockTimestamp = this.blockStore.getBlockTimestamp()?.toSeconds() ?? 0;
+    const blockTimestamp = this.blockStore.getBlockTimestamp();
     if (blockNumber === 0 || blockTimestamp === 0) {
       Logger.warn({
         at: 'VestingPositionStore#_update',
-        message: 'Block number is 0, returning...',
+        message: 'Block number or timestamp is not set yet, returning...',
       });
       return;
     }

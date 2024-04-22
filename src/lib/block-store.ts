@@ -1,22 +1,21 @@
-import { DateTime } from 'luxon';
 import { getSubgraphBlockNumber } from '../helpers/block-helper';
 import { delay } from './delay';
 import Logger from './logger';
 
 export default class BlockStore {
   private blockNumber: number;
-  private blockTimestamp: DateTime;
+  private blockTimestamp: number;
 
   constructor() {
     this.blockNumber = 0;
-    this.blockTimestamp = null;
+    this.blockTimestamp = 0;
   }
 
   public getBlockNumber(): number {
     return this.blockNumber;
   }
 
-  public getBlockTimestamp(): DateTime {
+  public getBlockTimestamp(): number {
     return this.blockTimestamp;
   }
 
@@ -54,7 +53,7 @@ export default class BlockStore {
     const { blockNumber, blockTimestamp } = await getSubgraphBlockNumber();
 
     this.blockNumber = blockNumber;
-    this.blockTimestamp = blockTimestamp;
+    this.blockTimestamp = blockTimestamp.toSeconds();
 
     Logger.info({
       at: 'BlockStore#_update',

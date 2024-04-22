@@ -68,7 +68,7 @@ async function start() {
   const subgraphBlockNumber = blockStore.getBlockNumber();
   const { riskParams } = await getDolomiteRiskParams(subgraphBlockNumber);
   const networkId = await dolomite.web3.eth.net.getId();
-  const mineralsUpdater = new MineralsUpdater(networkId);
+  const mineralsUpdater = new MineralsUpdater(networkId, blockStore);
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address
   if (riskParams.dolomiteMargin !== libraryDolomiteMargin) {
