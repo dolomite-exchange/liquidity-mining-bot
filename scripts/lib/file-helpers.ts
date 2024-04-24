@@ -1,6 +1,6 @@
-import { default as axios } from 'axios';
+import axios from 'axios';
 import fs from 'fs';
-import { MineralOutputFile } from '../calculate-mineral-rewards';
+import { MineralOutputFile } from './config-helper';
 
 const FOLDER_URL = 'https://api.github.com/repos/dolomite-exchange/liquidity-mining-data';
 
@@ -91,10 +91,11 @@ export async function writeFileToGitHub(
     await axios.patch(`${FOLDER_URL}/git/refs/heads/master`, {
       sha: commit.data.sha,
     }, headers);
-
   } catch (err) {
     console.error(err);
   }
+
+  return undefined;
 }
 
 export function writeOutputFile(

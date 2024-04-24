@@ -1,4 +1,4 @@
-import './lib/env-reader';
+import { isScript } from '../src/lib/env'
 import { dolomite } from '../src/helpers/web3';
 import Logger from '../src/lib/logger';
 import {
@@ -8,7 +8,6 @@ import {
   getOTokenConfigFileNameWithPath,
   OTokenType,
 } from './lib/config-helper';
-import { isScript } from './lib/env-reader';
 import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
 
 export const MAX_OARB_KEY_BEFORE_MIGRATIONS = 701;
@@ -24,7 +23,7 @@ export interface OTokenConfigFile extends ConfigFile<OTokenConfigEpoch> {
 async function calculateOTokenSeasonConfig(
   skipConfigUpdate: boolean = false,
 ): Promise<number> {
-  const networkId = dolomite.networkId;
+  const { networkId } = dolomite;
   if (Number.isNaN(networkId)) {
     return Promise.reject(new Error('Invalid network ID'));
   }
@@ -35,7 +34,7 @@ async function calculateOTokenSeasonConfig(
   ));
   const selectedEpoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   let maxKey = selectedEpoch
-  if (isNaN(selectedEpoch)) {
+  if (Number.isNaN(selectedEpoch)) {
     maxKey = Object.keys(oTokenConfigFile.epochs).reduce((max, key) => {
       const value = parseInt(key, 10);
       if (value >= MAX_OARB_KEY_BEFORE_MIGRATIONS) {
@@ -99,5 +98,4 @@ if (isScript()) {
       console.error(`Found error while starting: ${error.toString()}`, error);
       process.exit(1);
     });
-
 }

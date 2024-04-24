@@ -1,4 +1,35 @@
+import '../../src/lib/env';
 import { getLatestBlockNumberByTimestamp } from '../../src/clients/blocks';
+import { writeFileToGitHub } from './file-helpers';
+
+interface UserMineralAllocationForFile {
+  minerals: string; // big int
+  multiplier: string; // decimal
+  proofs: string[];
+}
+
+export interface MineralOutputFile {
+  users: {
+    [walletAddressLowercase: string]: UserMineralAllocationForFile;
+  };
+  metadata: {
+    epoch: number;
+    merkleRoot: string | null;
+    marketIds: number[];
+    marketNames: string[];
+    totalAmount: string; // big int
+    startBlockNumber: number;
+    endBlockNumber: number;
+    startTimestamp: number;
+    endTimestamp: number;
+  };
+}
+
+export interface MineralConfigEpoch extends EpochConfig {
+}
+
+export interface MineralConfigFile extends ConfigFile<MineralConfigEpoch> {
+}
 
 export enum OTokenType {
   oARB = 'oarb',
@@ -56,13 +87,13 @@ interface NextConfig {
   actualEndTimestamp: number;
 }
 
-const ONE_WEEK = 86_400 * 7;
+const ONE_WEEK_SECONDS = 86_400 * 7;
 
 export async function getNextConfigIfNeeded(oldEpoch: EpochConfig): Promise<NextConfig> {
   const isReadyForNext = oldEpoch.isTimeElapsed && oldEpoch.isMerkleRootGenerated;
   const newStartBlockNumber = isReadyForNext ? oldEpoch.endBlockNumber : oldEpoch.startBlockNumber;
   const newStartTimestamp = isReadyForNext ? oldEpoch.endTimestamp : oldEpoch.startTimestamp;
-  const newEndTimestamp = newStartTimestamp + ONE_WEEK
+  const newEndTimestamp = newStartTimestamp + ONE_WEEK_SECONDS;
   const newEndBlockNumberResult = await getLatestBlockNumberByTimestamp(newEndTimestamp);
 
   return {
@@ -151,4 +182,16 @@ function getMetadataFilePath(networkId: number, type: OTokenType | 'mineral'): s
 
 function getFinalizedFilePath(networkId: number, type: OTokenType | 'mineral', season: number, epoch: number): string {
   return `finalized/${networkId}/${type}/${type}-season-${season}-epoch-${epoch}-output.json`;
+}
+
+export async function writeMineralConfigToGitHub(
+  configFile: MineralConfigFile,
+  epochData: MineralConfigEpoch,
+): Promise<void> {
+  configFile.epochs[epochData.epoch] = epochData;
+  await writeFileToGitHub(
+    getMineralConfigFileNameWithPath(configFile.metadata.networkId),
+    configFile,
+    true,
+  );
 }

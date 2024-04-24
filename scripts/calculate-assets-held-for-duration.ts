@@ -9,9 +9,8 @@ import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
-import './lib/env-reader';
-import { MineralConfigFile } from './calculate-mineral-season-config';
-import { getMineralConfigFileNameWithPath } from './lib/config-helper';
+import '../src/lib/env'
+import { getMineralConfigFileNameWithPath, MineralConfigFile } from './lib/config-helper';
 import {
   getAccountBalancesByMarket,
   getAmmLiquidityPositionAndEvents,
@@ -51,7 +50,9 @@ const FOLDER_NAME = `${__dirname}/output`;
 async function start() {
   const networkId = await dolomite.web3.eth.net.getId();
 
-  const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>(getMineralConfigFileNameWithPath(networkId));
+  const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>(
+    getMineralConfigFileNameWithPath(networkId),
+  );
 
   const epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   if (Number.isNaN(epoch) || !liquidityMiningConfig.epochs[epoch]) {
@@ -73,10 +74,7 @@ async function start() {
   await blockStore._update();
   const marketStore = new MarketStore(blockStore);
 
-  const startBlockNumber = liquidityMiningConfig.epochs[epoch].startBlockNumber;
-  const startTimestamp = liquidityMiningConfig.epochs[epoch].startTimestamp;
-  const endBlockNumber = liquidityMiningConfig.epochs[epoch].endBlockNumber;
-  const endTimestamp = liquidityMiningConfig.epochs[epoch].endTimestamp;
+  const { startBlockNumber, startTimestamp, endBlockNumber, endTimestamp } = liquidityMiningConfig.epochs[epoch];
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address;
   if (networkId !== Number(process.env.NETWORK_ID)) {
@@ -180,8 +178,8 @@ async function start() {
     totalPointsForMarket: totalPointsPerMarket[validMarketId].times(ONE_ETH_WEI).toFixed(0),
     startBlock: startBlockNumber,
     endBlock: endBlockNumber,
-    startTimestamp: startTimestamp,
-    endTimestamp: endTimestamp,
+    startTimestamp,
+    endTimestamp,
   }
   writeOutputFile(fileName, dataToWrite);
 

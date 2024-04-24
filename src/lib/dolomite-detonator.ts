@@ -43,10 +43,10 @@ export default class DolomiteDetonator {
 
   _detonateAccounts = async () => {
     const lastBlockTimestamp = this.blockStore.getBlockTimestamp();
-    if (lastBlockTimestamp === null) {
+    if (lastBlockTimestamp === 0) {
       Logger.info({
         at: 'DolomiteDetonator#_detonateAccounts',
-        message: 'Block timestamp is null, returning...',
+        message: 'Block timestamp is not set yet, returning...',
       });
       return;
     }

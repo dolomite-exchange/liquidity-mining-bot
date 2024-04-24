@@ -8,15 +8,16 @@ import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
-import './lib/env-reader';
-import { MineralConfigFile, writeMineralConfigToGitHub } from './calculate-mineral-season-config';
+import { isScript } from '../src/lib/env';
 import {
   EpochMetadata,
   getMineralConfigFileNameWithPath,
   getMineralFinalizedFileNameWithPath,
   getMineralMetadataFileNameWithPath,
+  MineralConfigFile,
+  MineralOutputFile,
+  writeMineralConfigToGitHub,
 } from './lib/config-helper';
-import { isScript } from './lib/env-reader';
 import {
   getAccountBalancesByMarket,
   getAmmLiquidityPositionAndEvents,
@@ -48,29 +49,6 @@ interface UserMineralAllocation {
   multiplier: Decimal; // decimal
 }
 
-interface UserMineralAllocationForFile {
-  minerals: string; // big int
-  multiplier: string; // decimal
-  proofs: string[];
-}
-
-export interface MineralOutputFile {
-  users: {
-    [walletAddressLowercase: string]: UserMineralAllocationForFile;
-  };
-  metadata: {
-    epoch: number;
-    merkleRoot: string | null;
-    marketIds: number[];
-    marketNames: string[];
-    totalAmount: string; // big int
-    startBlock: number;
-    endBlock: number;
-    startTimestamp: number;
-    endTimestamp: number;
-  };
-}
-
 const SECONDS_PER_WEEK = 86_400 * 7;
 const WETH_MARKET_ID = '0';
 const USDC_MARKET_ID = '17';
@@ -83,7 +61,9 @@ const MAX_MULTIPLIER = new BigNumber('5');
 export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)): Promise<void> {
   const networkId = await dolomite.web3.eth.net.getId();
 
-  const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>(getMineralConfigFileNameWithPath(networkId));
+  const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>(
+    getMineralConfigFileNameWithPath(networkId),
+  );
   if (Number.isNaN(epoch) || !liquidityMiningConfig.epochs[epoch]) {
     return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
   }
@@ -224,7 +204,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     }, {});
   }
 
-  const validMarketIds = Object.keys(VALID_REWARD_MULTIPLIERS_MAP).map(m => parseInt(m));
+  const validMarketIds = Object.keys(VALID_REWARD_MULTIPLIERS_MAP).map(m => parseInt(m, 10));
   const marketNames = await Promise.all(
     validMarketIds.map<Promise<string>>(async validMarketId => {
       const tokenAddress = await dolomite.getters.getMarketTokenAddress(new BigNumber(validMarketId));
@@ -241,12 +221,12 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
       epoch,
       merkleRoot,
       marketNames,
+      startTimestamp,
+      endTimestamp,
+      startBlockNumber,
+      endBlockNumber,
       totalAmount: totalMinerals.times(ONE_ETH_WEI).toFixed(0),
       marketIds: validMarketIds,
-      startBlock: startBlockNumber,
-      endBlock: endBlockNumber,
-      startTimestamp: startTimestamp,
-      endTimestamp: endTimestamp,
     },
   };
   if (process.env.SCRIPT !== 'true') {
@@ -265,7 +245,8 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
 
   if (process.env.SCRIPT !== 'true' && merkleRoot) {
     // TODO: write merkle root to chain
-    // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds for an update)
+    // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds
+    //  for an update)
 
     const metadataFilePath = getMineralMetadataFileNameWithPath(networkId);
     const metadata = await readFileFromGitHub<EpochMetadata>(metadataFilePath);
@@ -276,6 +257,8 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     }
     await writeFileToGitHub(metadataFilePath, metadata, true)
   }
+
+  return undefined;
 }
 
 async function calculateFinalMinerals(

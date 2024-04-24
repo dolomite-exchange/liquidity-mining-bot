@@ -43,10 +43,10 @@ export default class DolomiteLevelRequestUpdater {
 
   _fulfillLevelUpdateRequests = async () => {
     const lastBlockTimestamp = this.blockStore.getBlockTimestamp();
-    if (lastBlockTimestamp === null) {
+    if (lastBlockTimestamp === 0) {
       Logger.info({
         at: 'DolomiteLevelRequestUpdater#_fulfillLevelUpdateRequests',
-        message: 'Block timestamp is null, returning...',
+        message: 'Block timestamp is not set yet, returning...',
       });
       return;
     }
