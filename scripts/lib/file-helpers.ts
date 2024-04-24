@@ -1,4 +1,5 @@
 import { default as axios } from 'axios';
+import fs from 'fs';
 import { MineralOutputFile } from '../calculate-mineral-rewards';
 
 const FOLDER_URL = 'https://api.github.com/repos/dolomite-exchange/liquidity-mining-data';
@@ -94,4 +95,19 @@ export async function writeFileToGitHub(
   } catch (err) {
     console.error(err);
   }
+}
+
+export function writeOutputFile(
+  fileName: string,
+  fileContent: object,
+): void {
+  if (!fs.existsSync(`${__dirname}/../output`)) {
+    fs.mkdirSync(`${__dirname}/../output`);
+  }
+
+  fs.writeFileSync(
+    `${__dirname}/../output/${fileName}`,
+    JSON.stringify(fileContent),
+    { encoding: 'utf8', flag: 'w' },
+  );
 }

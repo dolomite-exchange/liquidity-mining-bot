@@ -12,9 +12,9 @@ import './lib/env-reader';
 import { MineralConfigFile, writeMineralConfigToGitHub } from './calculate-mineral-season-config';
 import {
   EpochMetadata,
+  getMineralConfigFileNameWithPath,
   getMineralFinalizedFileNameWithPath,
   getMineralMetadataFileNameWithPath,
-  getMineralConfigFileNameWithPath,
 } from './lib/config-helper';
 import { isScript } from './lib/env-reader';
 import {
@@ -23,7 +23,7 @@ import {
   getArbVestingLiquidityPositionAndEvents,
   getBalanceChangingEvents,
 } from './lib/event-parser';
-import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
+import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
 import {
   ARB_VESTER_PROXY,
   calculateFinalPoints,
@@ -182,6 +182,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
   );
 
   const userToPointsMap = calculateFinalPoints(
+    networkId,
     accountToDolomiteBalanceMap,
     VALID_REWARD_MULTIPLIERS_MAP,
     poolToVirtualLiquidityPositionsAndEvents,
@@ -254,14 +255,15 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     Logger.info({
       message: 'Skipping file upload due to script execution',
     });
+    writeOutputFile(`minerals-${epoch}-${startTimestamp}-${endTimestamp}-output.json`, mineralOutputFile);
   }
 
-  if (merkleRoot) {
+  if (process.env.SCRIPT !== 'true' && merkleRoot) {
     liquidityMiningConfig.epochs[epoch].isMerkleRootGenerated = true;
     await writeMineralConfigToGitHub(liquidityMiningConfig, liquidityMiningConfig.epochs[epoch]);
   }
 
-  if (merkleRoot) {
+  if (process.env.SCRIPT !== 'true' && merkleRoot) {
     // TODO: write merkle root to chain
     // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds for an update)
 

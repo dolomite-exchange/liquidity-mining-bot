@@ -178,6 +178,7 @@ async function start() {
   );
 
   const userToOTokenRewards = calculateFinalRewards(
+    networkId,
     accountToDolomiteBalanceMap,
     poolToVirtualLiquidityPositionsAndEvents,
     totalPointsPerMarket,

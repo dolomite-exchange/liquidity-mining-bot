@@ -160,6 +160,7 @@ async function start() {
   );
 
   const userToPointsMap = calculateFinalPoints(
+    networkId,
     accountToDolomiteBalanceMap,
     validRewardMultipliersMap,
     poolToVirtualLiquidityPositionsAndEvents,

@@ -4,6 +4,7 @@ import { defaultAbiCoder, keccak256 } from 'ethers/lib/utils';
 import { MerkleTree } from 'merkletreejs';
 import { MarketIndex } from '../../src/lib/api-types';
 import { ONE_ETH_WEI } from '../../src/lib/constants';
+import { remapAccountToClaimableAccount } from './remapper';
 
 export const ETH_USDC_POOL = '0xb77a493a4950cad1b049e222d62bce14ff423c6f'.toLowerCase();
 export const ARB_VESTER_PROXY = '0x531BC6E97b65adF8B3683240bd594932Cfb63797'.toLowerCase();
@@ -40,6 +41,7 @@ interface AmountAndProof {
   proofs: string[];
 
 }
+
 export type VirtualLiquiditySnapshot = VirtualLiquiditySnapshotBalance;
 
 type AccountOwner = string;
@@ -339,6 +341,7 @@ export function calculateLiquidityPoints(
 }
 
 export function calculateFinalPoints(
+  networkId: number,
   accountToDolomiteBalanceMap: AccountSubAccountToMarketToBalanceMap,
   validMarketIdsMap: Record<string, any>,
   poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
@@ -352,11 +355,12 @@ export function calculateFinalPoints(
           if (validMarketIdsMap[market]) {
             const balanceStruct = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
 
-            if (!effectiveUserToPoints[balanceStruct.effectiveUser]) {
-              effectiveUserToPoints[balanceStruct.effectiveUser] = INTEGERS.ZERO;
+            const remappedAccount = remapAccountToClaimableAccount(networkId, balanceStruct.effectiveUser);
+            if (!effectiveUserToPoints[remappedAccount]) {
+              effectiveUserToPoints[remappedAccount] = INTEGERS.ZERO;
             }
-            effectiveUserToPoints[balanceStruct.effectiveUser]
-              = effectiveUserToPoints[balanceStruct.effectiveUser].plus(balanceStruct.rewardPoints);
+            effectiveUserToPoints[remappedAccount]
+              = effectiveUserToPoints[remappedAccount].plus(balanceStruct.rewardPoints);
           }
         });
       });
@@ -374,10 +378,11 @@ export function calculateFinalPoints(
           const balances = events.virtualLiquidityBalances[account]!;
           const rewardAmount = liquidityPoolReward.times(balances.equityPoints.dividedBy(totalPoolPoints));
 
-          if (!effectiveUserToPoints[account]) {
-            effectiveUserToPoints[account] = INTEGERS.ZERO;
+          const remappedAccount = remapAccountToClaimableAccount(networkId, account);
+          if (!effectiveUserToPoints[remappedAccount]) {
+            effectiveUserToPoints[remappedAccount] = INTEGERS.ZERO;
           }
-          effectiveUserToPoints[account] = effectiveUserToPoints[account].plus(rewardAmount);
+          effectiveUserToPoints[remappedAccount] = effectiveUserToPoints[account].plus(rewardAmount);
         }
       });
     }
@@ -393,6 +398,7 @@ export function calculateFinalPoints(
 }
 
 export function calculateFinalRewards(
+  networkId: number,
   accountToDolomiteBalanceMap: AccountSubAccountToMarketToBalanceMap,
   poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
   totalPointsPerMarket: Record<number, BigNumber>,
@@ -409,10 +415,11 @@ export function calculateFinalRewards(
           const points = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
           const oTokenReward = rewards.times(points.rewardPoints).dividedBy(totalPointsPerMarket[market]);
 
-          if (!effectiveUserToOTokenRewards[points.effectiveUser]) {
-            effectiveUserToOTokenRewards[points.effectiveUser] = INTEGERS.ZERO;
+          const remappedAccount = remapAccountToClaimableAccount(networkId, points.effectiveUser);
+          if (!effectiveUserToOTokenRewards[remappedAccount]) {
+            effectiveUserToOTokenRewards[remappedAccount] = INTEGERS.ZERO;
           }
-          effectiveUserToOTokenRewards[points.effectiveUser] = effectiveUserToOTokenRewards[points.effectiveUser].plus(
+          effectiveUserToOTokenRewards[remappedAccount] = effectiveUserToOTokenRewards[remappedAccount].plus(
             oTokenReward,
           );
         }
@@ -431,8 +438,13 @@ export function calculateFinalRewards(
           totalLiquidityPointsPerPool[pool],
         ));
 
-        effectiveUserToOTokenRewards[account] = effectiveUserToOTokenRewards[account] ?? INTEGERS.ZERO;
-        effectiveUserToOTokenRewards[account] = effectiveUserToOTokenRewards[account].plus(rewardAmount);
+        const remappedAccount = remapAccountToClaimableAccount(networkId, account);
+        if (!effectiveUserToOTokenRewards[remappedAccount]) {
+          effectiveUserToOTokenRewards[remappedAccount] = INTEGERS.ZERO;
+        }
+        effectiveUserToOTokenRewards[remappedAccount] = effectiveUserToOTokenRewards[remappedAccount].plus(
+          rewardAmount,
+        );
       });
     }
 

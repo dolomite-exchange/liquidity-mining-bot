@@ -2,6 +2,7 @@ import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { ethers } from 'ethers';
 import fs from 'fs';
 import './lib/env-reader';
+import { writeOutputFile } from './lib/file-helpers';
 import { calculateMerkleRootAndProofs } from './lib/rewards';
 
 interface OutputFile {
@@ -98,21 +99,6 @@ function readOutputFile(fileName: string): OutputFile {
       metadata: {},
     };
   }
-}
-
-function writeOutputFile(
-  fileName: string,
-  fileContent: OutputFile,
-): void {
-  if (!fs.existsSync(OUTPUT_FOLDER_NAME)) {
-    fs.mkdirSync(OUTPUT_FOLDER_NAME);
-  }
-
-  fs.writeFileSync(
-    fileName,
-    JSON.stringify(fileContent),
-    { encoding: 'utf8', flag: 'w' },
-  );
 }
 
 start()
