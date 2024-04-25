@@ -62,7 +62,9 @@ export async function writeFileToGitHub(
         message = 'AUTOMATED: Updated config';
       }
     } else if (filePath.includes('finalized')) {
-      if (filePath.includes('mineral') && !filePath.includes('metadata')) {
+      if (filePath.includes('ez-eth')) {
+        message = 'AUTOMATED: Added latest ez points';
+      } else if (filePath.includes('mineral') && !filePath.includes('metadata')) {
         const mineralData = fileContent as MineralOutputFile;
         if (mineralData.metadata.merkleRoot) {
           message = `AUTOMATED: Added finalized minerals for epoch ${mineralData.metadata.epoch}`;

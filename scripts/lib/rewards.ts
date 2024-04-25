@@ -377,7 +377,7 @@ export function calculateFinalPoints(
 
   return Object.keys(effectiveUserToPoints).reduce<Record<string, string>>((map, account) => {
     const finalPoints = effectiveUserToPoints[account].multipliedBy(ONE_ETH_WEI).dividedToIntegerBy(INTEGERS.ONE);
-    if (finalPoints.gt(INTEGERS.ZERO)) {
+    if (finalPoints.gt(INTEGERS.ZERO) && !blacklistMap[account]) {
       map[account] = finalPoints.toFixed(0);
     }
     return map;
