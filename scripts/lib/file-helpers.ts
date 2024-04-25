@@ -1,5 +1,6 @@
 import axios from 'axios';
 import fs from 'fs';
+import { OTokenOutputFile } from '../calculate-otoken-rewards';
 import { MineralOutputFile } from './config-helper';
 
 const FOLDER_URL = 'https://api.github.com/repos/dolomite-exchange/liquidity-mining-data';
@@ -61,20 +62,24 @@ export async function writeFileToGitHub(
         message = 'AUTOMATED: Updated config';
       }
     } else if (filePath.includes('finalized')) {
-      if (filePath.includes('mineral')) {
+      if (filePath.includes('mineral') && !filePath.includes('metadata')) {
         const mineralData = fileContent as MineralOutputFile;
-        if (fileContent.metadata.merkleRoot) {
+        if (mineralData.metadata.merkleRoot) {
           message = `AUTOMATED: Added finalized minerals for epoch ${mineralData.metadata.epoch}`;
         } else {
           message = `AUTOMATED: Updated minerals for epoch ${mineralData.metadata.epoch}`;
         }
-      } else if (filePath.includes('oarb')) {
-        const oArbData = fileContent as MineralOutputFile;
+      } else if (filePath.includes('oarb') && !filePath.includes('metadata')) {
+        const oArbData = fileContent as OTokenOutputFile;
         if (fileContent.metadata.merkleRoot) {
           message = `AUTOMATED: Added finalized oARB for epoch ${oArbData.metadata.epoch}`;
         } else {
           message = `AUTOMATED: Updated oARB for epoch ${oArbData.metadata.epoch}`;
         }
+      } else if (filePath.includes('mineral') && filePath.includes('metadata')) {
+        message = `AUTOMATED: Updated finalized mineral metadata`;
+      } else if (filePath.includes('oarb') && filePath.includes('metadata')) {
+        message = `AUTOMATED: Updated finalized oARB metadata`;
       } else {
         message = 'AUTOMATED: Added finalized data';
       }
