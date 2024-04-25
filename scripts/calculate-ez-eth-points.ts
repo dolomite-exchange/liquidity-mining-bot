@@ -1,32 +1,18 @@
-import { BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Decimal, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import fs from 'fs';
 import v8 from 'v8';
 import { getLatestBlockNumberByTimestamp } from '../src/clients/blocks';
-import { getAllDolomiteAccountsWithSupplyValue } from '../src/clients/dolomite';
+import { getAllDolomiteAccountsWithToken } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
-import BlockStore from '../src/lib/block-store';
+import { MarketIndex } from '../src/lib/api-types';
 import { ONE_ETH_WEI } from '../src/lib/constants';
 import Logger from '../src/lib/logger';
-import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
 import '../src/lib/env'
-import {
-  getAccountBalancesByMarket,
-  getAmmLiquidityPositionAndEvents,
-  getArbVestingLiquidityPositionAndEvents,
-  getBalanceChangingEvents,
-} from './lib/event-parser';
-import { writeFileToGitHub } from './lib/file-helpers';
-import {
-  ARB_VESTER_PROXY,
-  calculateFinalPoints,
-  calculateVirtualLiquidityPoints,
-  ETH_USDC_POOL,
-  InterestOperation,
-  LiquidityPositionsAndEvents,
-  processEventsAndCalculateTotalRewardPoints,
-} from './lib/rewards';
+import { getAccountBalancesByMarket, getBalanceChangingEvents } from './lib/event-parser';
+import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
+import { calculateFinalPoints, InterestOperation, processEventsAndCalculateTotalRewardPoints } from './lib/rewards';
 
 /* eslint-enable */
 
@@ -37,7 +23,7 @@ interface OutputFile {
   metadata: {
     marketId: number
     marketName: string // big int
-    totalPointsForMarket: string // big int
+    ezPoints: string // big int
     startBlock: number
     endBlock: number
     startTimestamp: number
@@ -49,19 +35,30 @@ const FOLDER_NAME = `${__dirname}/output`;
 
 const ezEthMarketId = 37;
 
-async function start() {
+export async function calculateEzEthPoints(appendResults: boolean) {
+  if (appendResults) {
+    Logger.info({
+      message: 'Using append strategy...',
+    });
+  } else {
+    Logger.info({
+      message: 'Performing raw pull for data...',
+    });
+  }
+
   const networkId = await dolomite.web3.eth.net.getId();
+  const githubFilePath = `finalized/${networkId}/ez-eth/ez-eth-running-points.json`;
+  const oldData = await readFileFromGitHub<OutputFile>(githubFilePath);
 
   const validMarketIdsMap = {
     [ezEthMarketId]: new BigNumber(1).div(3600), // 1 point every hour (in seconds)
   }
 
-  const blockStore = new BlockStore();
-  await blockStore._update();
-  const marketStore = new MarketStore(blockStore);
+  const realStartTimestamp = 1713398400; // April 18 00:00:00
+  const realStartBlock = 202117429;
 
-  const startTimestamp = 1713398400; // April 18 00:00:00
-  const startBlockNumber = (await getLatestBlockNumberByTimestamp(startTimestamp)).blockNumber;
+  const startTimestamp = appendResults ? oldData.metadata.endTimestamp : realStartTimestamp;
+  const startBlockNumber = appendResults ? oldData.metadata.endBlock : realStartBlock;
   const rawEndTimestamp = Math.floor(Date.now() / 1000);
   const {
     blockNumber: endBlockNumber,
@@ -90,16 +87,17 @@ async function start() {
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
 
-  await marketStore._update(startBlockNumber);
-  const startMarketMap = marketStore.getMarketMap();
-  const startMarketIndexMap = await marketStore.getMarketIndexMap(startMarketMap, { blockNumber: startBlockNumber });
-
-  await marketStore._update(endBlockNumber);
-  const endMarketMap = marketStore.getMarketMap();
-  const endMarketIndexMap = await marketStore.getMarketIndexMap(endMarketMap, { blockNumber: endBlockNumber });
+  const marketIndexMap: Record<string, MarketIndex> = {
+    [ezEthMarketId]: {
+      marketId: ezEthMarketId,
+      supply: INTEGERS.ONE,
+      borrow: INTEGERS.ONE,
+    },
+  }
+  const tokenAddress = await dolomite.getters.getMarketTokenAddress(new BigNumber(ezEthMarketId));
 
   const apiAccounts = await Pageable.getPageableValues(async (lastId) => {
-    const result = await getAllDolomiteAccountsWithSupplyValue(startMarketIndexMap, startBlockNumber, lastId);
+    const result = await getAllDolomiteAccountsWithToken(tokenAddress, marketIndexMap, startBlockNumber, lastId);
     return result.accounts;
   });
 
@@ -109,12 +107,12 @@ async function start() {
     validMarketIdsMap,
   );
 
-  const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
+  const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber, tokenAddress);
 
   const totalPointsPerMarket: Record<number, Decimal> = processEventsAndCalculateTotalRewardPoints(
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
-    endMarketIndexMap,
+    marketIndexMap,
     validMarketIdsMap,
     endTimestamp,
     InterestOperation.NOTHING,
@@ -126,57 +124,39 @@ async function start() {
     }
   });
 
-  const ammLiquidityBalancesAndEvents = await getAmmLiquidityPositionAndEvents(
-    startBlockNumber,
-    startTimestamp,
-    endTimestamp,
-  );
-
-  const vestingPositionsAndEvents = await getArbVestingLiquidityPositionAndEvents(
-    startBlockNumber,
-    startTimestamp,
-    endTimestamp,
-  );
-
-  const poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents> = {
-    [ETH_USDC_POOL]: ammLiquidityBalancesAndEvents,
-    [ARB_VESTER_PROXY]: vestingPositionsAndEvents,
-  };
-
-  const poolToTotalSubLiquidityPoints = calculateVirtualLiquidityPoints(
-    poolToVirtualLiquidityPositionsAndEvents,
-    startTimestamp,
-    endTimestamp,
-  );
-
+  const EMPTY_MAP = {};
   const userToPointsMap = calculateFinalPoints(
     networkId,
     accountToDolomiteBalanceMap,
     validMarketIdsMap,
-    poolToVirtualLiquidityPositionsAndEvents,
-    poolToTotalSubLiquidityPoints,
+    EMPTY_MAP,
+    EMPTY_MAP,
+    appendResults ? oldData.users : undefined,
   );
-  const tokenAddress = await dolomite.getters.getMarketTokenAddress(new BigNumber(ezEthMarketId));
   const token = new dolomite.web3.eth.Contract(TokenAbi, tokenAddress);
   const tokenName = await dolomite.contracts.callConstantContractFunction(token.methods.name());
+  const totalEzPoints = totalPointsPerMarket[ezEthMarketId]
+    .times(ONE_ETH_WEI)
+    .plus(oldData.metadata.ezPoints ?? '0');
 
   const dataToWrite: OutputFile = {
     users: userToPointsMap,
     metadata: {
       marketId: ezEthMarketId,
       marketName: tokenName,
-      totalPointsForMarket: totalPointsPerMarket[ezEthMarketId].times(ONE_ETH_WEI).toFixed(0),
-      startBlock: startBlockNumber,
-      endBlock: endBlockNumber,
-      startTimestamp,
+      ezPoints: totalEzPoints.toFixed(0),
+      startTimestamp: realStartTimestamp,
       endTimestamp,
+      startBlock: realStartBlock,
+      endBlock: endBlockNumber,
     },
   };
-  if (process.env.SCRIPTS !== 'true') {
-    const filePath = `finalized/${networkId}/ez-eth/ez-eth-running-points.json`;
-    await writeFileToGitHub(filePath, dataToWrite, true);
+  if (process.env.SCRIPT !== 'true') {
+    await writeFileToGitHub(githubFilePath, dataToWrite, true);
   } else {
-    writeOutputFile(`${__dirname}/output/ez-points.json`, dataToWrite)
+    const fileName = `${__dirname}/output/ez-points.json`;
+    console.log('Writing ez points to file', fileName);
+    writeOutputFile(fileName, dataToWrite)
   }
 
   return true;
@@ -197,11 +177,13 @@ function writeOutputFile(
   );
 }
 
-start()
-  .then(() => {
-    console.log('Finished executing script!');
-  })
-  .catch(error => {
-    console.error('Caught error while starting:', error);
-    process.exit(1);
-  });
+if (process.env.SCRIPT === 'true') {
+  calculateEzEthPoints(true)
+    .then(() => {
+      console.log('Finished executing script!');
+    })
+    .catch(error => {
+      console.error('Caught error while starting:', error);
+      process.exit(1);
+    });
+}

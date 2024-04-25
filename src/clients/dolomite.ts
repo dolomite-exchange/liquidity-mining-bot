@@ -57,6 +57,7 @@ async function getAccounts(
   query: string,
   blockNumber: number,
   lastId: string | undefined,
+  extraVariables: Record<string, any> = {},
 ): Promise<{ accounts: ApiAccount[] }> {
   const indexBase = ONE_ETH_WEI;
   const accounts: ApiAccount[] = await axios.post(
@@ -64,6 +65,7 @@ async function getAccounts(
     {
       query,
       variables: {
+        ...extraVariables,
         blockNumber,
         lastId: lastId ?? '',
       },
@@ -113,13 +115,18 @@ export async function getDeposits(
   startBlock: number,
   endBlock: number,
   lastId: string,
+  tokenAddress?: string,
 ): Promise<{ deposits: ApiDeposit[] }> {
   const query = `
   query getDeposits($startBlock: BigInt, $endBlock: Int, $lastId: ID) {
     deposits(
       first: ${Pageable.MAX_PAGE_SIZE},
       orderBy: id
-      where: { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } id_gt: $lastId }
+      where: {
+        transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }
+        id_gt: $lastId
+        ${tokenAddress ? `token: "${tokenAddress.toLowerCase()}"` : ''} 
+      }
     ) {
       id
       serialId
@@ -194,13 +201,26 @@ export async function getLiquidations(
   startBlock: number,
   endBlock: number,
   lastId: string,
+  tokenAddress?: string,
 ): Promise<{ liquidations: ApiLiquidation[] }> {
+  tokenAddress = tokenAddress?.toLowerCase();
   const query = `
     query getLiquidations($startBlock: Int, $endBlock: Int, $lastId: ID) {
       liquidations(
         first: ${Pageable.MAX_PAGE_SIZE},
         orderBy: id
-        where: { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } id_gt: $lastId }
+        where: {
+          ${tokenAddress ? `
+            and: [
+              { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } },
+              { id_gt: $lastId }
+            ]
+            or: [{ heldToken: "${tokenAddress}" }, { borrowedToken: "${tokenAddress}" }]
+          ` : `
+            transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }
+            id_gt: $lastId
+          `} 
+        }
       ) {
         id
         serialId
@@ -605,13 +625,26 @@ export async function getTrades(
   startBlock: number,
   endBlock: number,
   lastId: string,
+  tokenAddress?: string,
 ): Promise<{ trades: ApiTrade[] }> {
+  tokenAddress = tokenAddress?.toLowerCase();
   const query = `
     query getTrades($startBlock: Int, $endBlock: Int, $lastId: ID) {
       trades(
         first: ${Pageable.MAX_PAGE_SIZE},
         orderBy: id
-        where: { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } id_gt: $lastId }
+        where: {
+          ${tokenAddress ? `
+            and: [
+              { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } },
+              { id_gt: $lastId }
+            ]
+            or: [{ makerToken: "${tokenAddress}" }, { takerToken: "${tokenAddress}" }]
+          ` : `
+              transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock },
+              id_gt: $lastId
+          `} 
+        }
       ) {
         id
         serialId
@@ -721,13 +754,18 @@ export async function getTransfers(
   startBlock: number,
   endBlock: number,
   lastId: string,
+  tokenAddress?: string,
 ): Promise<{ transfers: ApiTransfer[] }> {
   const query = `
     query getTransfers($startBlock: Int, $endBlock: Int, $lastId: ID) {
       transfers(
         first: ${Pageable.MAX_PAGE_SIZE},
         orderBy: id
-        where: { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } id_gt: $lastId }
+        where: {
+          transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }
+          id_gt: $lastId
+          ${tokenAddress ? `token: "${tokenAddress.toLowerCase()}"` : ''} 
+        }
       ) {
         id
         serialId
@@ -883,13 +921,18 @@ export async function getWithdrawals(
   startBlock: number,
   endBlock: number,
   lastId: string,
+  tokenAddress?: string,
 ): Promise<{ withdrawals: ApiWithdrawal[] }> {
   const query = `
     query getWithdrawals($startBlock: Int, $endBlock: Int, $lastId: ID) {
     withdrawals(
       first: ${Pageable.MAX_PAGE_SIZE},
       orderBy: id
-      where: { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } id_gt: $lastId }
+      where: {
+        transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }
+        id_gt: $lastId
+        ${tokenAddress ? `token: "${tokenAddress.toLowerCase()}"` : ''} 
+      }
     ) {
         id
         serialId
@@ -981,7 +1024,7 @@ export async function getAllDolomiteAccountsWithSupplyValue(
                     }
                   }
                   accountNumber
-                  tokenValues {
+                  tokenValues) {
                     token {
                       id
                       marketId
@@ -995,6 +1038,44 @@ export async function getAllDolomiteAccountsWithSupplyValue(
                 }
               }`;
   return getAccounts(marketIndexMap, query, blockNumber, lastId);
+}
+
+export async function getAllDolomiteAccountsWithToken(
+  tokenAddress: string,
+  marketIndexMap: { [marketId: string]: MarketIndex },
+  blockNumber: number,
+  lastId: string | undefined,
+): Promise<{ accounts: ApiAccount[] }> {
+  const query = `
+            query getActiveMarginAccounts($blockNumber: Int, $token: String, $lastId: ID) {
+                marginAccounts(
+                  where: { hasSupplyValue: true id_gt: $lastId tokenValues_: { token: $token } }
+                  block: { number: $blockNumber }
+                  orderBy: id
+                  first: ${Pageable.MAX_PAGE_SIZE}
+                ) {
+                  id
+                  user {
+                    id
+                    effectiveUser {
+                      id
+                    }
+                  }
+                  accountNumber
+                  tokenValues(where: { token: $token }) {
+                    token {
+                      id
+                      marketId
+                      decimals
+                      symbol
+                    }
+                    valuePar
+                    expirationTimestamp
+                    expiryAddress
+                  }
+                }
+              }`;
+  return getAccounts(marketIndexMap, query, blockNumber, lastId, { token: tokenAddress.toLowerCase() });
 }
 
 export async function getDolomiteMarkets(

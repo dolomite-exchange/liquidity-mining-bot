@@ -65,35 +65,36 @@ export function getAccountBalancesByMarket(
 export async function getBalanceChangingEvents(
   startBlockNumber: number,
   endBlockNumber: number,
+  tokenAddress?: string,
 ): Promise<AccountToSubAccountToMarketToBalanceChangeMap> {
   const accountToAssetToEventsMap: AccountToSubAccountToMarketToBalanceChangeMap = {};
 
   const deposits = await Pageable.getPageableValues((async (lastId) => {
-    const results = await getDeposits(startBlockNumber, endBlockNumber, lastId);
+    const results = await getDeposits(startBlockNumber, endBlockNumber, lastId, tokenAddress);
     return results.deposits;
   }));
   parseDeposits(accountToAssetToEventsMap, deposits);
 
   const withdrawals = await Pageable.getPageableValues((async (lastId) => {
-    const results = await getWithdrawals(startBlockNumber, endBlockNumber, lastId);
+    const results = await getWithdrawals(startBlockNumber, endBlockNumber, lastId, tokenAddress);
     return results.withdrawals;
   }));
   parseWithdrawals(accountToAssetToEventsMap, withdrawals);
 
   const transfers = await Pageable.getPageableValues((async (lastId) => {
-    const results = await getTransfers(startBlockNumber, endBlockNumber, lastId);
+    const results = await getTransfers(startBlockNumber, endBlockNumber, lastId, tokenAddress);
     return results.transfers;
   }));
   parseTransfers(accountToAssetToEventsMap, transfers);
 
   const trades = await Pageable.getPageableValues((async (lastId) => {
-    const results = await getTrades(startBlockNumber, endBlockNumber, lastId);
+    const results = await getTrades(startBlockNumber, endBlockNumber, lastId, tokenAddress);
     return results.trades;
   }));
   parseTrades(accountToAssetToEventsMap, trades);
 
   const liquidations = await Pageable.getPageableValues((async (lastId) => {
-    const results = await getLiquidations(startBlockNumber, endBlockNumber, lastId);
+    const results = await getLiquidations(startBlockNumber, endBlockNumber, lastId, tokenAddress);
     return results.liquidations;
   }));
   parseLiquidations(accountToAssetToEventsMap, liquidations);

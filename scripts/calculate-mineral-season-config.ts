@@ -1,3 +1,4 @@
+import { dolomite } from '../src/helpers/web3';
 import { isScript } from '../src/lib/env';
 import Logger from '../src/lib/logger';
 import {
@@ -13,11 +14,8 @@ export const MAX_MINERALS_KEY_BEFORE_MIGRATIONS = 900
 
 export async function calculateMineralSeasonConfig(
   skipConfigUpdate: boolean = false,
-  networkId: number = parseInt(process.env.NETWORK_ID ?? '', 10),
 ): Promise<{ epochNumber: number; endTimestamp: number; isEpochElapsed: boolean }> {
-  if (Number.isNaN(networkId)) {
-    return Promise.reject(new Error('Invalid network ID'));
-  }
+  const networkId = await dolomite.web3.eth.net.getId();
 
   const configFile = await readFileFromGitHub<MineralConfigFile>(getMineralConfigFileNameWithPath(networkId));
   const epochNumber: number = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);

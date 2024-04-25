@@ -334,8 +334,12 @@ export function calculateFinalPoints(
   validMarketIdsMap: Record<string, any>,
   poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
   poolToTotalSubLiquidityPoints: Record<string, BigNumber>,
+  oldData: Record<string, string> = {},
 ): Record<string, string> {
-  const effectiveUserToPoints: Record<string, Decimal> = {};
+  const effectiveUserToPoints = Object.keys(oldData).reduce<Record<string, Decimal>>((memo, key) => {
+    memo[key] = new BigNumber(oldData[key]);
+    return memo;
+  }, {});
   Object.keys(accountToDolomiteBalanceMap).forEach(account => {
     Object.keys(accountToDolomiteBalanceMap[account]!).forEach(subAccount => {
       Object.keys(accountToDolomiteBalanceMap[account]![subAccount]!).forEach(market => {
