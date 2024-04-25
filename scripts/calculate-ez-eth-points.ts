@@ -59,6 +59,7 @@ export async function calculateEzEthPoints(appendResults: boolean) {
 
   const startTimestamp = appendResults ? oldData.metadata.endTimestamp : realStartTimestamp;
   const startBlockNumber = appendResults ? oldData.metadata.endBlock : realStartBlock;
+  const originalEzPoints = appendResults ? oldData.metadata.ezPoints : '0';
   const rawEndTimestamp = Math.floor(Date.now() / 1000);
   const {
     blockNumber: endBlockNumber,
@@ -137,7 +138,7 @@ export async function calculateEzEthPoints(appendResults: boolean) {
   const tokenName = await dolomite.contracts.callConstantContractFunction(token.methods.name());
   const totalEzPoints = totalPointsPerMarket[ezEthMarketId]
     .times(ONE_ETH_WEI)
-    .plus(oldData.metadata.ezPoints ?? '0');
+    .plus(originalEzPoints);
 
   const dataToWrite: OutputFile = {
     users: userToPointsMap,
