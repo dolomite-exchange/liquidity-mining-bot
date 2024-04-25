@@ -39,7 +39,8 @@ export async function calculateMineralSeasonConfig(
 
   if (skipConfigUpdate) {
     Logger.info({
-      message: 'calculateMineralSeasonConfig: Skipping config update...',
+      at: 'calculateMineralSeasonConfig',
+      message: 'Skipping config update...',
       epochNumber: maxKey,
     });
     return {
@@ -47,6 +48,13 @@ export async function calculateMineralSeasonConfig(
       endTimestamp: configFile.epochs[maxKey].endTimestamp,
       isEpochElapsed: configFile.epochs[maxKey].isTimeElapsed,
     };
+  } else {
+    Logger.info({
+      at: 'calculateMineralSeasonConfig',
+      epochNumber: maxKey,
+      endTimestamp: configFile.epochs[maxKey].endTimestamp,
+      isEpochElapsed: configFile.epochs[maxKey].isTimeElapsed,
+    })
   }
 
   const oldEpoch = configFile.epochs[maxKey];
@@ -66,7 +74,7 @@ export async function calculateMineralSeasonConfig(
   };
   await writeMineralConfigToGitHub(configFile, epochData);
 
-  return { epochNumber: maxKey, endTimestamp: epochData.endTimestamp, isEpochElapsed: isTimeElapsed };
+  return { epochNumber: epochData.epoch, endTimestamp: epochData.endTimestamp, isEpochElapsed: isTimeElapsed };
 }
 
 if (isScript()) {
