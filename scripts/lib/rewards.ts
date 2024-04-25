@@ -261,17 +261,20 @@ export function processEventsAndCalculateTotalRewardPoints(
           totalPointsPerMarket[market] = totalPointsPerMarket[market] ?? INTEGERS.ZERO;
 
           const userBalanceStruct = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
-          const rewardUpdate = userBalanceStruct.processEvent(
-            {
-              amountDeltaPar: INTEGERS.ZERO,
-              timestamp: endTimestamp,
-              serialId: 0,
-              effectiveUser: userBalanceStruct.effectiveUser,
-              interestIndex: endInterestIndexMap[market],
-            },
-            operation,
-          );
-          totalPointsPerMarket[market] = totalPointsPerMarket[market].plus(rewardUpdate);
+          const interestIndex = endInterestIndexMap[market];
+          if (interestIndex) {
+            const rewardUpdate = userBalanceStruct.processEvent(
+              {
+                amountDeltaPar: INTEGERS.ZERO,
+                timestamp: endTimestamp,
+                serialId: 0,
+                effectiveUser: userBalanceStruct.effectiveUser,
+                interestIndex: interestIndex,
+              },
+              operation,
+            );
+            totalPointsPerMarket[market] = totalPointsPerMarket[market].plus(rewardUpdate);
+          }
         });
       });
     }

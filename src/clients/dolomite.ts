@@ -24,7 +24,8 @@ import {
 } from '../lib/api-types';
 import { ONE_ETH_WEI } from '../lib/constants';
 import {
-  GraphqlAccountResult, GraphqlAmmLiquidityPositionSnapshotsResult,
+  GraphqlAccountResult,
+  GraphqlAmmLiquidityPositionSnapshotsResult,
   GraphqlAmmLiquidityPositionsResult,
   GraphqlDepositsResult,
   GraphqlLiquidationsResult,
@@ -42,6 +43,95 @@ import Pageable from '../lib/pageable';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ethers = require('ethers');
+
+const LIQUIDATION_FIELDS_GQL = `     id
+        serialId
+        transaction {
+          timestamp
+        }
+        solidEffectiveUser {
+          id
+        }
+        liquidEffectiveUser {
+          id
+        }
+        solidMarginAccount {
+          user {
+            id
+          }
+          accountNumber
+        }
+        liquidMarginAccount {
+          user {
+            id
+          }
+          accountNumber
+        }
+        heldToken {
+          marketId
+        }
+        heldTokenAmountDeltaWei
+        heldTokenLiquidationRewardWei
+        borrowedToken {
+          marketId
+        }
+        borrowedTokenAmountDeltaWei
+        solidHeldTokenAmountDeltaPar
+        liquidHeldTokenAmountDeltaPar
+        solidBorrowedTokenAmountDeltaPar
+        liquidBorrowedTokenAmountDeltaPar
+        heldInterestIndex {
+          supplyIndex
+          borrowIndex
+        }
+        borrowedInterestIndex {
+          supplyIndex
+          borrowIndex
+        }`
+
+const TRADE_FIELDS_GQL = `        id
+        serialId
+        transaction {
+          timestamp
+        }
+        takerEffectiveUser {
+          id
+        }
+        takerMarginAccount {
+          user {
+            id
+          }
+          accountNumber
+        }
+        takerToken {
+          marketId
+        }
+        makerTokenDeltaWei
+        takerTokenDeltaWei
+        takerInputTokenDeltaPar
+        takerOutputTokenDeltaPar
+        makerInputTokenDeltaPar
+        makerOutputTokenDeltaPar
+        makerEffectiveUser {
+          id
+        }
+        makerMarginAccount {
+          user {
+            id
+          }
+          accountNumber
+        }
+        makerToken {
+          marketId
+        }
+        takerInterestIndex {
+          supplyIndex
+          borrowIndex
+        }
+        makerInterestIndex {
+          supplyIndex
+          borrowIndex
+        }`;
 
 const defaultAxiosConfig = {
   headers: { 'Accept-Encoding': 'gzip,deflate,compress' },
@@ -201,71 +291,18 @@ export async function getLiquidations(
   startBlock: number,
   endBlock: number,
   lastId: string,
-  tokenAddress?: string,
 ): Promise<{ liquidations: ApiLiquidation[] }> {
-  tokenAddress = tokenAddress?.toLowerCase();
   const query = `
     query getLiquidations($startBlock: Int, $endBlock: Int, $lastId: ID) {
       liquidations(
         first: ${Pageable.MAX_PAGE_SIZE},
         orderBy: id
         where: {
-          ${tokenAddress ? `
-            and: [
-              { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } },
-              { id_gt: $lastId }
-            ]
-            or: [{ heldToken: "${tokenAddress}" }, { borrowedToken: "${tokenAddress}" }]
-          ` : `
             transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }
             id_gt: $lastId
-          `} 
         }
       ) {
-        id
-        serialId
-        transaction {
-          timestamp
-        }
-        solidEffectiveUser {
-          id
-        }
-        liquidEffectiveUser {
-          id
-        }
-        solidMarginAccount {
-          user {
-            id
-          }
-          accountNumber
-        }
-        liquidMarginAccount {
-          user {
-            id
-          }
-          accountNumber
-        }
-        heldToken {
-          marketId
-        }
-        heldTokenAmountDeltaWei
-        heldTokenLiquidationRewardWei
-        borrowedToken {
-          marketId
-        }
-        borrowedTokenAmountDeltaWei
-        solidHeldTokenAmountDeltaPar
-        liquidHeldTokenAmountDeltaPar
-        solidBorrowedTokenAmountDeltaPar
-        liquidBorrowedTokenAmountDeltaPar
-        heldInterestIndex {
-          supplyIndex
-          borrowIndex
-        }
-        borrowedInterestIndex {
-          supplyIndex
-          borrowIndex
-        }
+        ${LIQUIDATION_FIELDS_GQL}
       }
     }
   `;
@@ -288,50 +325,97 @@ export async function getLiquidations(
     return Promise.reject(result.errors[0]);
   }
 
-  if (result.data.liquidations.length === 0) {
-    return { liquidations: [] };
-  }
-  const liquidations = (result as GraphqlLiquidationsResult).data.liquidations.map<ApiLiquidation>(liquidation => {
-    return {
-      id: liquidation.id,
-      serialId: parseInt(liquidation.serialId, 10),
-      timestamp: parseInt(liquidation.transaction.timestamp, 10),
-      solidEffectiveUser: liquidation.solidEffectiveUser.id.toLowerCase(),
-      solidMarginAccount: {
-        user: liquidation.solidMarginAccount.user.id.toLowerCase(),
-        accountNumber: liquidation.solidMarginAccount.accountNumber,
-      },
-      liquidEffectiveUser: liquidation.liquidEffectiveUser.id.toLowerCase(),
-      liquidMarginAccount: {
-        user: liquidation.liquidMarginAccount.user.id.toLowerCase(),
-        accountNumber: liquidation.liquidMarginAccount.accountNumber,
-      },
-      heldMarketId: new BigNumber(liquidation.heldToken.marketId).toNumber(),
-      borrowedMarketId: new BigNumber(liquidation.borrowedToken.marketId).toNumber(),
-      heldTokenAmountDeltaWei: new BigNumber(liquidation.heldTokenAmountDeltaWei),
-      borrowedTokenAmountDeltaWei: new BigNumber(liquidation.borrowedTokenAmountDeltaWei),
-      solidHeldTokenAmountDeltaPar: new BigNumber(liquidation.solidHeldTokenAmountDeltaPar),
-      liquidHeldTokenAmountDeltaPar: new BigNumber(liquidation.liquidHeldTokenAmountDeltaPar),
-      solidBorrowedTokenAmountDeltaPar: new BigNumber(liquidation.solidBorrowedTokenAmountDeltaPar),
-      liquidBorrowedTokenAmountDeltaPar: new BigNumber(liquidation.liquidBorrowedTokenAmountDeltaPar),
-      heldSupplyIndex: new BigNumber(liquidation.heldTokenAmountDeltaWei).div(liquidation.liquidHeldTokenAmountDeltaPar)
-        .abs(),
-      borrowedSupplyIndex: new BigNumber(liquidation.borrowedTokenAmountDeltaWei)
-        .div(liquidation.solidBorrowedTokenAmountDeltaPar)
-        .abs(),
-      heldInterestIndex: {
-        marketId: new BigNumber(liquidation.heldToken.marketId).toNumber(),
-        borrow: new BigNumber(liquidation.heldInterestIndex.borrowIndex),
-        supply: new BigNumber(liquidation.heldInterestIndex.supplyIndex),
-      },
-      borrowedInterestIndex: {
-        marketId: new BigNumber(liquidation.borrowedToken.marketId).toNumber(),
-        borrow: new BigNumber(liquidation.borrowedInterestIndex.borrowIndex),
-        supply: new BigNumber(liquidation.borrowedInterestIndex.supplyIndex),
-      },
-    }
-  });
+  const liquidations = result.data.liquidations.map(liquidation => mapLiquidationGqlToApiLiquidation(liquidation));
+  return { liquidations };
+}
 
+export async function getLiquidationsByHeldToken(
+  startBlock: number,
+  endBlock: number,
+  lastId: string,
+  heldTokenAddress: string,
+): Promise<{ liquidations: ApiLiquidation[] }> {
+  const query = `
+    query getLiquidations($startBlock: Int, $endBlock: Int, $lastId: ID, $heldToken: String) {
+      liquidations(
+        first: ${Pageable.MAX_PAGE_SIZE},
+        orderBy: id
+        where: {
+            transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }
+            id_gt: $lastId
+            heldToken: $heldToken
+        }
+      ) {
+        ${LIQUIDATION_FIELDS_GQL}
+      }
+    }
+  `;
+  const result = await axios.post(
+    subgraphUrl,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+        heldToken: heldTokenAddress.toLowerCase(),
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlLiquidationsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const liquidations = result.data.liquidations.map(liquidation => mapLiquidationGqlToApiLiquidation(liquidation));
+  return { liquidations };
+}
+
+export async function getLiquidationsByBorrowedToken(
+  startBlock: number,
+  endBlock: number,
+  lastId: string,
+  borrowedTokenAddress: string,
+): Promise<{ liquidations: ApiLiquidation[] }> {
+  const query = `
+    query getLiquidations($startBlock: Int, $endBlock: Int, $lastId: ID, $borrowedToken: String) {
+      liquidations(
+        first: ${Pageable.MAX_PAGE_SIZE},
+        orderBy: id
+        where: {
+            transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }
+            id_gt: $lastId
+            borrowedToken: $borrowedToken
+        }
+      ) {
+        ${LIQUIDATION_FIELDS_GQL}
+      }
+    }
+  `;
+  const result = await axios.post(
+    subgraphUrl,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+        borrowedToken: borrowedTokenAddress.toLowerCase(),
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlLiquidationsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const liquidations = result.data.liquidations.map(liquidation => mapLiquidationGqlToApiLiquidation(liquidation));
   return { liquidations };
 }
 
@@ -625,70 +709,18 @@ export async function getTrades(
   startBlock: number,
   endBlock: number,
   lastId: string,
-  tokenAddress?: string,
 ): Promise<{ trades: ApiTrade[] }> {
-  tokenAddress = tokenAddress?.toLowerCase();
   const query = `
     query getTrades($startBlock: Int, $endBlock: Int, $lastId: ID) {
       trades(
         first: ${Pageable.MAX_PAGE_SIZE},
         orderBy: id
         where: {
-          ${tokenAddress ? `
-            and: [
-              { transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock } },
-              { id_gt: $lastId }
-            ]
-            or: [{ makerToken: "${tokenAddress}" }, { takerToken: "${tokenAddress}" }]
-          ` : `
-              transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock },
-              id_gt: $lastId
-          `} 
+          transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock },
+          id_gt: $lastId
         }
       ) {
-        id
-        serialId
-        transaction {
-          timestamp
-        }
-        takerEffectiveUser {
-          id
-        }
-        takerMarginAccount {
-          user {
-            id
-          }
-          accountNumber
-        }
-        takerToken {
-          marketId
-        }
-        makerTokenDeltaWei
-        takerTokenDeltaWei
-        takerInputTokenDeltaPar
-        takerOutputTokenDeltaPar
-        makerInputTokenDeltaPar
-        makerOutputTokenDeltaPar
-        makerEffectiveUser {
-          id
-        }
-        makerMarginAccount {
-          user {
-            id
-          }
-          accountNumber
-        }
-        makerToken {
-          marketId
-        }
-        takerInterestIndex {
-          supplyIndex
-          borrowIndex
-        }
-        makerInterestIndex {
-          supplyIndex
-          borrowIndex
-        }
+        ${TRADE_FIELDS_GQL}
       }
     }
   `;
@@ -711,42 +743,97 @@ export async function getTrades(
     return Promise.reject(result.errors[0]);
   }
 
-  const trades = (result.data.trades as any[]).map<ApiTrade>(trade => {
-    return {
-      id: trade.id,
-      serialId: parseInt(trade.serialId, 10),
-      timestamp: parseInt(trade.transaction.timestamp, 10),
-      takerEffectiveUser: trade.takerEffectiveUser.id.toLowerCase(),
-      takerMarginAccount: {
-        user: trade.takerMarginAccount.user.id.toLowerCase(),
-        accountNumber: trade.takerMarginAccount.accountNumber,
-      },
-      takerMarketId: new BigNumber(trade.takerToken.marketId).toNumber(),
-      takerTokenDeltaWei: new BigNumber(trade.takerTokenDeltaWei),
-      makerTokenDeltaWei: new BigNumber(trade.makerTokenDeltaWei),
-      takerInputTokenDeltaPar: new BigNumber(trade.takerInputTokenDeltaPar),
-      takerOutputTokenDeltaPar: new BigNumber(trade.takerOutputTokenDeltaPar),
-      makerInputTokenDeltaPar: new BigNumber(trade.makerInputTokenDeltaPar),
-      makerOutputTokenDeltaPar: new BigNumber(trade.makerOutputTokenDeltaPar),
-      makerEffectiveUser: trade.makerEffectiveUser ? trade.makerEffectiveUser.id.toLowerCase() : null,
-      makerMarginAccount: trade.makerMarginAccount ? {
-        user: trade.makerMarginAccount.user.id.toLowerCase(),
-        accountNumber: trade.makerMarginAccount.accountNumber,
-      } : undefined,
-      makerMarketId: new BigNumber(trade.makerToken.marketId).toNumber(),
-      makerInterestIndex: {
-        marketId: new BigNumber(trade.makerToken.marketId).toNumber(),
-        borrow: new BigNumber(trade.makerInterestIndex.borrowIndex),
-        supply: new BigNumber(trade.makerInterestIndex.supplyIndex),
-      },
-      takerInterestIndex: {
-        marketId: new BigNumber(trade.takerToken.marketId).toNumber(),
-        borrow: new BigNumber(trade.takerInterestIndex.borrowIndex),
-        supply: new BigNumber(trade.takerInterestIndex.supplyIndex),
-      },
-    }
-  });
+  const trades = result.data.trades.map<ApiTrade>(trade => mapTradeGqlToApiTrade(trade));
+  return { trades };
+}
 
+export async function getTakerTrades(
+  startBlock: number,
+  endBlock: number,
+  lastId: string,
+  takerTokenAddress: string,
+): Promise<{ trades: ApiTrade[] }> {
+  const query = `
+    query getTrades($startBlock: Int, $endBlock: Int, $lastId: ID, $takerToken: String) {
+      trades(
+        first: ${Pageable.MAX_PAGE_SIZE},
+        orderBy: id
+        where: {
+          transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock },
+          id_gt: $lastId
+          takerToken: $takerToken
+        }
+      ) {
+        ${TRADE_FIELDS_GQL}
+      }
+    }
+  `;
+  const result = await axios.post(
+    subgraphUrl,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+        takerToken: takerTokenAddress.toLowerCase(),
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlTradesResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const trades = result.data.trades.map<ApiTrade>(trade => mapTradeGqlToApiTrade(trade));
+  return { trades };
+}
+
+export async function getMakerTrades(
+  startBlock: number,
+  endBlock: number,
+  lastId: string,
+  makerTokenAddress: string,
+): Promise<{ trades: ApiTrade[] }> {
+  const query = `
+    query getTrades($startBlock: Int, $endBlock: Int, $lastId: ID, $makerToken: String) {
+      trades(
+        first: ${Pageable.MAX_PAGE_SIZE},
+        orderBy: id
+        where: {
+          transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock },
+          id_gt: $lastId
+          makerToken: $makerToken
+        }
+      ) {
+        ${TRADE_FIELDS_GQL}
+      }
+    }
+  `;
+  const result = await axios.post(
+    subgraphUrl,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+        makerToken: makerTokenAddress.toLowerCase(),
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlTradesResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const trades = result.data.trades.map<ApiTrade>(trade => mapTradeGqlToApiTrade(trade));
   return { trades };
 }
 
@@ -1205,4 +1292,76 @@ export async function getTimestampToBlockNumberMap(timestamps: number[]): Promis
     memo[timestamp.toString()] = result.data[`_${timestamp}`]?.[0]?.number;
     return memo;
   }, {});
+}
+
+function mapLiquidationGqlToApiLiquidation(liquidation: any): ApiLiquidation {
+  return {
+    id: liquidation.id,
+    serialId: parseInt(liquidation.serialId, 10),
+    timestamp: parseInt(liquidation.transaction.timestamp, 10),
+    solidEffectiveUser: liquidation.solidEffectiveUser.id.toLowerCase(),
+    solidMarginAccount: {
+      user: liquidation.solidMarginAccount.user.id.toLowerCase(),
+      accountNumber: liquidation.solidMarginAccount.accountNumber,
+    },
+    liquidEffectiveUser: liquidation.liquidEffectiveUser.id.toLowerCase(),
+    liquidMarginAccount: {
+      user: liquidation.liquidMarginAccount.user.id.toLowerCase(),
+      accountNumber: liquidation.liquidMarginAccount.accountNumber,
+    },
+    heldMarketId: new BigNumber(liquidation.heldToken.marketId).toNumber(),
+    borrowedMarketId: new BigNumber(liquidation.borrowedToken.marketId).toNumber(),
+    heldTokenAmountDeltaWei: new BigNumber(liquidation.heldTokenAmountDeltaWei),
+    borrowedTokenAmountDeltaWei: new BigNumber(liquidation.borrowedTokenAmountDeltaWei),
+    solidHeldTokenAmountDeltaPar: new BigNumber(liquidation.solidHeldTokenAmountDeltaPar),
+    liquidHeldTokenAmountDeltaPar: new BigNumber(liquidation.liquidHeldTokenAmountDeltaPar),
+    solidBorrowedTokenAmountDeltaPar: new BigNumber(liquidation.solidBorrowedTokenAmountDeltaPar),
+    liquidBorrowedTokenAmountDeltaPar: new BigNumber(liquidation.liquidBorrowedTokenAmountDeltaPar),
+    heldInterestIndex: {
+      marketId: new BigNumber(liquidation.heldToken.marketId).toNumber(),
+      borrow: new BigNumber(liquidation.heldInterestIndex.borrowIndex),
+      supply: new BigNumber(liquidation.heldInterestIndex.supplyIndex),
+    },
+    borrowedInterestIndex: {
+      marketId: new BigNumber(liquidation.borrowedToken.marketId).toNumber(),
+      borrow: new BigNumber(liquidation.borrowedInterestIndex.borrowIndex),
+      supply: new BigNumber(liquidation.borrowedInterestIndex.supplyIndex),
+    },
+  };
+}
+
+function mapTradeGqlToApiTrade(trade: any): ApiTrade {
+  return {
+    id: trade.id,
+    serialId: parseInt(trade.serialId, 10),
+    timestamp: parseInt(trade.transaction.timestamp, 10),
+    takerEffectiveUser: trade.takerEffectiveUser.id.toLowerCase(),
+    takerMarginAccount: {
+      user: trade.takerMarginAccount.user.id.toLowerCase(),
+      accountNumber: trade.takerMarginAccount.accountNumber,
+    },
+    takerMarketId: new BigNumber(trade.takerToken.marketId).toNumber(),
+    takerTokenDeltaWei: new BigNumber(trade.takerTokenDeltaWei),
+    makerTokenDeltaWei: new BigNumber(trade.makerTokenDeltaWei),
+    takerInputTokenDeltaPar: new BigNumber(trade.takerInputTokenDeltaPar),
+    takerOutputTokenDeltaPar: new BigNumber(trade.takerOutputTokenDeltaPar),
+    makerInputTokenDeltaPar: new BigNumber(trade.makerInputTokenDeltaPar),
+    makerOutputTokenDeltaPar: new BigNumber(trade.makerOutputTokenDeltaPar),
+    makerEffectiveUser: trade.makerEffectiveUser ? trade.makerEffectiveUser.id.toLowerCase() : null,
+    makerMarginAccount: trade.makerMarginAccount ? {
+      user: trade.makerMarginAccount.user.id.toLowerCase(),
+      accountNumber: trade.makerMarginAccount.accountNumber,
+    } : undefined,
+    makerMarketId: new BigNumber(trade.makerToken.marketId).toNumber(),
+    makerInterestIndex: {
+      marketId: new BigNumber(trade.makerToken.marketId).toNumber(),
+      borrow: new BigNumber(trade.makerInterestIndex.borrowIndex),
+      supply: new BigNumber(trade.makerInterestIndex.supplyIndex),
+    },
+    takerInterestIndex: {
+      marketId: new BigNumber(trade.takerToken.marketId).toNumber(),
+      borrow: new BigNumber(trade.takerInterestIndex.borrowIndex),
+      supply: new BigNumber(trade.takerInterestIndex.supplyIndex),
+    },
+  };
 }

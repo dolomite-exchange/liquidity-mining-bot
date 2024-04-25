@@ -2,9 +2,13 @@ import { BigNumber, Decimal, INTEGERS } from '@dolomite-exchange/dolomite-margin
 import {
   getDeposits,
   getLiquidations,
+  getLiquidationsByBorrowedToken,
+  getLiquidationsByHeldToken,
   getLiquidityMiningVestingPositions,
   getLiquidityPositions,
   getLiquiditySnapshots,
+  getMakerTrades,
+  getTakerTrades,
   getTrades,
   getTransfers,
   getVestingPositionTransfers,
@@ -87,16 +91,52 @@ export async function getBalanceChangingEvents(
   }));
   parseTransfers(accountToAssetToEventsMap, transfers);
 
-  const trades = await Pageable.getPageableValues((async (lastId) => {
-    const results = await getTrades(startBlockNumber, endBlockNumber, lastId, tokenAddress);
-    return results.trades;
-  }));
+  const trades: ApiTrade[] = [];
+  if (tokenAddress) {
+    trades.push(
+      ...await Pageable.getPageableValues((async (lastId) => {
+        const results = await getTakerTrades(startBlockNumber, endBlockNumber, lastId, tokenAddress);
+        return results.trades;
+      })),
+    );
+    trades.push(
+      ...await Pageable.getPageableValues((async (lastId) => {
+        const results = await getMakerTrades(startBlockNumber, endBlockNumber, lastId, tokenAddress);
+        return results.trades;
+      })),
+    );
+  } else {
+    trades.push(
+      ...await Pageable.getPageableValues((async (lastId) => {
+        const results = await getTrades(startBlockNumber, endBlockNumber, lastId);
+        return results.trades;
+      })),
+    );
+  }
   parseTrades(accountToAssetToEventsMap, trades);
 
-  const liquidations = await Pageable.getPageableValues((async (lastId) => {
-    const results = await getLiquidations(startBlockNumber, endBlockNumber, lastId, tokenAddress);
-    return results.liquidations;
-  }));
+  const liquidations: ApiLiquidation[] = [];
+  if (tokenAddress) {
+    liquidations.push(
+      ...await Pageable.getPageableValues((async (lastId) => {
+        const results = await getLiquidationsByHeldToken(startBlockNumber, endBlockNumber, lastId, tokenAddress);
+        return results.liquidations;
+      })),
+    );
+    liquidations.push(
+      ...await Pageable.getPageableValues((async (lastId) => {
+        const results = await getLiquidationsByBorrowedToken(startBlockNumber, endBlockNumber, lastId, tokenAddress);
+        return results.liquidations;
+      })),
+    );
+  } else {
+    liquidations.push(
+      ...await Pageable.getPageableValues((async (lastId) => {
+        const results = await getLiquidations(startBlockNumber, endBlockNumber, lastId);
+        return results.liquidations;
+      })),
+    );
+  }
   parseLiquidations(accountToAssetToEventsMap, liquidations);
 
   return accountToAssetToEventsMap;
