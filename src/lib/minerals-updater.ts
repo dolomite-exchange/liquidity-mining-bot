@@ -13,7 +13,6 @@ export default class MineralsUpdater {
 
   constructor(
     private readonly networkId,
-    private readonly blockStore,
   ) {
   }
 
@@ -31,8 +30,8 @@ export default class MineralsUpdater {
     // noinspection InfiniteLoopJS
     for (; ;) {
       try {
-        const isEpochElapsed = await this._update();
-        const delayTimeMillis = this._getDelayTimeMillis(isEpochElapsed);
+        const { isEpochElapsed, endTimestamp } = await this._update();
+        const delayTimeMillis = this._getDelayTimeMillis(isEpochElapsed, endTimestamp);
         Logger.info({
           at: 'MineralsUpdater#_poll',
           message: `Waiting for ${delayTimeMillis}ms until next update`,
@@ -52,16 +51,17 @@ export default class MineralsUpdater {
     }
   };
 
-  _update = async (): Promise<boolean> => {
+  _update = async (): Promise<{ isEpochElapsed: boolean, endTimestamp: number }> => {
     Logger.info({
       at: 'MineralsUpdater#_update',
       message: 'Starting update...',
     });
 
-    const { epochNumber, isEpochElapsed } = await calculateMineralSeasonConfig(this.skipConfigUpdate, this.networkId);
+    const { epochNumber, endTimestamp, isEpochElapsed } = await calculateMineralSeasonConfig(this.skipConfigUpdate, this.networkId);
     Logger.info({
       at: 'MineralsUpdater#_update',
       message: `Finished updating season config for epoch ${epochNumber}`,
+      isEpochElapsed,
     });
 
     Logger.info({
@@ -86,24 +86,19 @@ export default class MineralsUpdater {
       message: `Finished calculating mineral rewards for epoch ${epochNumber}`,
     });
 
-    return isEpochElapsed;
+    return { isEpochElapsed, endTimestamp };
   };
 
-  private _getDelayTimeMillis(isEpochElapsed: boolean): number {
+  private _getDelayTimeMillis(isEpochElapsed: boolean, endTimestamp: number): number {
     if (isEpochElapsed) {
       // We don't want to wait too long for the next epoch's calculation
       return SHORT_WAIT_DURATION_MILLIS;
     }
 
-    const currentTimestamp = this.blockStore.getBlockTimestamp();
-    if (currentTimestamp === 0) {
-      return LONG_WAIT_DURATION_MILLIS;
-    }
-
     // Add 5 minutes as a buffer to wait for any syncing to occur after seconds
-    const currentWeek = Math.floor(currentTimestamp / ONE_WEEK_SECONDS) * ONE_WEEK_SECONDS;
+    const currentWeek = Math.floor(endTimestamp / ONE_WEEK_SECONDS) * ONE_WEEK_SECONDS;
     const nextWeek = currentWeek + ONE_WEEK_SECONDS + FOUR_MINUTES_SECONDS;
-    const timeDeltaMillis = (nextWeek - currentTimestamp) * 1_000;
+    const timeDeltaMillis = (nextWeek - endTimestamp) * 1_000;
     return Math.min(timeDeltaMillis, LONG_WAIT_DURATION_MILLIS);
   }
 }
