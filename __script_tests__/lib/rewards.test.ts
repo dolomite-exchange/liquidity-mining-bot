@@ -11,7 +11,7 @@ import {
   BalanceChangeEvent,
   BalanceChangeType,
   calculateFinalEquityRewards,
-  calculateLiquidityPoints,
+  calculateVirtualLiquidityPoints,
   processEventsAndCalculateTotalRewardPoints,
   LiquidityPositionsAndEvents,
 } from '../../scripts/lib/rewards';
@@ -230,7 +230,7 @@ describe('rewards', () => {
   });
 
   describe('calculateLiquidityPoints', () => {
-    totalLiquidityPoints = calculateLiquidityPoints(
+    totalLiquidityPoints = calculateVirtualLiquidityPoints(
       poolToVirtualLiquidityPositionsAndEvents,
       blockRewardStartTimestamp,
       blockRewardEndTimestamp,

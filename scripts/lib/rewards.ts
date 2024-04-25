@@ -1,4 +1,4 @@
-import { BigNumber, Decimal, INTEGERS } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import { ethers } from 'ethers';
 import { defaultAbiCoder, keccak256 } from 'ethers/lib/utils';
 import { MerkleTree } from 'merkletreejs';
@@ -10,7 +10,8 @@ export const ETH_USDC_POOL = '0xb77a493a4950cad1b049e222d62bce14ff423c6f'.toLowe
 export const ARB_VESTER_PROXY = '0x531BC6E97b65adF8B3683240bd594932Cfb63797'.toLowerCase();
 
 const blacklistedAddresses = process.env.BLACKLIST_ADDRESSES?.split(',') ?? []
-export const BLACKLIST_MAP: Record<string, boolean> = blacklistedAddresses.reduce((map, address) => {
+
+const blacklistMap: Record<string, boolean> = blacklistedAddresses.reduce((map, address) => {
   if (!ethers.utils.isAddress(address)) {
     throw new Error(`Invalid address: ${address}`);
   }
@@ -191,10 +192,10 @@ export function processEventsAndCalculateTotalRewardPoints(
   marketToPointsPerSecondMap: Record<string, Decimal>,
   endTimestamp: number,
   operation: InterestOperation,
-): Record<number, BigNumber> {
-  const totalPointsPerMarket: Record<number, BigNumber> = {};
+): Record<number, Decimal> {
+  const totalPointsPerMarket: Record<number, Decimal> = {};
   Object.keys(accountToMarketToEventsMap).forEach(account => {
-    if (!BLACKLIST_MAP[account.toLowerCase()]) {
+    if (!blacklistMap[account.toLowerCase()]) {
       Object.keys(accountToMarketToEventsMap[account]!).forEach(subAccount => {
         // Make sure user => subAccount ==> market => balance record exists
         if (!accountToDolomiteBalanceMap[account]) {
@@ -254,7 +255,7 @@ export function processEventsAndCalculateTotalRewardPoints(
 
   // Do final loop through all balances to finish reward point calculation
   Object.keys(accountToDolomiteBalanceMap).forEach(account => {
-    if (!BLACKLIST_MAP[account.toLowerCase()]) {
+    if (!blacklistMap[account.toLowerCase()]) {
       Object.keys(accountToDolomiteBalanceMap[account]!).forEach(subAccount => {
         Object.keys(accountToDolomiteBalanceMap[account]![subAccount]!).forEach(market => {
           totalPointsPerMarket[market] = totalPointsPerMarket[market] ?? INTEGERS.ZERO;
@@ -279,16 +280,16 @@ export function processEventsAndCalculateTotalRewardPoints(
   return totalPointsPerMarket;
 }
 
-export function calculateLiquidityPoints(
+export function calculateVirtualLiquidityPoints(
   poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
   startTimestamp: number,
   endTimestamp: number,
-): Record<string, BigNumber> {
+): Record<string, Decimal> {
   // Warning: do not exclude the blacklisted users here. It can over-inflate the equity of other users then!
-  const poolToTotalLiquidityPoints: Record<string, BigNumber> = {};
+  const poolToTotalLiquidityPoints: Record<string, Decimal> = {};
   Object.keys(poolToVirtualLiquidityPositionsAndEvents).forEach(pool => {
-    const { userToLiquiditySnapshots, virtualLiquidityBalances } = poolToVirtualLiquidityPositionsAndEvents[pool];
     poolToTotalLiquidityPoints[pool] = INTEGERS.ZERO;
+    const { userToLiquiditySnapshots, virtualLiquidityBalances } = poolToVirtualLiquidityPositionsAndEvents[pool];
 
     Object.keys(userToLiquiditySnapshots).forEach(account => {
       userToLiquiditySnapshots[account]!.sort((a, b) => {
@@ -334,7 +335,7 @@ export function calculateFinalPoints(
   poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
   poolToTotalSubLiquidityPoints: Record<string, BigNumber>,
 ): Record<string, string> {
-  const effectiveUserToPoints: Record<string, BigNumber> = {};
+  const effectiveUserToPoints: Record<string, Decimal> = {};
   Object.keys(accountToDolomiteBalanceMap).forEach(account => {
     Object.keys(accountToDolomiteBalanceMap[account]!).forEach(subAccount => {
       Object.keys(accountToDolomiteBalanceMap[account]![subAccount]!).forEach(market => {
@@ -375,7 +376,10 @@ export function calculateFinalPoints(
 
 
   return Object.keys(effectiveUserToPoints).reduce<Record<string, string>>((map, account) => {
-    map[account] = effectiveUserToPoints[account].multipliedBy(ONE_ETH_WEI).toFixed(0);
+    const finalPoints = effectiveUserToPoints[account].multipliedBy(ONE_ETH_WEI).dividedToIntegerBy(INTEGERS.ONE);
+    if (finalPoints.gt(INTEGERS.ZERO)) {
+      map[account] = finalPoints.toFixed(0);
+    }
     return map;
   }, {});
 }
@@ -384,63 +388,62 @@ export function calculateFinalEquityRewards(
   networkId: number,
   accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceMap,
   poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
-  totalPointsPerMarket: Record<number, BigNumber>,
-  totalLiquidityPointsPerPool: Record<string, BigNumber>,
-  validOTokenRewardsMap: Record<number, BigNumber | undefined>,
-  minimumOArbAmount: BigNumber,
-): Record<string, BigNumber> {
-  const effectiveUserToOTokenRewards: Record<string, BigNumber> = {};
+  totalPointsPerMarket: Record<number, Decimal>,
+  totalLiquidityPointsPerPool: Record<string, Decimal>,
+  validOTokenRewardsMap: Record<number, Integer | undefined>,
+  minimumOTokenAmount: Integer,
+): Record<string, Integer> {
+  const userToOTokenRewards: Record<string, Integer> = {};
   Object.keys(accountToDolomiteBalanceMap).forEach(account => {
-    Object.keys(accountToDolomiteBalanceMap[account]!).forEach(subAccount => {
-      Object.keys(accountToDolomiteBalanceMap[account]![subAccount]!).forEach(market => {
-        const rewards = validOTokenRewardsMap[market];
-        if (rewards) {
-          const points = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
-          const oTokenReward = rewards.times(points.rewardPoints).dividedBy(totalPointsPerMarket[market]);
+    if (!blacklistMap[account.toLowerCase()]) {
+      Object.keys(accountToDolomiteBalanceMap[account]!).forEach(subAccount => {
+        Object.keys(accountToDolomiteBalanceMap[account]![subAccount]!).forEach(market => {
+          const rewards = validOTokenRewardsMap[market];
+          if (rewards) {
+            const points = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
+            const oTokenReward = rewards.times(points.rewardPoints).dividedToIntegerBy(totalPointsPerMarket[market]);
 
-          const remappedAccount = remapAccountToClaimableAccount(networkId, points.effectiveUser);
-          if (!effectiveUserToOTokenRewards[remappedAccount]) {
-            effectiveUserToOTokenRewards[remappedAccount] = INTEGERS.ZERO;
+            const remappedAccount = remapAccountToClaimableAccount(networkId, points.effectiveUser);
+            if (!userToOTokenRewards[remappedAccount]) {
+              userToOTokenRewards[remappedAccount] = INTEGERS.ZERO;
+            }
+            userToOTokenRewards[remappedAccount] = userToOTokenRewards[remappedAccount].plus(oTokenReward);
           }
-          effectiveUserToOTokenRewards[remappedAccount] = effectiveUserToOTokenRewards[remappedAccount].plus(
-            oTokenReward,
-          );
-        }
+        });
       });
-    });
+    }
   });
 
   // Distribute liquidity pool rewards
   Object.keys(poolToVirtualLiquidityPositionsAndEvents).forEach(pool => {
-    const liquidityPoolReward = effectiveUserToOTokenRewards[pool];
-    if (liquidityPoolReward && totalLiquidityPointsPerPool[pool]) {
+    const liquidityPoolReward: Integer = userToOTokenRewards[pool];
+    if (liquidityPoolReward && liquidityPoolReward.gt(INTEGERS.ZERO) && totalLiquidityPointsPerPool[pool]) {
       const events = poolToVirtualLiquidityPositionsAndEvents[pool];
       Object.keys(events.virtualLiquidityBalances).forEach(account => {
-        const balances = events.virtualLiquidityBalances[account]!;
-        const rewardAmount = liquidityPoolReward.times(balances.equityPoints.dividedBy(
-          totalLiquidityPointsPerPool[pool],
-        ));
+        if (!blacklistMap[account.toLowerCase()]) {
+          const balances = events.virtualLiquidityBalances[account]!;
+          const rewardAmount = liquidityPoolReward.times(balances.equityPoints)
+            .dividedToIntegerBy(totalLiquidityPointsPerPool[pool]);
 
-        const remappedAccount = remapAccountToClaimableAccount(networkId, account);
-        if (!effectiveUserToOTokenRewards[remappedAccount]) {
-          effectiveUserToOTokenRewards[remappedAccount] = INTEGERS.ZERO;
+          const remappedAccount = remapAccountToClaimableAccount(networkId, account);
+          if (!userToOTokenRewards[remappedAccount]) {
+            userToOTokenRewards[remappedAccount] = INTEGERS.ZERO;
+          }
+          userToOTokenRewards[remappedAccount] = userToOTokenRewards[remappedAccount].plus(rewardAmount);
         }
-        effectiveUserToOTokenRewards[remappedAccount] = effectiveUserToOTokenRewards[remappedAccount].plus(
-          rewardAmount,
-        );
       });
     }
 
-    delete effectiveUserToOTokenRewards[pool];
+    delete userToOTokenRewards[pool];
   });
 
   let filteredAmount = INTEGERS.ZERO;
-  const accounts = Object.keys(effectiveUserToOTokenRewards);
+  const accounts = Object.keys(userToOTokenRewards);
   const finalizedRewardsMap = accounts.reduce<Record<string, BigNumber>>((map, account) => {
-    if (effectiveUserToOTokenRewards[account].gte(minimumOArbAmount)) {
-      map[account] = effectiveUserToOTokenRewards[account];
+    if (userToOTokenRewards[account].gte(minimumOTokenAmount)) {
+      map[account] = userToOTokenRewards[account];
     } else {
-      filteredAmount = filteredAmount.plus(effectiveUserToOTokenRewards[account]);
+      filteredAmount = filteredAmount.plus(userToOTokenRewards[account]);
     }
     return map;
   }, {});
@@ -455,7 +458,7 @@ export interface MerkleRootAndProofs {
   walletAddressToLeavesMap: Record<string, AmountAndProof>; // wallet ==> proofs + amounts
 }
 
-export function calculateMerkleRootAndProofs(userToAmounts: Record<string, BigNumber>): MerkleRootAndProofs {
+export function calculateMerkleRootAndProofs(userToAmounts: Record<string, Integer>): MerkleRootAndProofs {
   const walletAddressToFinalDataMap: Record<string, AmountAndProof> = {};
   const leaves: string[] = [];
   const userAccounts = Object.keys(userToAmounts);

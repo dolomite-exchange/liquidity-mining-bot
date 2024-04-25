@@ -1,4 +1,4 @@
-import { BigNumber } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Decimal, Integer } from '@dolomite-exchange/dolomite-margin';
 import { ethers } from 'ethers';
 import { parseEther } from 'ethers/lib/utils';
 import v8 from 'v8';
@@ -28,7 +28,7 @@ import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
 import {
   ARB_VESTER_PROXY,
   calculateFinalEquityRewards,
-  calculateLiquidityPoints,
+  calculateVirtualLiquidityPoints,
   calculateMerkleRootAndProofs,
   processEventsAndCalculateTotalRewardPoints,
   ETH_USDC_POOL,
@@ -56,7 +56,7 @@ export interface OTokenOutputFile {
   };
 }
 
-const MINIMUM_O_TOKEN_AMOUNT_WEI = new BigNumber(ethers.utils.parseEther('0.01').toString());
+const MINIMUM_O_TOKEN_AMOUNT_WEI: Integer = new BigNumber(ethers.utils.parseEther('0.01').toString());
 
 const REWARD_MULTIPLIERS_MAP = {};
 
@@ -91,7 +91,7 @@ async function start() {
   const [
     oTokenRewardWeiMap,
     sumOfWeights,
-  ] = Object.keys(rewardWeights).reduce<[Record<string, BigNumber>, BigNumber]>(([acc, sum], key) => {
+  ] = Object.keys(rewardWeights).reduce<[Record<string, Integer>, Decimal]>(([acc, sum], key) => {
     acc[key] = new BigNumber(parseEther(rewardWeights[key]).toString());
     return [acc, sum.plus(rewardWeights[key])];
   }, [{}, new BigNumber(0)]);
@@ -146,7 +146,7 @@ async function start() {
 
   const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
 
-  const totalPointsPerMarket = processEventsAndCalculateTotalRewardPoints(
+  const totalPointsPerMarket: Record<number, Decimal> = processEventsAndCalculateTotalRewardPoints(
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
     endMarketIndexMap,
@@ -172,13 +172,13 @@ async function start() {
     [ARB_VESTER_PROXY]: vestingPositionsAndEvents,
   };
 
-  const poolToTotalSubLiquidityPoints = calculateLiquidityPoints(
+  const poolToTotalSubLiquidityPoints: Record<string, Decimal> = calculateVirtualLiquidityPoints(
     poolToVirtualLiquidityPositionsAndEvents,
     startTimestamp,
     endTimestamp,
   );
 
-  const userToOTokenRewards = calculateFinalEquityRewards(
+  const userToOTokenRewards: Record<string, Integer> = calculateFinalEquityRewards(
     networkId,
     accountToDolomiteBalanceMap,
     poolToVirtualLiquidityPositionsAndEvents,

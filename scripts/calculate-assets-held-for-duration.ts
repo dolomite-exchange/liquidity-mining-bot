@@ -21,7 +21,7 @@ import { readFileFromGitHub } from './lib/file-helpers';
 import {
   ARB_VESTER_PROXY,
   calculateFinalPoints,
-  calculateLiquidityPoints,
+  calculateVirtualLiquidityPoints,
   processEventsAndCalculateTotalRewardPoints,
   ETH_USDC_POOL,
   InterestOperation,
@@ -151,7 +151,7 @@ async function start() {
     [ARB_VESTER_PROXY]: vestingPositionsAndEvents,
   };
 
-  const poolToTotalSubLiquidityPoints = calculateLiquidityPoints(
+  const poolToTotalSubLiquidityPoints = calculateVirtualLiquidityPoints(
     poolToVirtualLiquidityPositionsAndEvents,
     startTimestamp,
     endTimestamp,

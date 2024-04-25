@@ -27,7 +27,6 @@ import {
   AccountToVirtualLiquiditySnapshotsMap,
   BalanceAndRewardPoints,
   BalanceChangeEvent,
-  BLACKLIST_MAP,
   LiquidityPositionsAndEvents,
   VirtualBalanceAndRewardPoints,
   VirtualLiquidityPosition,
@@ -411,17 +410,15 @@ export function parseVirtualLiquidityPositions(
   blockRewardStartTimestamp: number,
 ): void {
   virtualLiquidityPositions.forEach(position => {
-    if (!BLACKLIST_MAP[position.effectiveUser.toLowerCase()]) {
-      if (!userToVirtualLiquidityBalances[position.effectiveUser]) {
-        userToVirtualLiquidityBalances[position.effectiveUser] = new VirtualBalanceAndRewardPoints(
-          position.effectiveUser,
-          blockRewardStartTimestamp,
-          new BigNumber(position.balancePar),
-        );
-      } else {
-        const balanceStruct = userToVirtualLiquidityBalances[position.effectiveUser]!;
-        balanceStruct!.balancePar = balanceStruct.balancePar.plus(position.balancePar);
-      }
+    if (!userToVirtualLiquidityBalances[position.effectiveUser]) {
+      userToVirtualLiquidityBalances[position.effectiveUser] = new VirtualBalanceAndRewardPoints(
+        position.effectiveUser,
+        blockRewardStartTimestamp,
+        new BigNumber(position.balancePar),
+      );
+    } else {
+      const balanceStruct = userToVirtualLiquidityBalances[position.effectiveUser]!;
+      balanceStruct!.balancePar = balanceStruct.balancePar.plus(position.balancePar);
     }
   });
 }
@@ -432,14 +429,12 @@ export function parseVirtualLiquiditySnapshots(
   virtualLiquidityBalanceMap: AccountToVirtualLiquidityBalanceMap,
 ): void {
   virtualLiquiditySnapshots.forEach(snapshot => {
-    if (!BLACKLIST_MAP[snapshot.effectiveUser.toLowerCase()]) {
-      addLiquiditySnapshotToUser(
-        userToLiquiditySnapshots,
-        snapshot.effectiveUser,
-        snapshot,
-        virtualLiquidityBalanceMap,
-      );
-    }
+    addLiquiditySnapshotToUser(
+      userToLiquiditySnapshots,
+      snapshot.effectiveUser,
+      snapshot,
+      virtualLiquidityBalanceMap,
+    );
   });
 }
 

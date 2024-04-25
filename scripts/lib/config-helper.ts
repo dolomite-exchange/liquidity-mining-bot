@@ -18,6 +18,7 @@ export interface MineralOutputFile {
     marketIds: number[];
     marketNames: string[];
     totalAmount: string; // big int
+    totalUsers: number; // big int
     startBlockNumber: number;
     endBlockNumber: number;
     startTimestamp: number;

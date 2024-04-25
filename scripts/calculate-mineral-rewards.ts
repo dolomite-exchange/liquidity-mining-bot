@@ -28,7 +28,7 @@ import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/fi
 import {
   ARB_VESTER_PROXY,
   calculateFinalPoints,
-  calculateLiquidityPoints,
+  calculateVirtualLiquidityPoints,
   calculateMerkleRootAndProofs,
   ETH_USDC_POOL,
   InterestOperation,
@@ -57,8 +57,6 @@ const VALID_REWARD_MULTIPLIERS_MAP = {
   [USDC_MARKET_ID]: new BigNumber(1).div(SECONDS_PER_WEEK),
 };
 const MAX_MULTIPLIER = new BigNumber('5');
-
-const accountToTest = '0x52256ef863a713Ef349ae6E97A7E8f35785145dE'.toLowerCase();
 
 export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)): Promise<void> {
   const networkId = await dolomite.web3.eth.net.getId();
@@ -157,7 +155,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     [ARB_VESTER_PROXY]: vestingPositionsAndEvents,
   };
 
-  const poolToTotalSubLiquidityPoints = calculateLiquidityPoints(
+  const poolToTotalSubLiquidityPoints = calculateVirtualLiquidityPoints(
     poolToVirtualLiquidityPositionsAndEvents,
     startTimestamp,
     endTimestamp,
@@ -171,7 +169,6 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     poolToTotalSubLiquidityPoints,
   );
 
-  console.log('epoch points:', epoch, userToPointsMap[accountToTest]);
   const userToMineralsDataMap = await calculateFinalMinerals(userToPointsMap, networkId, epoch);
 
   let merkleRoot: string | null;
@@ -229,6 +226,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
       startBlockNumber,
       endBlockNumber,
       totalAmount: totalMinerals.times(ONE_ETH_WEI).toFixed(0),
+      totalUsers: Object.keys(userToMineralsDataMap).length,
       marketIds: validMarketIds,
     },
   };
