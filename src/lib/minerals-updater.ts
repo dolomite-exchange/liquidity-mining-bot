@@ -32,7 +32,12 @@ export default class MineralsUpdater {
     for (; ;) {
       try {
         const isEpochElapsed = await this._update();
-        await delay(this._getDelayTimeMillis(isEpochElapsed));
+        const delayTimeMillis = this._getDelayTimeMillis(isEpochElapsed);
+        Logger.info({
+          at: 'MineralsUpdater#_poll',
+          message: `Waiting for ${delayTimeMillis}ms until next update`,
+        })
+        await delay(delayTimeMillis);
         if (isEpochElapsed) {
           await this._update();
         }
