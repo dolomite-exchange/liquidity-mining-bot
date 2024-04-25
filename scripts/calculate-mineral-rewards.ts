@@ -4,11 +4,11 @@ import { getAllDolomiteAccountsWithSupplyValue } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
 import BlockStore from '../src/lib/block-store';
 import { ONE_ETH_WEI } from '../src/lib/constants';
+import { isScript } from '../src/lib/env';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
-import { isScript } from '../src/lib/env';
 import {
   EpochMetadata,
   getMineralConfigFileNameWithPath,
@@ -30,10 +30,10 @@ import {
   calculateFinalPoints,
   calculateLiquidityPoints,
   calculateMerkleRootAndProofs,
-  calculateTotalRewardPoints,
   ETH_USDC_POOL,
   InterestOperation,
   LiquidityPositionsAndEvents,
+  processEventsAndCalculateTotalRewardPoints,
 } from './lib/rewards';
 
 /* eslint-enable */
@@ -57,6 +57,8 @@ const VALID_REWARD_MULTIPLIERS_MAP = {
   [USDC_MARKET_ID]: new BigNumber(1).div(SECONDS_PER_WEEK),
 };
 const MAX_MULTIPLIER = new BigNumber('5');
+
+const accountToTest = '0x52256ef863a713Ef349ae6E97A7E8f35785145dE'.toLowerCase();
 
 export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)): Promise<void> {
   const networkId = await dolomite.web3.eth.net.getId();
@@ -123,7 +125,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
 
   const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
 
-  const totalPointsToMarketMap = calculateTotalRewardPoints(
+  const totalPointsToMarketMap = processEventsAndCalculateTotalRewardPoints(
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
     endMarketIndexMap,
@@ -169,6 +171,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     poolToTotalSubLiquidityPoints,
   );
 
+  console.log('epoch points:', epoch, userToPointsMap[accountToTest]);
   const userToMineralsDataMap = await calculateFinalMinerals(userToPointsMap, networkId, epoch);
 
   let merkleRoot: string | null;
@@ -253,7 +256,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
   const metadata = await readFileFromGitHub<EpochMetadata>(metadataFilePath);
 
   // Once the merkle root is written, update the metadata to the new highest epoch that is finalized
-  if (metadata.maxEpochNumber === epoch - 1) {
+  if (metadata.maxEpochNumber < epoch) {
     metadata.maxEpochNumber = epoch;
     await writeFileToGitHub(metadataFilePath, metadata, true);
   }

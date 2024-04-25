@@ -27,10 +27,10 @@ import {
 import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
 import {
   ARB_VESTER_PROXY,
-  calculateFinalRewards,
+  calculateFinalEquityRewards,
   calculateLiquidityPoints,
   calculateMerkleRootAndProofs,
-  calculateTotalRewardPoints,
+  processEventsAndCalculateTotalRewardPoints,
   ETH_USDC_POOL,
   InterestOperation,
   LiquidityPositionsAndEvents,
@@ -146,7 +146,7 @@ async function start() {
 
   const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
 
-  const totalPointsPerMarket = calculateTotalRewardPoints(
+  const totalPointsPerMarket = processEventsAndCalculateTotalRewardPoints(
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
     endMarketIndexMap,
@@ -178,7 +178,7 @@ async function start() {
     endTimestamp,
   );
 
-  const userToOTokenRewards = calculateFinalRewards(
+  const userToOTokenRewards = calculateFinalEquityRewards(
     networkId,
     accountToDolomiteBalanceMap,
     poolToVirtualLiquidityPositionsAndEvents,

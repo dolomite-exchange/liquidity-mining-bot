@@ -1,6 +1,6 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { parseDeposits, parseLiquidations, parseTrades, parseTransfers } from '../../scripts/lib/event-parser';
-import { AccountToSubAccountMarketToBalanceChangeMap } from '../../scripts/lib/rewards';
+import { AccountToSubAccountToMarketToBalanceChangeMap } from '../../scripts/lib/rewards';
 import { ApiDeposit, ApiLiquidation, ApiTrade, ApiTransfer, ApiWithdrawal } from '../../src/lib/api-types';
 
 const address1 = '0x44f6ccf0d09ef0d4991eb74d8c26d77a52a1ba9e';
@@ -11,7 +11,7 @@ const subAccount2 = '6';
 describe('event-parser', () => {
   describe('parseDeposit', () => {
     it('should work normally', async () => {
-      const accountToAssetToEventsMap: AccountToSubAccountMarketToBalanceChangeMap = {};
+      const accountToAssetToEventsMap: AccountToSubAccountToMarketToBalanceChangeMap = {};
       const deposits: ApiDeposit[] = [
         {
           id: '0xd66778a4d3b9fc6fd6d84a5049763e0b3b2912c16d19c3d6bd46da01f8524119-24',
@@ -35,7 +35,7 @@ describe('event-parser', () => {
 
   describe('parseWithdraw', () => {
     it('should work normally', async () => {
-      const accountToAssetToEventsMap: AccountToSubAccountMarketToBalanceChangeMap = {};
+      const accountToAssetToEventsMap: AccountToSubAccountToMarketToBalanceChangeMap = {};
       const withdrawals: ApiWithdrawal[] = [
         {
           id: '0x4d5d9d8a6c6f9e9b1f3f3f8a0b3a9d1d2a0f8a7d1b8a0a5b5a4c5a3b2a1a0a9a8-12',
@@ -59,7 +59,7 @@ describe('event-parser', () => {
 
   describe('parseTransfer', () => {
     it('should work normally', async () => {
-      const accountToAssetToEventsMap: AccountToSubAccountMarketToBalanceChangeMap = {};
+      const accountToAssetToEventsMap: AccountToSubAccountToMarketToBalanceChangeMap = {};
       const transfers: ApiTransfer[] = [
         {
           id: '0xb44e6204445c71f5f508360c946d54f722a1efba9174ddcc1815321bd30f3985-25',
@@ -90,7 +90,7 @@ describe('event-parser', () => {
     });
 
     it('should not skip if fromEffectiveUser equals toEffectiveUser', async () => {
-      const accountToAssetToEventsMap: AccountToSubAccountMarketToBalanceChangeMap = {};
+      const accountToAssetToEventsMap: AccountToSubAccountToMarketToBalanceChangeMap = {};
       const transfers: ApiTransfer[] = [
         {
           id: '0xb44e6204445c71f5f508360c946d54f722a1efba9174ddcc1815321bd30f3985-25',
@@ -123,7 +123,7 @@ describe('event-parser', () => {
 
   describe('parseTrade', () => {
     it('should work normally', async () => {
-      const accountToAssetToEventsMap: AccountToSubAccountMarketToBalanceChangeMap = {};
+      const accountToAssetToEventsMap: AccountToSubAccountToMarketToBalanceChangeMap = {};
       const trades: ApiTrade[] = [
         {
           id: '0xd2ddf2db086817f6385e44a5eb78aa6a1794c04c8728705fe83a871d6650d94a-8',
@@ -191,7 +191,7 @@ describe('event-parser', () => {
 
   describe('parseLiquidation', () => {
     it('should work normally', async () => {
-      const accountToAssetToEventsMap: AccountToSubAccountMarketToBalanceChangeMap = {};
+      const accountToAssetToEventsMap: AccountToSubAccountToMarketToBalanceChangeMap = {};
       const liquidations: ApiLiquidation[] = [
         {
           id: '0xfb787b3126a0879f083d79b38c64144188da8732902c07836acbacb0de6c0cc1-17',

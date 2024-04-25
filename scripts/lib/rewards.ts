@@ -10,7 +10,7 @@ export const ETH_USDC_POOL = '0xb77a493a4950cad1b049e222d62bce14ff423c6f'.toLowe
 export const ARB_VESTER_PROXY = '0x531BC6E97b65adF8B3683240bd594932Cfb63797'.toLowerCase();
 
 const blacklistedAddresses = process.env.BLACKLIST_ADDRESSES?.split(',') ?? []
-const blacklistedAddressMap: Record<string, boolean> = blacklistedAddresses.reduce((map, address) => {
+export const BLACKLIST_MAP: Record<string, boolean> = blacklistedAddresses.reduce((map, address) => {
   if (!ethers.utils.isAddress(address)) {
     throw new Error(`Invalid address: ${address}`);
   }
@@ -18,22 +18,12 @@ const blacklistedAddressMap: Record<string, boolean> = blacklistedAddresses.redu
   return map;
 }, {})
 
-export enum BalanceChangeType {
-  DEPOSIT = 'deposit',
-  WITHDRAW = 'withdraw',
-  TRADE = 'trade',
-  TRANSFER = 'transfer',
-  LIQUIDATION = 'liquidation',
-  INITIALIZE = 'initialize',
-}
-
 export interface BalanceChangeEvent {
   amountDeltaPar: BigNumber;
   interestIndex: MarketIndex;
   timestamp: number;
   serialId: number;
   effectiveUser: string;
-  type: BalanceChangeType;
 }
 
 interface AmountAndProof {
@@ -49,9 +39,9 @@ type AccountNumber = string;
 type AccountMarketId = string;
 
 // eslint-disable-next-line max-len
-export type AccountSubAccountToMarketToBalanceMap = Record<AccountOwner, Record<AccountNumber, Record<AccountMarketId, BalanceAndRewardPoints | undefined> | undefined> | undefined>;
+export type AccountToSubAccountToMarketToBalanceMap = Record<AccountOwner, Record<AccountNumber, Record<AccountMarketId, BalanceAndRewardPoints | undefined> | undefined> | undefined>;
 // eslint-disable-next-line max-len
-export type AccountToSubAccountMarketToBalanceChangeMap = Record<AccountOwner, Record<AccountNumber, Record<AccountMarketId, BalanceChangeEvent[] | undefined> | undefined> | undefined>;
+export type AccountToSubAccountToMarketToBalanceChangeMap = Record<AccountOwner, Record<AccountNumber, Record<AccountMarketId, BalanceChangeEvent[] | undefined> | undefined> | undefined>;
 export type AccountToVirtualLiquidityBalanceMap = Record<AccountOwner, VirtualBalanceAndRewardPoints | undefined>;
 export type AccountToVirtualLiquiditySnapshotsMap = Record<AccountOwner, VirtualLiquiditySnapshot[] | undefined>;
 
@@ -99,7 +89,7 @@ export class BalanceAndRewardPoints {
 
   constructor(
     public readonly effectiveUser: string,
-    public readonly rewardMultiplier: Decimal,
+    public readonly pointsPerSecond: Decimal,
     public readonly marketId: number,
     public lastUpdated: number,
     public balancePar: Decimal,
@@ -139,18 +129,18 @@ export class BalanceAndRewardPoints {
 
     // Accrue balance-based points
     if (this.balancePar.gt(0)) {
-      pointsUpdate = pointsUpdate.plus(this.balancePar.times(timeDelta).times(this.rewardMultiplier));
+      pointsUpdate = pointsUpdate.plus(this.balancePar.times(timeDelta).times(this.pointsPerSecond));
     }
 
     // Accrue interest-based points
     if (operation === InterestOperation.ADD_POSITIVE) {
-      pointsUpdate = pointsUpdate.plus(positiveInterest.times(timeDelta).times(this.rewardMultiplier));
+      pointsUpdate = pointsUpdate.plus(positiveInterest.times(timeDelta).times(this.pointsPerSecond));
     } else if (operation === InterestOperation.ADD_NEGATIVE) {
-      pointsUpdate = pointsUpdate.plus(negativeInterest.abs().times(timeDelta).times(this.rewardMultiplier));
+      pointsUpdate = pointsUpdate.plus(negativeInterest.abs().times(timeDelta).times(this.pointsPerSecond));
     } else if (operation === InterestOperation.NEGATE) {
       pointsUpdate = pointsUpdate.plus(positiveInterest.plus(negativeInterest)
         .times(timeDelta)
-        .times(this.rewardMultiplier));
+        .times(this.pointsPerSecond));
     } else {
       if (operation !== InterestOperation.NOTHING) {
         throw new Error(`Invalid operation, found: ${operation}`);
@@ -194,24 +184,24 @@ export class VirtualBalanceAndRewardPoints {
   }
 }
 
-export function calculateTotalRewardPoints(
-  accountInfoToDolomiteBalanceMap: AccountSubAccountToMarketToBalanceMap,
-  accountToMarketToEventsMap: AccountToSubAccountMarketToBalanceChangeMap,
+export function processEventsAndCalculateTotalRewardPoints(
+  accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceMap,
+  accountToMarketToEventsMap: AccountToSubAccountToMarketToBalanceChangeMap,
   endInterestIndexMap: Record<string, MarketIndex>,
-  rewardMultipliersMap: Record<string, Decimal>,
+  marketToPointsPerSecondMap: Record<string, Decimal>,
   endTimestamp: number,
   operation: InterestOperation,
 ): Record<number, BigNumber> {
   const totalPointsPerMarket: Record<number, BigNumber> = {};
   Object.keys(accountToMarketToEventsMap).forEach(account => {
-    if (!blacklistedAddressMap[account.toLowerCase()]) {
+    if (!BLACKLIST_MAP[account.toLowerCase()]) {
       Object.keys(accountToMarketToEventsMap[account]!).forEach(subAccount => {
         // Make sure user => subAccount ==> market => balance record exists
-        if (!accountInfoToDolomiteBalanceMap[account]) {
-          accountInfoToDolomiteBalanceMap[account] = {};
+        if (!accountToDolomiteBalanceMap[account]) {
+          accountToDolomiteBalanceMap[account] = {};
         }
-        if (!accountInfoToDolomiteBalanceMap[account]![subAccount]) {
-          accountInfoToDolomiteBalanceMap[account]![subAccount] = {};
+        if (!accountToDolomiteBalanceMap[account]![subAccount]) {
+          accountToDolomiteBalanceMap[account]![subAccount] = {};
         }
         const marketToEventsMap = accountToMarketToEventsMap[account]![subAccount]!;
         Object.keys(marketToEventsMap).forEach(market => {
@@ -222,18 +212,18 @@ export function calculateTotalRewardPoints(
             return a.serialId - b.serialId;
           });
           marketToEventsMap[market]!.forEach(event => {
-            let userBalanceStruct = accountInfoToDolomiteBalanceMap[account]![subAccount]![market]!;
+            let userBalanceStruct = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
             if (!userBalanceStruct) {
               // For the first event, initialize the struct. Don't process it because we need to normalize the par value
               // if interest needs to be accrued for the `InterestOperation`
               userBalanceStruct = new BalanceAndRewardPoints(
                 event.effectiveUser,
-                rewardMultipliersMap[market] ?? INTEGERS.ONE,
+                marketToPointsPerSecondMap[market] ?? INTEGERS.ONE,
                 event.interestIndex.marketId,
                 event.timestamp,
                 event.amountDeltaPar,
               );
-              accountInfoToDolomiteBalanceMap[account]![subAccount]![market] = userBalanceStruct;
+              accountToDolomiteBalanceMap[account]![subAccount]![market] = userBalanceStruct;
             } else {
               const rewardUpdate = userBalanceStruct.processEvent(event, operation);
               totalPointsPerMarket[market] = totalPointsPerMarket[market].plus(rewardUpdate);
@@ -244,39 +234,38 @@ export function calculateTotalRewardPoints(
             }
           });
 
-          const userBalanceStruct = accountInfoToDolomiteBalanceMap[account]![subAccount]![market]!;
+          const userBalanceStruct = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
           if (userBalanceStruct.balancePar.eq(0) && userBalanceStruct.rewardPoints.eq(0)) {
-            delete accountInfoToDolomiteBalanceMap[account]![subAccount]![market];
+            delete accountToDolomiteBalanceMap[account]![subAccount]![market];
           }
         });
-        if (Object.keys(accountInfoToDolomiteBalanceMap[account]![subAccount]!).length === 0) {
-          delete accountInfoToDolomiteBalanceMap[account]![subAccount];
+        if (Object.keys(accountToDolomiteBalanceMap[account]![subAccount]!).length === 0) {
+          delete accountToDolomiteBalanceMap[account]![subAccount];
         }
       });
       if (
-        accountInfoToDolomiteBalanceMap[account]
-        && Object.keys(accountInfoToDolomiteBalanceMap[account]!).length === 0
+        accountToDolomiteBalanceMap[account]
+        && Object.keys(accountToDolomiteBalanceMap[account]!).length === 0
       ) {
-        delete accountInfoToDolomiteBalanceMap[account];
+        delete accountToDolomiteBalanceMap[account];
       }
     }
   });
 
   // Do final loop through all balances to finish reward point calculation
-  Object.keys(accountInfoToDolomiteBalanceMap).forEach(account => {
-    if (!blacklistedAddressMap[account.toLowerCase()]) {
-      Object.keys(accountInfoToDolomiteBalanceMap[account]!).forEach(subAccount => {
-        Object.keys(accountInfoToDolomiteBalanceMap[account]![subAccount]!).forEach(market => {
+  Object.keys(accountToDolomiteBalanceMap).forEach(account => {
+    if (!BLACKLIST_MAP[account.toLowerCase()]) {
+      Object.keys(accountToDolomiteBalanceMap[account]!).forEach(subAccount => {
+        Object.keys(accountToDolomiteBalanceMap[account]![subAccount]!).forEach(market => {
           totalPointsPerMarket[market] = totalPointsPerMarket[market] ?? INTEGERS.ZERO;
 
-          const userBalanceStruct = accountInfoToDolomiteBalanceMap[account]![subAccount]![market]!;
+          const userBalanceStruct = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
           const rewardUpdate = userBalanceStruct.processEvent(
             {
               amountDeltaPar: INTEGERS.ZERO,
               timestamp: endTimestamp,
               serialId: 0,
               effectiveUser: userBalanceStruct.effectiveUser,
-              type: BalanceChangeType.INITIALIZE,
               interestIndex: endInterestIndexMap[market],
             },
             operation,
@@ -292,8 +281,8 @@ export function calculateTotalRewardPoints(
 
 export function calculateLiquidityPoints(
   poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
-  blockRewardStartTimestamp: number,
-  blockRewardEndTimestamp: number,
+  startTimestamp: number,
+  endTimestamp: number,
 ): Record<string, BigNumber> {
   // Warning: do not exclude the blacklisted users here. It can over-inflate the equity of other users then!
   const poolToTotalLiquidityPoints: Record<string, BigNumber> = {};
@@ -307,7 +296,7 @@ export function calculateLiquidityPoints(
       });
       virtualLiquidityBalances[account] = virtualLiquidityBalances[account] ?? new VirtualBalanceAndRewardPoints(
         account,
-        blockRewardStartTimestamp,
+        startTimestamp,
         INTEGERS.ZERO,
       );
 
@@ -324,16 +313,14 @@ export function calculateLiquidityPoints(
     const { virtualLiquidityBalances } = poolToVirtualLiquidityPositionsAndEvents[pool];
 
     Object.keys(virtualLiquidityBalances).forEach(account => {
-      if (!blacklistedAddressMap[account]) {
-        const balanceStruct = virtualLiquidityBalances[account]!;
-        const points = balanceStruct.processLiquiditySnapshot({
-          id: '-1',
-          effectiveUser: balanceStruct.effectiveUser,
-          balancePar: balanceStruct.balancePar,
-          timestamp: blockRewardEndTimestamp,
-        });
-        poolToTotalLiquidityPoints[pool] = poolToTotalLiquidityPoints[pool].plus(points);
-      }
+      const balanceStruct = virtualLiquidityBalances[account]!;
+      const points = balanceStruct.processLiquiditySnapshot({
+        id: '-1',
+        effectiveUser: balanceStruct.effectiveUser,
+        balancePar: balanceStruct.balancePar,
+        timestamp: endTimestamp,
+      });
+      poolToTotalLiquidityPoints[pool] = poolToTotalLiquidityPoints[pool].plus(points);
     });
   });
 
@@ -342,29 +329,27 @@ export function calculateLiquidityPoints(
 
 export function calculateFinalPoints(
   networkId: number,
-  accountToDolomiteBalanceMap: AccountSubAccountToMarketToBalanceMap,
+  accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceMap,
   validMarketIdsMap: Record<string, any>,
   poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
   poolToTotalSubLiquidityPoints: Record<string, BigNumber>,
 ): Record<string, string> {
   const effectiveUserToPoints: Record<string, BigNumber> = {};
   Object.keys(accountToDolomiteBalanceMap).forEach(account => {
-    if (!blacklistedAddressMap[account]) {
-      Object.keys(accountToDolomiteBalanceMap[account]!).forEach(subAccount => {
-        Object.keys(accountToDolomiteBalanceMap[account]![subAccount]!).forEach(market => {
-          if (validMarketIdsMap[market]) {
-            const balanceStruct = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
+    Object.keys(accountToDolomiteBalanceMap[account]!).forEach(subAccount => {
+      Object.keys(accountToDolomiteBalanceMap[account]![subAccount]!).forEach(market => {
+        if (validMarketIdsMap[market]) {
+          const balanceStruct = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
 
-            const remappedAccount = remapAccountToClaimableAccount(networkId, balanceStruct.effectiveUser);
-            if (!effectiveUserToPoints[remappedAccount]) {
-              effectiveUserToPoints[remappedAccount] = INTEGERS.ZERO;
-            }
-            effectiveUserToPoints[remappedAccount]
-              = effectiveUserToPoints[remappedAccount].plus(balanceStruct.rewardPoints);
+          const remappedAccount = remapAccountToClaimableAccount(networkId, balanceStruct.effectiveUser);
+          if (!effectiveUserToPoints[remappedAccount]) {
+            effectiveUserToPoints[remappedAccount] = INTEGERS.ZERO;
           }
-        });
+          effectiveUserToPoints[remappedAccount]
+            = effectiveUserToPoints[remappedAccount].plus(balanceStruct.rewardPoints);
+        }
       });
-    }
+    });
   });
 
   // Distribute liquidity pool rewards
@@ -374,16 +359,14 @@ export function calculateFinalPoints(
       const totalPoolPoints = poolToTotalSubLiquidityPoints[pool];
       const events = poolToVirtualLiquidityPositionsAndEvents[pool];
       Object.keys(events.virtualLiquidityBalances).forEach(account => {
-        if (!blacklistedAddressMap[account]) {
-          const balances = events.virtualLiquidityBalances[account]!;
-          const rewardAmount = liquidityPoolReward.times(balances.equityPoints.dividedBy(totalPoolPoints));
+        const balances = events.virtualLiquidityBalances[account]!;
+        const rewardAmount = liquidityPoolReward.times(balances.equityPoints.dividedBy(totalPoolPoints));
 
-          const remappedAccount = remapAccountToClaimableAccount(networkId, account);
-          if (!effectiveUserToPoints[remappedAccount]) {
-            effectiveUserToPoints[remappedAccount] = INTEGERS.ZERO;
-          }
-          effectiveUserToPoints[remappedAccount] = effectiveUserToPoints[account].plus(rewardAmount);
+        const remappedAccount = remapAccountToClaimableAccount(networkId, account);
+        if (!effectiveUserToPoints[remappedAccount]) {
+          effectiveUserToPoints[remappedAccount] = INTEGERS.ZERO;
         }
+        effectiveUserToPoints[remappedAccount] = effectiveUserToPoints[account].plus(rewardAmount);
       });
     }
 
@@ -397,9 +380,9 @@ export function calculateFinalPoints(
   }, {});
 }
 
-export function calculateFinalRewards(
+export function calculateFinalEquityRewards(
   networkId: number,
-  accountToDolomiteBalanceMap: AccountSubAccountToMarketToBalanceMap,
+  accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceMap,
   poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
   totalPointsPerMarket: Record<number, BigNumber>,
   totalLiquidityPointsPerPool: Record<string, BigNumber>,

@@ -89,7 +89,7 @@ async function getAccounts(
           tokenName: value.token.name,
           tokenSymbol: value.token.symbol,
           tokenDecimals: Number.parseInt(value.token.decimals, 10),
-          tokenAddress: value.token.id,
+          tokenAddress: value.token.id.toLowerCase(),
           par: valuePar,
           wei: new BigNumber(valuePar).times(index).dividedToIntegerBy(indexBase, BigNumber.ROUND_HALF_UP),
           expiresAt: value.expirationTimestamp ? new BigNumber(value.expirationTimestamp) : null,
@@ -591,7 +591,7 @@ export async function getLiquiditySnapshots(
   const snapshots: ApiAmmLiquiditySnapshot[] = result.data.ammLiquidityPositionSnapshots.map(snapshot => {
     return {
       id: snapshot.id,
-      effectiveUser: snapshot.effectiveUser.id,
+      effectiveUser: snapshot.effectiveUser.id.toLowerCase(),
       block: snapshot.block,
       timestamp: snapshot.timestamp,
       liquidityTokenBalance: snapshot.liquidityTokenBalance,

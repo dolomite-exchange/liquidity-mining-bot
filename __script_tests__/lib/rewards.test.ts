@@ -4,15 +4,15 @@ import { defaultAbiCoder, keccak256, parseEther } from 'ethers/lib/utils';
 import { MerkleTree } from 'merkletreejs';
 import liquidityMiningConfig from '../../scripts/config/oarb-season-0.json';
 import {
-  AccountSubAccountToMarketToBalanceMap,
+  AccountToSubAccountToMarketToBalanceMap,
   AccountToVirtualLiquidityBalanceMap,
   AccountToVirtualLiquiditySnapshotsMap,
   BalanceAndRewardPoints,
   BalanceChangeEvent,
   BalanceChangeType,
-  calculateFinalRewards,
+  calculateFinalEquityRewards,
   calculateLiquidityPoints,
-  calculateTotalRewardPoints,
+  processEventsAndCalculateTotalRewardPoints,
   LiquidityPositionsAndEvents,
 } from '../../scripts/lib/rewards';
 
@@ -55,7 +55,7 @@ const FINAL_EVENT: BalanceChangeEvent = {
   type: BalanceChangeType.INITIALIZE,
 };
 
-const accountToDolomiteBalanceMap: AccountSubAccountToMarketToBalanceMap = {
+const accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceMap = {
   [user1]: {
     [subAccount1]: {
       17: new BalanceAndRewardPoints(blockRewardStartTimestamp, user1, new BigNumber('100000000')),
@@ -188,7 +188,7 @@ describe('rewards', () => {
   });
 
   describe('calculateRewardPoints', () => {
-    totalPointsPerMarket = calculateTotalRewardPoints(
+    totalPointsPerMarket = processEventsAndCalculateTotalRewardPoints(
       accountToDolomiteBalanceMap,
       {},
       blockRewardStartTimestamp,
@@ -250,7 +250,7 @@ describe('rewards', () => {
       return acc;
     }, {});
     const minimumOArbAmount = new BigNumber(ethers.utils.parseEther('1').toString());
-    const userToOarbRewards = calculateFinalRewards(
+    const userToOarbRewards = calculateFinalEquityRewards(
       accountToDolomiteBalanceMap,
       poolToVirtualLiquidityPositionsAndEvents,
       totalPointsPerMarket,

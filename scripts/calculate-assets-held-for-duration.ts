@@ -22,7 +22,7 @@ import {
   ARB_VESTER_PROXY,
   calculateFinalPoints,
   calculateLiquidityPoints,
-  calculateTotalRewardPoints,
+  processEventsAndCalculateTotalRewardPoints,
   ETH_USDC_POOL,
   InterestOperation,
   LiquidityPositionsAndEvents,
@@ -66,7 +66,7 @@ async function start() {
     return Promise.reject(new Error(`MARKET_ID contains an element that is too large, found: ${validMarketId}`));
   }
 
-  const validRewardMultipliersMap = {
+  const validMarketIdsMap = {
     [validMarketId]: INTEGERS.ONE,
   }
 
@@ -114,16 +114,16 @@ async function start() {
   const accountToDolomiteBalanceMap = getAccountBalancesByMarket(
     apiAccounts,
     startTimestamp,
-    validRewardMultipliersMap,
+    validMarketIdsMap,
   );
 
   const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
 
-  const totalPointsPerMarket = calculateTotalRewardPoints(
+  const totalPointsPerMarket = processEventsAndCalculateTotalRewardPoints(
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
     endMarketIndexMap,
-    validRewardMultipliersMap,
+    validMarketIdsMap,
     endTimestamp,
     InterestOperation.NOTHING,
   );
@@ -160,7 +160,7 @@ async function start() {
   const userToPointsMap = calculateFinalPoints(
     networkId,
     accountToDolomiteBalanceMap,
-    validRewardMultipliersMap,
+    validMarketIdsMap,
     poolToVirtualLiquidityPositionsAndEvents,
     poolToTotalSubLiquidityPoints,
   );
