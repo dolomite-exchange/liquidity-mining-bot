@@ -247,15 +247,15 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     // TODO: write merkle root to chain
     // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds
     //  for an update)
+  }
 
-    const metadataFilePath = getMineralMetadataFileNameWithPath(networkId);
-    const metadata = await readFileFromGitHub<EpochMetadata>(metadataFilePath);
+  const metadataFilePath = getMineralMetadataFileNameWithPath(networkId);
+  const metadata = await readFileFromGitHub<EpochMetadata>(metadataFilePath);
 
-    // Once the merkle root is written, update the metadata to the new highest epoch that is finalized
-    if (metadata.maxEpochNumber === epoch - 1) {
-      metadata.maxEpochNumber = epoch;
-    }
-    await writeFileToGitHub(metadataFilePath, metadata, true)
+  // Once the merkle root is written, update the metadata to the new highest epoch that is finalized
+  if (metadata.maxEpochNumber === epoch - 1) {
+    metadata.maxEpochNumber = epoch;
+    await writeFileToGitHub(metadataFilePath, metadata, true);
   }
 
   return undefined;
