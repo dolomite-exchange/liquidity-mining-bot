@@ -340,7 +340,7 @@ export function calculateFinalPoints(
   oldData: Record<string, string> = {},
 ): Record<string, string> {
   const effectiveUserToPoints = Object.keys(oldData).reduce<Record<string, Decimal>>((memo, key) => {
-    memo[key] = new BigNumber(oldData[key]);
+    memo[key] = new BigNumber(oldData[key]).div(ONE_ETH_WEI);
     return memo;
   }, {});
   Object.keys(accountToDolomiteBalanceMap).forEach(account => {

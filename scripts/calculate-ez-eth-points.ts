@@ -152,7 +152,7 @@ export async function calculateEzEthPoints(appendResults: boolean) {
       endBlock: endBlockNumber,
     },
   };
-  if (process.env.SCRIPT !== 'true') {
+  if (process.env.SCRIPT === 'true') {
     await writeFileToGitHub(githubFilePath, dataToWrite, true);
   } else {
     const fileName = `${__dirname}/output/ez-points.json`;
@@ -179,7 +179,7 @@ function writeOutputFile(
 }
 
 if (process.env.SCRIPT === 'true') {
-  calculateEzEthPoints(true)
+  calculateEzEthPoints(false)
     .then(() => {
       console.log('Finished executing script!');
     })
