@@ -209,7 +209,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     validMarketIds.map<Promise<string>>(async validMarketId => {
       const tokenAddress = await dolomite.getters.getMarketTokenAddress(new BigNumber(validMarketId));
       const token = new dolomite.web3.eth.Contract(TokenAbi, tokenAddress);
-      return dolomite.contracts.callConstantContractFunction(token.methods.name())
+      return dolomite.contracts.callConstantContractFunction(token.methods.symbol())
     }),
   );
 
