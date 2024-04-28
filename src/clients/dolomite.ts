@@ -1111,7 +1111,7 @@ export async function getAllDolomiteAccountsWithSupplyValue(
                     }
                   }
                   accountNumber
-                  tokenValues) {
+                  tokenValues {
                     token {
                       id
                       marketId
