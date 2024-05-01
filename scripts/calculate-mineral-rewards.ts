@@ -61,7 +61,6 @@ const MAX_MULTIPLIER = new BigNumber('5');
 
 export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)): Promise<void> {
   const networkId = await dolomite.web3.eth.net.getId();
-// 2966.8076437837371818818783068783
   const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>(
     getMineralConfigFileNameWithPath(networkId),
   );
