@@ -1,14 +1,14 @@
-import { BigNumber, Decimal, Integer } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import { ethers } from 'ethers';
 import { parseEther } from 'ethers/lib/utils';
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
 import BlockStore from '../src/lib/block-store';
+import { isScript } from '../src/lib/env'
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
-import { isScript } from '../src/lib/env'
 import { OTokenConfigFile, writeOTokenConfigToGitHub } from './calculate-otoken-season-config';
 import {
   EpochMetadata,
@@ -27,13 +27,13 @@ import {
 import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
 import {
   ARB_VESTER_PROXY,
-  calculateFinalEquityRewards,
-  calculateVirtualLiquidityPoints,
+  calculateFinalPoints,
   calculateMerkleRootAndProofs,
-  processEventsUntilEndTimestamp,
+  calculateVirtualLiquidityPoints,
   ETH_USDC_POOL,
   InterestOperation,
   LiquidityPositionsAndEvents,
+  processEventsUntilEndTimestamp,
 } from './lib/rewards';
 
 export interface OTokenEpochMetadata extends EpochMetadata {
@@ -55,8 +55,6 @@ export interface OTokenOutputFile {
     }
   };
 }
-
-const MINIMUM_O_TOKEN_AMOUNT_WEI: Integer = new BigNumber(ethers.utils.parseEther('0.01').toString());
 
 const REWARD_MULTIPLIERS_MAP = {};
 
@@ -91,10 +89,11 @@ async function start() {
   const [
     oTokenRewardWeiMap,
     sumOfWeights,
-  ] = Object.keys(rewardWeights).reduce<[Record<string, Integer>, Decimal]>(([acc, sum], key) => {
-    acc[key] = new BigNumber(parseEther(rewardWeights[key]).toString());
-    return [acc, sum.plus(rewardWeights[key])];
-  }, [{}, new BigNumber(0)]);
+  ]: [Record<string, Integer>, Decimal] = Object.keys(rewardWeights)
+    .reduce<[Record<string, Integer>, Decimal]>(([acc, sum], key) => {
+      acc[key] = new BigNumber(parseEther(rewardWeights[key]).toString());
+      return [acc, sum.plus(rewardWeights[key])];
+    }, [{}, new BigNumber(0)]);
   if (!totalOARbAmount.eq(sumOfWeights)) {
     return Promise.reject(new Error(`Invalid reward weights sum, found: ${sumOfWeights.toString()}`));
   }
@@ -146,7 +145,7 @@ async function start() {
 
   const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
 
-  const totalPointsPerMarket: Record<number, Decimal> = processEventsUntilEndTimestamp(
+  processEventsUntilEndTimestamp(
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
     endMarketIndexMap,
@@ -178,15 +177,25 @@ async function start() {
     endTimestamp,
   );
 
-  const userToOTokenRewards: Record<string, Integer> = calculateFinalEquityRewards(
+  const { userToMarketToPointsMap, marketToPointsMap } = calculateFinalPoints(
     networkId,
     accountToDolomiteBalanceMap,
-    poolToVirtualLiquidityPositionsAndEvents,
-    totalPointsPerMarket,
-    poolToTotalSubLiquidityPoints,
     oTokenRewardWeiMap,
-    MINIMUM_O_TOKEN_AMOUNT_WEI,
+    poolToVirtualLiquidityPositionsAndEvents,
+    poolToTotalSubLiquidityPoints,
   );
+
+  const userToOTokenRewards = Object.keys(userToMarketToPointsMap).reduce<Record<string, Integer>>((memo, user) => {
+    Object.keys(userToMarketToPointsMap[user]).forEach(market => {
+      const userPoints = userToMarketToPointsMap[user][market];
+      const totalPoints = marketToPointsMap[market];
+      if (!memo[user]) {
+        memo[user] = INTEGERS.ZERO;
+      }
+      memo[user] = memo[user].plus(oTokenRewardWeiMap[market].times(userPoints).div(totalPoints));
+    });
+    return memo;
+  }, {});
 
   const { merkleRoot, walletAddressToLeavesMap } = calculateMerkleRootAndProofs(userToOTokenRewards);
 
@@ -197,8 +206,8 @@ async function start() {
       epoch,
       merkleRoot,
       marketTotalPointsForEpoch: {
-        ...Object.keys(totalPointsPerMarket).reduce((acc, market) => {
-          acc[market] = totalPointsPerMarket[market].toString();
+        ...Object.keys(marketToPointsMap).reduce((acc, market) => {
+          acc[market] = marketToPointsMap[market].toString();
           return acc;
         }, {}),
       },

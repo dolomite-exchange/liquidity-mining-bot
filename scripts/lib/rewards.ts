@@ -326,43 +326,52 @@ export function calculateFinalPoints(
   validMarketIdsMap: Record<string, any>,
   poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
   poolToTotalSubLiquidityPoints: Record<string, Decimal>,
-  oldData: Record<string, string> = {},
+  oldUserToPointsMap: Record<string, string> = {},
+  oldUserToMarketToPointsMap: Record<string, string> = {},
 ): {
   userToPointsMap: Record<string, Integer>;
+  userToMarketToPointsMap: Record<string, Record<string, Integer>>;
   marketToPointsMap: Record<string, Integer>;
 } {
   const marketToPointsMap: Record<string, Integer> = {};
-  const userToPointsMap: Record<string, Integer> = Object.keys(oldData)
+  const userToPointsMap: Record<string, Integer> = Object.keys(oldUserToPointsMap)
     .reduce<Record<string, Integer>>((memo, key) => {
-      memo[key] = new BigNumber(oldData[key]);
+      memo[key] = new BigNumber(oldUserToPointsMap[key]);
       return memo;
     }, {});
-  const accountToMarketsToPointsMap: Record<string, Record<string, Integer>> = {};
+  const userToMarketToPointsMap: Record<string, Record<string, Integer>> = Object.keys(oldUserToMarketToPointsMap)
+    .reduce<Record<string, Record<string, Integer>>>((memo1, user) => {
+      memo1[user] = Object.keys(userToMarketToPointsMap[user]).reduce<Record<string, Integer>>((memo2, market) => {
+        memo2[market] = new BigNumber(oldUserToMarketToPointsMap[user][market]);
+        return memo2;
+      }, {});
+      return memo1;
+    }, {});
 
   Object.keys(accountToDolomiteBalanceMap).forEach(account => {
     Object.keys(accountToDolomiteBalanceMap[account]!).forEach(subAccount => {
       Object.keys(accountToDolomiteBalanceMap[account]![subAccount]!).forEach(market => {
         if (validMarketIdsMap[market] && !blacklistMap[account]) {
           const balanceStruct = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
+          if (!marketToPointsMap[market]) {
+            marketToPointsMap[market] = INTEGERS.ZERO;
+          }
 
           const remappedAccount = remapAccountToClaimableAccount(networkId, balanceStruct.effectiveUser);
           if (!userToPointsMap[remappedAccount]) {
             userToPointsMap[remappedAccount] = INTEGERS.ZERO;
           }
-          if (!marketToPointsMap[market]) {
-            marketToPointsMap[market] = INTEGERS.ZERO;
+          if (!userToMarketToPointsMap[remappedAccount]) {
+            userToMarketToPointsMap[remappedAccount] = {};
           }
-          if (!accountToMarketsToPointsMap[account]) {
-            accountToMarketsToPointsMap[account] = {};
-          }
-          if (!accountToMarketsToPointsMap[account][market]) {
-            accountToMarketsToPointsMap[account][market] = INTEGERS.ZERO;
+          if (!userToMarketToPointsMap[remappedAccount][market]) {
+            userToMarketToPointsMap[remappedAccount][market] = INTEGERS.ZERO;
           }
 
           const points = balanceStruct.rewardPoints.times(ONE_ETH_WEI).dividedToIntegerBy(INTEGERS.ONE);
           userToPointsMap[remappedAccount] = userToPointsMap[remappedAccount].plus(points);
           marketToPointsMap[market] = marketToPointsMap[market].plus(points);
-          accountToMarketsToPointsMap[account][market] = accountToMarketsToPointsMap[account][market].plus(points);
+          userToMarketToPointsMap[remappedAccount][market] = userToMarketToPointsMap[remappedAccount][market].plus(points);
         }
       });
     });
@@ -392,17 +401,18 @@ export function calculateFinalPoints(
       });
     }
 
-    Object.keys(accountToMarketsToPointsMap[pool] ?? {}).forEach(market => {
+    Object.keys(userToMarketToPointsMap[pool] ?? {}).forEach(market => {
       // Get rid of points accrued by the blacklist for that particular market's total points
-      const pointsFromMarket = accountToMarketsToPointsMap[pool][market];
-      const whitelistPointsFromMarket = pointsFromMarket.times(totalWhitelistPoints).dividedToIntegerBy(totalLiquidityPoolPoints);
+      const pointsFromMarket = userToMarketToPointsMap[pool][market];
+      const whitelistPointsFromMarket = pointsFromMarket.times(totalWhitelistPoints)
+        .dividedToIntegerBy(totalLiquidityPoolPoints);
       const blacklistPoints = pointsFromMarket.minus(whitelistPointsFromMarket);
       marketToPointsMap[market] = marketToPointsMap[market].minus(blacklistPoints);
     })
     delete userToPointsMap[pool];
   });
 
-  return { userToPointsMap, marketToPointsMap };
+  return { userToPointsMap, userToMarketToPointsMap, marketToPointsMap };
 }
 
 export function calculateFinalEquityRewards(
