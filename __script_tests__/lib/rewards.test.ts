@@ -12,7 +12,7 @@ import {
   BalanceChangeType,
   calculateFinalEquityRewards,
   calculateVirtualLiquidityPoints,
-  processEventsAndCalculateTotalRewardPoints,
+  processEventsUntilEndTimestamp,
   LiquidityPositionsAndEvents,
 } from '../../scripts/lib/rewards';
 
@@ -188,7 +188,7 @@ describe('rewards', () => {
   });
 
   describe('calculateRewardPoints', () => {
-    totalPointsPerMarket = processEventsAndCalculateTotalRewardPoints(
+    totalPointsPerMarket = processEventsUntilEndTimestamp(
       accountToDolomiteBalanceMap,
       {},
       blockRewardStartTimestamp,

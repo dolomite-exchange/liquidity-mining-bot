@@ -1,18 +1,18 @@
-import { BigNumber, Decimal, INTEGERS } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import fs from 'fs';
 import v8 from 'v8';
 import { getLatestBlockNumberByTimestamp } from '../src/clients/blocks';
 import { getAllDolomiteAccountsWithToken } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
 import { MarketIndex } from '../src/lib/api-types';
-import { ONE_ETH_WEI } from '../src/lib/constants';
+import { isScript } from '../src/lib/env';
 import Logger from '../src/lib/logger';
 import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
 import '../src/lib/env'
 import { getAccountBalancesByMarket, getBalanceChangingEvents } from './lib/event-parser';
 import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
-import { calculateFinalPoints, InterestOperation, processEventsAndCalculateTotalRewardPoints } from './lib/rewards';
+import { calculateFinalPoints, InterestOperation, processEventsUntilEndTimestamp } from './lib/rewards';
 
 /* eslint-enable */
 
@@ -110,7 +110,7 @@ export async function calculateEzEthPoints(appendResults: boolean) {
 
   const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber, tokenAddress);
 
-  const totalPointsPerMarket: Record<number, Decimal> = processEventsAndCalculateTotalRewardPoints(
+  processEventsUntilEndTimestamp(
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
     marketIndexMap,
@@ -118,15 +118,9 @@ export async function calculateEzEthPoints(appendResults: boolean) {
     endTimestamp,
     InterestOperation.NOTHING,
   );
-  const allMarketIds = Object.keys(totalPointsPerMarket);
-  allMarketIds.forEach(marketId => {
-    if (marketId !== ezEthMarketId.toString()) {
-      delete totalPointsPerMarket[marketId];
-    }
-  });
 
   const EMPTY_MAP = {};
-  const userToPointsMap = calculateFinalPoints(
+  const { userToPointsMap, marketToPointsMap } = calculateFinalPoints(
     networkId,
     accountToDolomiteBalanceMap,
     validMarketIdsMap,
@@ -136,12 +130,13 @@ export async function calculateEzEthPoints(appendResults: boolean) {
   );
   const token = new dolomite.web3.eth.Contract(TokenAbi, tokenAddress);
   const tokenName = await dolomite.contracts.callConstantContractFunction(token.methods.name());
-  const totalEzPoints = totalPointsPerMarket[ezEthMarketId]
-    .times(ONE_ETH_WEI)
-    .plus(originalEzPoints);
+  const totalEzPoints = marketToPointsMap[ezEthMarketId].plus(originalEzPoints);
 
   const dataToWrite: OutputFile = {
-    users: userToPointsMap,
+    users: Object.keys(userToPointsMap).reduce((memo, user) => {
+      memo[user] = userToPointsMap[user].toFixed(0);
+      return memo;
+    }, {}),
     metadata: {
       marketId: ezEthMarketId,
       marketName: tokenName,
@@ -152,7 +147,7 @@ export async function calculateEzEthPoints(appendResults: boolean) {
       endBlock: endBlockNumber,
     },
   };
-  if (process.env.SCRIPT !== 'true') {
+  if (!isScript()) {
     await writeFileToGitHub(githubFilePath, dataToWrite, true);
   } else {
     const fileName = `${__dirname}/output/ez-points.json`;
@@ -178,7 +173,7 @@ function writeOutputFile(
   );
 }
 
-if (process.env.SCRIPT === 'true') {
+if (isScript()) {
   calculateEzEthPoints(true)
     .then(() => {
       console.log('Finished executing script!');

@@ -3,7 +3,7 @@ import { delay } from './delay';
 import Logger from './logger';
 
 const SHORT_WAIT_DURATION_MILLIS = 60 * 1_000;
-const WAIT_DURATION_MILLIS = 900 * 1_000; // 15 minutes in millis
+const WAIT_DURATION_MILLIS = 1_800 * 1_000; // 30 minutes in millis
 const APPEND_RESULTS = true;
 
 export default class EzPointsUpdater {

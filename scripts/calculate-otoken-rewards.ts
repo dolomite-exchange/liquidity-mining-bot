@@ -30,7 +30,7 @@ import {
   calculateFinalEquityRewards,
   calculateVirtualLiquidityPoints,
   calculateMerkleRootAndProofs,
-  processEventsAndCalculateTotalRewardPoints,
+  processEventsUntilEndTimestamp,
   ETH_USDC_POOL,
   InterestOperation,
   LiquidityPositionsAndEvents,
@@ -146,7 +146,7 @@ async function start() {
 
   const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
 
-  const totalPointsPerMarket: Record<number, Decimal> = processEventsAndCalculateTotalRewardPoints(
+  const totalPointsPerMarket: Record<number, Decimal> = processEventsUntilEndTimestamp(
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
     endMarketIndexMap,

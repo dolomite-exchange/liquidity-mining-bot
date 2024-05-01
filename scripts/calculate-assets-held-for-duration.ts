@@ -4,7 +4,6 @@ import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
 import BlockStore from '../src/lib/block-store';
-import { ONE_ETH_WEI } from '../src/lib/constants';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
@@ -22,10 +21,10 @@ import {
   ARB_VESTER_PROXY,
   calculateFinalPoints,
   calculateVirtualLiquidityPoints,
-  processEventsAndCalculateTotalRewardPoints,
   ETH_USDC_POOL,
   InterestOperation,
   LiquidityPositionsAndEvents,
+  processEventsUntilEndTimestamp,
 } from './lib/rewards';
 
 /* eslint-enable */
@@ -119,7 +118,7 @@ async function start() {
 
   const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
 
-  const totalPointsPerMarket = processEventsAndCalculateTotalRewardPoints(
+  processEventsUntilEndTimestamp(
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
     endMarketIndexMap,
@@ -127,12 +126,6 @@ async function start() {
     endTimestamp,
     InterestOperation.NOTHING,
   );
-  const allMarketIds = Object.keys(totalPointsPerMarket);
-  allMarketIds.forEach(marketId => {
-    if (marketId !== validMarketId.toString()) {
-      delete totalPointsPerMarket[marketId];
-    }
-  });
 
   const ammLiquidityBalancesAndEvents = await getAmmLiquidityPositionAndEvents(
     startBlockNumber,
@@ -157,13 +150,21 @@ async function start() {
     endTimestamp,
   );
 
-  const userToPointsMap = calculateFinalPoints(
+  const { userToPointsMap, marketToPointsMap } = calculateFinalPoints(
     networkId,
     accountToDolomiteBalanceMap,
     validMarketIdsMap,
     poolToVirtualLiquidityPositionsAndEvents,
     poolToTotalSubLiquidityPoints,
   );
+
+  const allMarketIds = Object.keys(marketToPointsMap);
+  allMarketIds.forEach(marketId => {
+    if (marketId !== validMarketId.toString()) {
+      delete marketToPointsMap[marketId];
+    }
+  });
+
   const tokenAddress = await dolomite.getters.getMarketTokenAddress(new BigNumber(validMarketId));
   const token = new dolomite.web3.eth.Contract(TokenAbi, tokenAddress);
   const tokenName = await dolomite.contracts.callConstantContractFunction(token.methods.name());
@@ -171,11 +172,14 @@ async function start() {
   // eslint-disable-next-line max-len
   const fileName = `${FOLDER_NAME}/asset-held-${startTimestamp}-${endTimestamp}-${validMarketId}-output.json`;
   const dataToWrite = readOutputFile(fileName);
-  dataToWrite.users = userToPointsMap;
+  dataToWrite.users = Object.keys(userToPointsMap).reduce((memo, user) => {
+    memo[user] = userToPointsMap[user].toFixed(0);
+    return memo;
+  }, {});
   dataToWrite.metadata = {
     marketId: validMarketId,
     marketName: tokenName,
-    totalPointsForMarket: totalPointsPerMarket[validMarketId].times(ONE_ETH_WEI).toFixed(0),
+    totalPointsForMarket: marketToPointsMap[validMarketId].toFixed(0),
     startBlock: startBlockNumber,
     endBlock: endBlockNumber,
     startTimestamp,

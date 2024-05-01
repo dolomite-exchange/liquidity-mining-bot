@@ -27,13 +27,14 @@ import {
 import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
 import {
   ARB_VESTER_PROXY,
+  BLACKLIST_ADDRESSES,
   calculateFinalPoints,
-  calculateVirtualLiquidityPoints,
   calculateMerkleRootAndProofs,
+  calculateVirtualLiquidityPoints,
   ETH_USDC_POOL,
   InterestOperation,
   LiquidityPositionsAndEvents,
-  processEventsAndCalculateTotalRewardPoints,
+  processEventsUntilEndTimestamp,
 } from './lib/rewards';
 
 /* eslint-enable */
@@ -60,7 +61,7 @@ const MAX_MULTIPLIER = new BigNumber('5');
 
 export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)): Promise<void> {
   const networkId = await dolomite.web3.eth.net.getId();
-
+// 2966.8076437837371818818783068783
   const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>(
     getMineralConfigFileNameWithPath(networkId),
   );
@@ -90,6 +91,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
 
   Logger.info({
     message: 'Mineral rewards data',
+    blacklistAddresses: BLACKLIST_ADDRESSES,
     blockRewardStart: startBlockNumber,
     blockRewardStartTimestamp: startTimestamp,
     blockRewardEnd: endBlockNumber,
@@ -123,7 +125,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
 
   const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
 
-  const totalPointsToMarketMap = processEventsAndCalculateTotalRewardPoints(
+  processEventsUntilEndTimestamp(
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
     endMarketIndexMap,
@@ -131,12 +133,6 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     endTimestamp,
     InterestOperation.ADD_POSITIVE,
   );
-  const totalMinerals = Object.keys(totalPointsToMarketMap).reduce((acc, market) => {
-    if (VALID_REWARD_MULTIPLIERS_MAP[market]) {
-      acc = acc.plus(totalPointsToMarketMap[market])
-    }
-    return acc;
-  }, INTEGERS.ZERO);
 
   const ammLiquidityBalancesAndEvents = await getAmmLiquidityPositionAndEvents(
     startBlockNumber,
@@ -161,13 +157,19 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     endTimestamp,
   );
 
-  const userToPointsMap = calculateFinalPoints(
+  const { userToPointsMap, marketToPointsMap } = calculateFinalPoints(
     networkId,
     accountToDolomiteBalanceMap,
     VALID_REWARD_MULTIPLIERS_MAP,
     poolToVirtualLiquidityPositionsAndEvents,
     poolToTotalSubLiquidityPoints,
   );
+  const totalMinerals = Object.keys(marketToPointsMap).reduce((acc, market) => {
+    if (VALID_REWARD_MULTIPLIERS_MAP[market]) {
+      acc = acc.plus(marketToPointsMap[market])
+    }
+    return acc;
+  }, INTEGERS.ZERO);
 
   const userToMineralsDataMap = await calculateFinalMinerals(userToPointsMap, networkId, epoch);
 
@@ -230,7 +232,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
       marketIds: validMarketIds,
     },
   };
-  if (process.env.SCRIPT !== 'true') {
+  if (!isScript()) {
     await writeFileToGitHub(fileName, mineralOutputFile, false);
   } else {
     Logger.info({
@@ -239,12 +241,12 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     writeOutputFile(`minerals-${epoch}-${startTimestamp}-${endTimestamp}-output.json`, mineralOutputFile);
   }
 
-  if (process.env.SCRIPT !== 'true' && merkleRoot) {
+  if (!isScript() && merkleRoot) {
     liquidityMiningConfig.epochs[epoch].isMerkleRootGenerated = true;
     await writeMineralConfigToGitHub(liquidityMiningConfig, liquidityMiningConfig.epochs[epoch]);
   }
 
-  if (process.env.SCRIPT !== 'true' && merkleRoot) {
+  if (!isScript() && merkleRoot) {
     // TODO: write merkle root to chain
     // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds
     //  for an update)
@@ -263,14 +265,14 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
 }
 
 async function calculateFinalMinerals(
-  userToPointsMap: Record<string, string>,
+  userToPointsMap: Record<string, Integer>,
   networkId: number,
   epoch: number,
 ): Promise<Record<string, UserMineralAllocation>> {
   if (epoch === 0) {
     return Object.keys(userToPointsMap).reduce((memo, user) => {
       memo[user] = {
-        amount: new BigNumber(userToPointsMap[user]),
+        amount: userToPointsMap[user],
         multiplier: INTEGERS.ONE,
       };
       return memo;
