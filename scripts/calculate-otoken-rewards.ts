@@ -1,5 +1,4 @@
 import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
-import { ethers } from 'ethers';
 import { parseEther } from 'ethers/lib/utils';
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
