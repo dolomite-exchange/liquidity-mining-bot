@@ -4,7 +4,7 @@ import { getAllDolomiteAccountsWithSupplyValue } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
 import BlockStore from '../src/lib/block-store';
 import { ONE_ETH_WEI } from '../src/lib/constants';
-import { isScript } from '../src/lib/env';
+import { isScript, shouldForceUpload } from '../src/lib/env';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
@@ -13,9 +13,9 @@ import {
   EpochMetadata,
   getMineralConfigFileNameWithPath,
   getMineralFinalizedFileNameWithPath,
-  getMineralMetadataFileNameWithPath,
+  getMineralMetadataFileNameWithPath, MINERAL_SEASON,
   MineralConfigFile,
-  MineralOutputFile,
+  MineralOutputFile, UserMineralAllocationForFile,
   writeMineralConfigToGitHub,
 } from './lib/config-helper';
 import {
@@ -98,6 +98,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     dolomiteMargin: libraryDolomiteMargin,
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
+    isTimeElapsed,
     networkId,
     marketIds: Object.keys(VALID_REWARD_MULTIPLIERS_MAP),
     subgraphUrl: process.env.SUBGRAPH_URL,
@@ -170,10 +171,10 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     return acc;
   }, INTEGERS.ZERO);
 
-  const userToMineralsDataMap = await calculateFinalMinerals(userToPointsMap, networkId, epoch);
+  const userToMineralsDataMap = await calculateFinalMinerals(userToPointsMap, networkId, epoch, isTimeElapsed);
 
   let merkleRoot: string | null;
-  let userToMineralsMapForFile: any;
+  let userToMineralsMapForFile: Record<string, UserMineralAllocationForFile>;
   if (isTimeElapsed) {
     const userToAmountMap = Object.keys(userToMineralsDataMap).reduce((memo, k) => {
       memo[k] = userToMineralsDataMap[k].amount;
@@ -192,7 +193,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
         proofs: walletAddressToLeavesMap[k].proofs,
       }
       return memo;
-    }, {});
+    }, {} as Record<string, UserMineralAllocationForFile>);
   } else {
     merkleRoot = null;
     userToMineralsMapForFile = Object.keys(userToMineralsDataMap).reduce((memo, k) => {
@@ -202,7 +203,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
         proofs: [],
       }
       return memo;
-    }, {});
+    }, {} as Record<string, UserMineralAllocationForFile>);
   }
 
   const validMarketIds = Object.keys(VALID_REWARD_MULTIPLIERS_MAP).map(m => parseInt(m, 10));
@@ -231,16 +232,16 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
       marketIds: validMarketIds,
     },
   };
-  if (!isScript()) {
+  if (!isScript() || shouldForceUpload()) {
     await writeFileToGitHub(fileName, mineralOutputFile, false);
   } else {
     Logger.info({
       message: 'Skipping file upload due to script execution',
     });
-    writeOutputFile(`minerals-${epoch}-${startTimestamp}-${endTimestamp}-output.json`, mineralOutputFile);
+    writeOutputFile(`mineral-season-${MINERAL_SEASON}-epoch-${epoch}-output.json`, mineralOutputFile);
   }
 
-  if (!isScript() && merkleRoot) {
+  if ((!isScript() || shouldForceUpload()) && merkleRoot) {
     liquidityMiningConfig.epochs[epoch].isMerkleRootGenerated = true;
     await writeMineralConfigToGitHub(liquidityMiningConfig, liquidityMiningConfig.epochs[epoch]);
   }
@@ -267,6 +268,7 @@ async function calculateFinalMinerals(
   userToPointsMap: Record<string, Integer>,
   networkId: number,
   epoch: number,
+  isTimeElapsed: boolean,
 ): Promise<Record<string, UserMineralAllocation>> {
   if (epoch === 0) {
     return Object.keys(userToPointsMap).reduce((memo, user) => {
@@ -282,12 +284,12 @@ async function calculateFinalMinerals(
     getMineralFinalizedFileNameWithPath(networkId, epoch - 1),
   );
   return Object.keys(userToPointsMap).reduce((memo, user) => {
-    const userCurrent = new BigNumber(userToPointsMap[user]);
-    const userPrevious = new BigNumber(previousMinerals.users[user]?.minerals ?? '0');
+    const userCurrent = userToPointsMap[user];
+    const userPrevious = new BigNumber(previousMinerals.users[user]?.amount ?? '0');
     const userPreviousMultiplier = new BigNumber(previousMinerals.users[user]?.multiplier ?? '1');
     const userPreviousNormalized = userPrevious.dividedToIntegerBy(userPreviousMultiplier);
     let newMultiplier = INTEGERS.ONE;
-    if (userCurrent.gt(userPreviousNormalized) && userPreviousNormalized.gt(INTEGERS.ZERO)) {
+    if (isTimeElapsed && userCurrent.gt(userPreviousNormalized) && userPreviousNormalized.gt(INTEGERS.ZERO)) {
       newMultiplier = userPreviousMultiplier.plus(0.5);
       if (newMultiplier.gt(MAX_MULTIPLIER)) {
         newMultiplier = MAX_MULTIPLIER

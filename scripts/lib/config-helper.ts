@@ -2,8 +2,8 @@ import '../../src/lib/env';
 import { getLatestBlockNumberByTimestamp } from '../../src/clients/blocks';
 import { writeFileToGitHub } from './file-helpers';
 
-interface UserMineralAllocationForFile {
-  minerals: string; // big int
+export interface UserMineralAllocationForFile {
+  amount: string; // big int
   multiplier: string; // decimal
   proofs: string[];
 }
@@ -107,9 +107,9 @@ export async function getNextConfigIfNeeded(oldEpoch: EpochConfig): Promise<Next
   };
 }
 
-const MINERAL_SEASON = 0;
-const OARB_SEASON = 0;
-const OMATIC_SEASON = 0;
+export const MINERAL_SEASON = 0;
+export const OARB_SEASON = 0;
+export const OMATIC_SEASON = 0;
 
 /**
  * path cannot start with a "/"

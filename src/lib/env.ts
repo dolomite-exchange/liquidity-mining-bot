@@ -26,3 +26,7 @@ if (ENV_FILENAME || (NETWORK_TO_ENV_FILE_MAP[NETWORK] && fs.existsSync(NETWORK_T
 export function isScript() {
   return process.env.SCRIPT === 'true';
 }
+
+export function shouldForceUpload() {
+  return process.env.FORCE_UPLOAD === 'true';
+}
