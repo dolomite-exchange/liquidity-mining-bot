@@ -69,6 +69,7 @@ export async function calculateMineralSeasonConfig(
     isTimeElapsed,
     isMerkleRootGenerated: false,
     isMerkleRootWrittenOnChain: false,
+    marketIdToRewardMap: oldEpoch.marketIdToRewardMap,
   };
   await writeMineralConfigToGitHub(configFile, epochData);
 

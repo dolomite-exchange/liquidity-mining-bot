@@ -27,6 +27,9 @@ export interface MineralOutputFile {
 }
 
 export interface MineralConfigEpoch extends EpochConfig {
+  marketIdToRewardMap: {
+    [marketId: string]: string;
+  };
 }
 
 export interface MineralConfigFile extends ConfigFile<MineralConfigEpoch> {

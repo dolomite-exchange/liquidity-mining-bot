@@ -38,8 +38,9 @@ export default class MineralsUpdater {
         this.skipConfigUpdate = false;
       } catch (e: any) {
         Logger.error({
+          at: 'MineralsUpdater#_poll',
           message: `Could not update minerals due to error: ${e.message}`,
-          error: e,
+          remediation: `Waiting for ${SHORT_WAIT_DURATION_MILLIS} before trying again...`
         })
         await delay(SHORT_WAIT_DURATION_MILLIS);
       }
@@ -71,7 +72,7 @@ export default class MineralsUpdater {
       Logger.error({
         at: 'MineralsUpdater#_update',
         message: `Error calculating mineral rewards: ${e.message}`,
-        e,
+        error: e,
       });
       throw e;
     }

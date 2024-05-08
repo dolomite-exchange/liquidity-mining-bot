@@ -11,10 +11,10 @@ export default class GasPriceUpdater {
       at: 'GasPriceUpdater#start',
       message: 'Starting gas price updater',
     });
-    this.updateGasPrices();
+    this._updateGasPrices();
   }
 
-  updateGasPrices = async () => {
+  _updateGasPrices = async () => {
     // noinspection InfiniteLoopJS
     for (; ;) {
       try {

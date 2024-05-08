@@ -1,6 +1,6 @@
 import { BigNumber, DolomiteMargin, Integer } from '@dolomite-exchange/dolomite-margin';
 import axios from 'axios';
-import { ChainId, isArbitrum, isPolygon } from '../lib/chain-id';
+import { ChainId, isArbitrum, isMantle } from '../lib/chain-id';
 import Logger from '../lib/logger';
 import '../lib/env';
 
@@ -31,10 +31,8 @@ export async function updateGasPrice(dolomite: DolomiteMargin) {
 
   const multiplier = new BigNumber(process.env.GAS_PRICE_MULTIPLIER as string);
   const addition = new BigNumber(process.env.GAS_PRICE_ADDITION as string);
-  const networkId = Number(process.env.NETWORK_ID)
-  const base = networkId === ChainId.Ethereum ? 100_000_000 : 1_000_000_000;
   const totalWei = new BigNumber(fast)
-    .times(base)
+    .times(1_000_000_000)
     .times(multiplier)
     .plus(addition)
     .toFixed(0);
@@ -54,18 +52,25 @@ export function getGasPriceWei(): Integer {
 
 async function getGasPrices(dolomite: DolomiteMargin): Promise<{ fast: string }> {
   Logger.info({
-    at: 'getGasPrices',
-    message: 'Fetching gas prices',
+    message: '#getGasPrices: Fetching gas prices',
   });
 
   const networkId = Number(process.env.NETWORK_ID);
-  if (isPolygon(networkId)) {
+  if (networkId === ChainId.PolygonZkEvm) {
     const response = await axios.get('https://gasstation.polygon.technology/zkevm');
     return response.data;
+  } else if (networkId === ChainId.XLayer) {
+    const response = await axios.get('https://rpc.xlayer.tech/gasstation');
+    return response.data;
   } else if (isArbitrum(networkId)) {
-    const result = await dolomite.arbitrumGasInfo.getPricesInWei();
+    const result = await dolomite.arbitrumGasInfo!.getPricesInWei();
     return {
       fast: result.perArbGasTotal.dividedBy('1000000000').toFixed(), // convert to gwei
+    };
+  } else if (isMantle(networkId)) {
+    const result = await dolomite.mantleGasInfo!.getPriceInWei();
+    return {
+      fast: result.dividedBy('1000000000').toFixed(), // convert to gwei
     };
   } else {
     const errorMessage = `Could not find network ID ${networkId}`;

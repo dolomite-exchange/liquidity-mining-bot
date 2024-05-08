@@ -29,6 +29,7 @@ checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
 checkPrivateKey('ACCOUNT_WALLET_PRIVATE_KEY');
 checkDuration('BLOCK_POLL_INTERVAL_MS', 1000);
+checkBooleanValue('BLOCK_STORE_ENABLED');
 checkBooleanValue('DETONATIONS_ENABLED');
 checkDuration('DETONATIONS_KEY_EXPIRATION_SECONDS', 1, false);
 checkDuration('DETONATIONS_POLL_INTERVAL_MS', 1000);
@@ -37,6 +38,7 @@ checkExists('EZ_POINTS_ENABLED');
 checkBigNumber('GAS_PRICE_ADDITION');
 checkBigNumber('GAS_PRICE_MULTIPLIER');
 checkBigNumber('GAS_PRICE_POLL_INTERVAL_MS');
+checkBooleanValue('GAS_PRICE_UPDATER_ENABLED');
 checkBigNumber('INITIAL_GAS_PRICE_WEI');
 checkBooleanValue('LEVEL_REQUESTS_ENABLED');
 checkDuration('LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS', 1, false);
@@ -91,6 +93,7 @@ async function start() {
     accountPollIntervalMillis: process.env.ACCOUNT_POLL_INTERVAL_MS,
     accountWalletAddress: process.env.ACCOUNT_WALLET_ADDRESS,
     blockPollIntervalMillis: process.env.BLOCK_POLL_INTERVAL_MS,
+    blockStoreEnabled: process.env.BLOCK_STORE_ENABLED,
     detonationsEnabled: process.env.DETONATIONS_ENABLED,
     detonationsKeyExpirationSeconds: process.env.DETONATIONS_KEY_EXPIRATION_SECONDS,
     detonationsPollIntervalMillis: process.env.DETONATIONS_POLL_INTERVAL_MS,
@@ -100,6 +103,7 @@ async function start() {
     gasPriceAddition: process.env.GAS_PRICE_ADDITION,
     gasPriceMultiplier: process.env.GAS_PRICE_MULTIPLIER,
     gasPricePollIntervalMillis: process.env.GAS_PRICE_POLL_INTERVAL_MS,
+    gasPriceUpdaterEnabled: process.env.GAS_PRICE_UPDATER_ENABLED,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     initialGasPriceWei: process.env.INITIAL_GAS_PRICE_WEI,
     levelRequestsEnabled: process.env.LEVEL_REQUESTS_ENABLED,
@@ -111,9 +115,12 @@ async function start() {
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
 
-  blockStore.start();
-  gasPriceUpdater.start();
-
+  if (process.env.BLOCK_STORE_ENABLED === 'true') {
+    blockStore.start();
+  }
+  if (process.env.GAS_PRICE_UPDATER_ENABLED === 'true') {
+    gasPriceUpdater.start();
+  }
   if (process.env.DETONATIONS_ENABLED === 'true') {
     vestingPositionStore.start();
     dolomiteDetonator.start();

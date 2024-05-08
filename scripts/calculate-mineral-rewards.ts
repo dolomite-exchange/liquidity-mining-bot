@@ -51,12 +51,6 @@ interface UserMineralAllocation {
 }
 
 const SECONDS_PER_WEEK = 86_400 * 7;
-const WETH_MARKET_ID = '0';
-const USDC_MARKET_ID = '17';
-const VALID_REWARD_MULTIPLIERS_MAP = {
-  [WETH_MARKET_ID]: new BigNumber(5000).div(SECONDS_PER_WEEK),
-  [USDC_MARKET_ID]: new BigNumber(1).div(SECONDS_PER_WEEK),
-};
 const MAX_MULTIPLIER = new BigNumber('5');
 
 export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)): Promise<void> {
@@ -78,7 +72,21 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     endBlockNumber,
     endTimestamp,
     isTimeElapsed,
+    marketIdToRewardMap
   } = liquidityMiningConfig.epochs[epoch];
+
+  if (!Object.keys(marketIdToRewardMap).every(m => !Number.isNaN(parseInt(m)))) {
+    return Promise.reject('Invalid market ID in map');
+  } else if (!Object.values(marketIdToRewardMap).every(m => !new BigNumber(m).isNaN())) {
+    return Promise.reject('Reward amounts are invalid');
+  } else if (!Object.values(marketIdToRewardMap).every(m => new BigNumber(m).lt(1_000_000))) {
+    return Promise.reject('Reward amounts are too large. Is this a bug?');
+  }
+
+  const validRewardMultipliersMap = Object.keys(marketIdToRewardMap).reduce((memo, marketId) => {
+    memo[marketId] = new BigNumber(marketIdToRewardMap[marketId]).div(SECONDS_PER_WEEK)
+    return memo;
+  }, {} as Record<string, Decimal>)
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address;
   if (networkId !== Number(process.env.NETWORK_ID)) {
@@ -100,7 +108,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     isTimeElapsed,
     networkId,
-    marketIds: Object.keys(VALID_REWARD_MULTIPLIERS_MAP),
+    marketIds: Object.keys(marketIdToRewardMap),
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
 
@@ -120,7 +128,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
   const accountToDolomiteBalanceMap = getAccountBalancesByMarket(
     apiAccounts,
     startTimestamp,
-    VALID_REWARD_MULTIPLIERS_MAP,
+    validRewardMultipliersMap,
   );
 
   const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
@@ -129,7 +137,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
     endMarketIndexMap,
-    VALID_REWARD_MULTIPLIERS_MAP,
+    validRewardMultipliersMap,
     endTimestamp,
     InterestOperation.ADD_POSITIVE,
   );
@@ -160,12 +168,12 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
   const { userToPointsMap, marketToPointsMap } = calculateFinalPoints(
     networkId,
     accountToDolomiteBalanceMap,
-    VALID_REWARD_MULTIPLIERS_MAP,
+    validRewardMultipliersMap,
     poolToVirtualLiquidityPositionsAndEvents,
     poolToTotalSubLiquidityPoints,
   );
   const totalMinerals = Object.keys(marketToPointsMap).reduce((acc, market) => {
-    if (VALID_REWARD_MULTIPLIERS_MAP[market]) {
+    if (validRewardMultipliersMap[market]) {
       acc = acc.plus(marketToPointsMap[market])
     }
     return acc;
@@ -206,7 +214,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     }, {} as Record<string, UserMineralAllocationForFile>);
   }
 
-  const validMarketIds = Object.keys(VALID_REWARD_MULTIPLIERS_MAP).map(m => parseInt(m, 10));
+  const validMarketIds = Object.keys(validRewardMultipliersMap).map(m => parseInt(m, 10));
   const marketNames = await Promise.all(
     validMarketIds.map<Promise<string>>(async validMarketId => {
       const tokenAddress = await dolomite.getters.getMarketTokenAddress(new BigNumber(validMarketId));

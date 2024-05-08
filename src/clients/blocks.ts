@@ -7,9 +7,9 @@ const defaultAxiosConfig = {
   headers: { 'Accept-Encoding': 'gzip,deflate,compress' },
 };
 
-const subgraphUrl = process.env.BLOCKS_SUBGRAPH_URL ?? '';
+const subgraphUrl = process.env.SUBGRAPH_BLOCKS_URL ?? '';
 if (!subgraphUrl) {
-  throw new Error('BLOCKS_SUBGRAPH_URL is not set')
+  throw new Error('SUBGRAPH_BLOCKS_URL is not set')
 }
 
 interface LatestBlockNumberAndTimestamp {
