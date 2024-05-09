@@ -410,6 +410,13 @@ export function calculateFinalPoints(
       marketToPointsMap[market] = marketToPointsMap[market].minus(blacklistPoints);
     })
     delete userToPointsMap[pool];
+  });1
+
+  // Remove all users with 0 points
+  Object.keys(userToPointsMap).forEach(user => {
+    if (userToPointsMap[user].eq(INTEGERS.ZERO)) {
+      delete userToPointsMap[user];
+    }
   });
 
   return { userToPointsMap, userToMarketToPointsMap, marketToPointsMap };

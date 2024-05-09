@@ -1,10 +1,9 @@
 /* eslint-disable max-len */
-import { BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Decimal, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
 import { DETONATION_WINDOW_SECONDS } from '../helpers/dolomite-helpers';
 import { isMarketIgnored } from '../helpers/market-helpers';
-import { dolomite } from '../helpers/web3';
 import {
   ApiAccount,
   ApiAmmLiquidityPosition,
@@ -23,8 +22,8 @@ import {
   ApiWithdrawal,
   MarketIndex,
 } from '../lib/api-types';
-import { ONE_ETH_WEI } from '../lib/constants';
 import {
+  GraphqlAccount,
   GraphqlAccountResult,
   GraphqlAmmLiquidityPositionSnapshotsResult,
   GraphqlAmmLiquidityPositionsResult,
@@ -145,13 +144,12 @@ if (!subgraphUrl) {
 }
 
 async function getAccounts(
-  marketIndexMap: { [marketId: string]: { borrow: Decimal, supply: Decimal } },
+  marketIndexMap: { [marketId: string]: { borrow: Decimal, supply: Decimal } | undefined },
   query: string,
   blockNumber: number,
   lastId: string | undefined,
   extraVariables: Record<string, any> = {},
 ): Promise<{ accounts: ApiAccount[] }> {
-  const indexBase = ONE_ETH_WEI;
   const accounts: ApiAccount[] = await axios.post(
     subgraphUrl,
     {
@@ -172,33 +170,13 @@ async function getAccounts(
         return (response as GraphqlAccountResult).data.marginAccounts;
       }
     })
-    .then(graphqlAccounts => graphqlAccounts.map<ApiAccount>(account => {
-      const balances = account.tokenValues.reduce<{ [marketNumber: string]: ApiBalance }>((memo, value) => {
-        const tokenBase = new BigNumber('10').pow(value.token.decimals);
-        const valuePar = new BigNumber(value.valuePar).times(tokenBase);
-        const indexObject = marketIndexMap[value.token.marketId];
-        const index = (new BigNumber(valuePar).lt('0') ? indexObject.borrow : indexObject.supply).times(indexBase);
-        memo[value.token.marketId] = {
-          marketId: Number(value.token.marketId),
-          tokenName: value.token.name,
-          tokenSymbol: value.token.symbol,
-          tokenDecimals: Number.parseInt(value.token.decimals, 10),
-          tokenAddress: value.token.id.toLowerCase(),
-          par: valuePar,
-          wei: new BigNumber(valuePar).times(index).dividedToIntegerBy(indexBase, BigNumber.ROUND_HALF_UP),
-          expiresAt: value.expirationTimestamp ? new BigNumber(value.expirationTimestamp) : null,
-          expiryAddress: value.expiryAddress,
-        };
-        return memo;
-      }, {});
-      return {
-        id: `${account.user.id}-${account.accountNumber}`,
-        owner: account.user.id.toLowerCase(),
-        number: new BigNumber(account.accountNumber),
-        effectiveUser: account.user?.effectiveUser?.id.toLowerCase(),
-        balances,
-      };
-    }));
+    .then(graphqlAccounts => graphqlAccounts.reduce((memo, account) => {
+      const apiAccount = _mapGraphqlAccountToApiAccount(account, marketIndexMap)
+      if (apiAccount) {
+        memo.push(apiAccount);
+      }
+      return memo;
+    }, [] as ApiAccount[]));
 
   return { accounts };
 }
@@ -327,7 +305,7 @@ export async function getLiquidations(
     return Promise.reject(result.errors[0]);
   }
 
-  const liquidations = result.data.liquidations.map(liquidation => mapLiquidationGqlToApiLiquidation(liquidation));
+  const liquidations = result.data.liquidations.map(liquidation => _mapLiquidationGqlToApiLiquidation(liquidation));
   return { liquidations };
 }
 
@@ -372,7 +350,7 @@ export async function getLiquidationsByHeldToken(
     return Promise.reject(result.errors[0]);
   }
 
-  const liquidations = result.data.liquidations.map(liquidation => mapLiquidationGqlToApiLiquidation(liquidation));
+  const liquidations = result.data.liquidations.map(liquidation => _mapLiquidationGqlToApiLiquidation(liquidation));
   return { liquidations };
 }
 
@@ -417,7 +395,7 @@ export async function getLiquidationsByBorrowedToken(
     return Promise.reject(result.errors[0]);
   }
 
-  const liquidations = result.data.liquidations.map(liquidation => mapLiquidationGqlToApiLiquidation(liquidation));
+  const liquidations = result.data.liquidations.map(liquidation => _mapLiquidationGqlToApiLiquidation(liquidation));
   return { liquidations };
 }
 
@@ -745,7 +723,7 @@ export async function getTrades(
     return Promise.reject(result.errors[0]);
   }
 
-  const trades = result.data.trades.map<ApiTrade>(trade => mapTradeGqlToApiTrade(trade));
+  const trades = result.data.trades.map<ApiTrade>(trade => _mapTradeGqlToApiTrade(trade));
   return { trades };
 }
 
@@ -790,7 +768,7 @@ export async function getTakerTrades(
     return Promise.reject(result.errors[0]);
   }
 
-  const trades = result.data.trades.map<ApiTrade>(trade => mapTradeGqlToApiTrade(trade));
+  const trades = result.data.trades.map<ApiTrade>(trade => _mapTradeGqlToApiTrade(trade));
   return { trades };
 }
 
@@ -835,7 +813,7 @@ export async function getMakerTrades(
     return Promise.reject(result.errors[0]);
   }
 
-  const trades = result.data.trades.map<ApiTrade>(trade => mapTradeGqlToApiTrade(trade));
+  const trades = result.data.trades.map<ApiTrade>(trade => _mapTradeGqlToApiTrade(trade));
   return { trades };
 }
 
@@ -1211,18 +1189,9 @@ export async function getDolomiteMarkets(
     return !isMarketIgnored(parseInt(market.token.marketId, 10));
   });
 
-  const marketPriceCalls = filteredMarketRiskInfos.map(market => {
-    return {
-      target: dolomite.address,
-      callData: dolomite.contracts.dolomiteMargin.methods.getMarketPrice(market.token.marketId).encodeABI(),
-    };
-  });
+  // @note: Got rid of oracle price retrieval because it would time out for historical queries
 
-  // Even though the block number from the subgraph is certainly behind the RPC, we want the most updated chain data!
-  const { results: marketPriceResults } = await dolomite.multiCall.aggregate(marketPriceCalls);
-
-  const markets: Promise<ApiMarket>[] = filteredMarketRiskInfos.map(async (market, i) => {
-    const oraclePrice = dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i]);
+  const markets: Promise<ApiMarket>[] = filteredMarketRiskInfos.map(async market => {
     const marketId = new BigNumber(market.token.marketId)
     const apiMarket: ApiMarket = {
       marketId: marketId.toNumber(),
@@ -1230,7 +1199,6 @@ export async function getDolomiteMarkets(
       symbol: market.token.symbol,
       name: market.token.name,
       tokenAddress: market.token.id,
-      oraclePrice: new BigNumber(oraclePrice),
       marginPremium: new BigNumber(decimalToString(market.marginPremium)),
       liquidationRewardPremium: new BigNumber(decimalToString(market.liquidationRewardPremium)),
     };
@@ -1300,7 +1268,52 @@ export async function getTimestampToBlockNumberMap(timestamps: number[]): Promis
   }, {});
 }
 
-function mapLiquidationGqlToApiLiquidation(liquidation: any): ApiLiquidation {
+function _mapGraphqlAccountToApiAccount(
+  account: GraphqlAccount,
+  marketIndexMap: { [marketId: string]: { borrow: Decimal, supply: Decimal } | undefined },
+): ApiAccount | undefined {
+  let skip = false;
+  const balances = account.tokenValues.reduce<{ [marketNumber: string]: ApiBalance }>((memo, value) => {
+    const tokenBase = new BigNumber('10').pow(value.token.decimals);
+    const valuePar = new BigNumber(value.valuePar).times(tokenBase);
+    const indexObject = marketIndexMap[value.token.marketId];
+    if (!indexObject) {
+      skip = true;
+      return memo;
+    }
+
+    const index = (new BigNumber(valuePar).lt('0')
+      ? indexObject.borrow
+      : indexObject.supply).times(INTEGERS.INTEREST_RATE_BASE);
+    memo[value.token.marketId] = {
+      marketId: Number(value.token.marketId),
+      tokenName: value.token.name,
+      tokenSymbol: value.token.symbol,
+      tokenDecimals: Number.parseInt(value.token.decimals, 10),
+      tokenAddress: value.token.id.toLowerCase(),
+      par: valuePar,
+      wei: new BigNumber(valuePar).times(index)
+        .dividedToIntegerBy(INTEGERS.INTEREST_RATE_BASE, BigNumber.ROUND_HALF_UP),
+      expiresAt: value.expirationTimestamp ? new BigNumber(value.expirationTimestamp) : null,
+      expiryAddress: value.expiryAddress,
+    };
+    return memo;
+  }, {});
+
+  if (skip) {
+    return undefined;
+  }
+
+  return {
+    id: `${account.user.id}-${account.accountNumber}`,
+    owner: account.user.id.toLowerCase(),
+    number: new BigNumber(account.accountNumber),
+    effectiveUser: account.user?.effectiveUser?.id.toLowerCase(),
+    balances,
+  };
+}
+
+function _mapLiquidationGqlToApiLiquidation(liquidation: any): ApiLiquidation {
   return {
     id: liquidation.id,
     serialId: parseInt(liquidation.serialId, 10),
@@ -1336,7 +1349,7 @@ function mapLiquidationGqlToApiLiquidation(liquidation: any): ApiLiquidation {
   };
 }
 
-function mapTradeGqlToApiTrade(trade: any): ApiTrade {
+function _mapTradeGqlToApiTrade(trade: any): ApiTrade {
   return {
     id: trade.id,
     serialId: parseInt(trade.serialId, 10),

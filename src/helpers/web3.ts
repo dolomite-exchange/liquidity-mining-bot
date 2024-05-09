@@ -6,7 +6,7 @@ import '../lib/env';
 const accountWalletAddress = process.env.ACCOUNT_WALLET_ADDRESS?.toLowerCase() ?? '';
 const opts = { defaultAccount: accountWalletAddress };
 
-const provider: any = new Web3.providers.HttpProvider(process.env.ETHEREUM_NODE_URL ?? '');
+const provider = new Web3.providers.HttpProvider(process.env.ETHEREUM_NODE_URL ?? '');
 
 const networkId = Number(process.env.NETWORK_ID);
 if (Object.keys(ChainId).indexOf(networkId.toString()) === -1) {

@@ -9,6 +9,7 @@ import { ONE_ETH_WEI } from './constants';
 import { delay } from './delay';
 import Logger from './logger';
 import Pageable from './pageable';
+import { chunkArray } from './utils';
 
 export default class MarketStore {
   private marketMap: { [marketId: string]: ApiMarket };
@@ -26,16 +27,22 @@ export default class MarketStore {
     options?: ContractConstantCallOptions,
   ): Promise<{ [marketId: string]: MarketIndex }> {
     const marketIds = Object.keys(marketMap);
-    const indexCalls = marketIds.map(marketId => {
-      return {
-        target: dolomite.contracts.dolomiteMargin.options.address,
-        callData: dolomite.contracts.dolomiteMargin.methods.getMarketCurrentIndex(marketId)
-          .encodeABI(),
-      };
-    });
+    const indexCalls = chunkArray(
+      marketIds.map(marketId => {
+        return {
+          target: dolomite.contracts.dolomiteMargin.options.address,
+          callData: dolomite.contracts.dolomiteMargin.methods.getMarketCurrentIndex(marketId)
+            .encodeABI(),
+        };
+      }),
+      10,
+    );
 
-    // Even though the block number from the subgraph is certainly behind the RPC, we want the most updated chain data!
-    const { results: indexResults } = await dolomite.multiCall.aggregate(indexCalls, options);
+    const indexResults: string[] = [];
+    for (let i = 0; i < indexCalls.length; i++) {
+      const { results: chunkedResults } = await dolomite.multiCall.aggregate(indexCalls[i], options);
+      indexResults.push(...chunkedResults);
+    }
 
     return indexResults.reduce<{ [marketId: string]: MarketIndex }>((memo, rawIndexResult, i) => {
       const decodedResults = dolomite.web3.eth.abi.decodeParameters(['uint256', 'uint256', 'uint256'], rawIndexResult);

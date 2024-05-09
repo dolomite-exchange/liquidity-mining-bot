@@ -79,7 +79,6 @@ export interface ApiMarket {
   name: string
   tokenAddress: address
   decimals: number
-  oraclePrice: Integer
   marginPremium: Integer
   liquidationRewardPremium: Integer
 }
