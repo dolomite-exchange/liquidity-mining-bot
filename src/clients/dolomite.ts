@@ -3,6 +3,7 @@ import { BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
 import { DETONATION_WINDOW_SECONDS } from '../helpers/dolomite-helpers';
+import { isMarketIgnored } from '../helpers/market-helpers';
 import { dolomite } from '../helpers/web3';
 import {
   ApiAccount,
@@ -1206,7 +1207,11 @@ export async function getDolomiteMarkets(
     return Promise.reject(result.errors[0]);
   }
 
-  const marketPriceCalls = result.data.marketRiskInfos.map(market => {
+  const filteredMarketRiskInfos = result.data.marketRiskInfos.filter(market => {
+    return !isMarketIgnored(parseInt(market.token.marketId, 10));
+  });
+
+  const marketPriceCalls = filteredMarketRiskInfos.map(market => {
     return {
       target: dolomite.address,
       callData: dolomite.contracts.dolomiteMargin.methods.getMarketPrice(market.token.marketId).encodeABI(),
@@ -1216,7 +1221,7 @@ export async function getDolomiteMarkets(
   // Even though the block number from the subgraph is certainly behind the RPC, we want the most updated chain data!
   const { results: marketPriceResults } = await dolomite.multiCall.aggregate(marketPriceCalls);
 
-  const markets: Promise<ApiMarket>[] = result.data.marketRiskInfos.map(async (market, i) => {
+  const markets: Promise<ApiMarket>[] = filteredMarketRiskInfos.map(async (market, i) => {
     const oraclePrice = dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i]);
     const marketId = new BigNumber(market.token.marketId)
     const apiMarket: ApiMarket = {

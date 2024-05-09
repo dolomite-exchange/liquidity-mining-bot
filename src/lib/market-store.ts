@@ -1,6 +1,7 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { ContractConstantCallOptions } from '@dolomite-exchange/dolomite-margin/dist/src/types';
 import { getDolomiteMarkets } from '../clients/dolomite';
+import { isMarketIgnored } from '../helpers/market-helpers';
 import { dolomite } from '../helpers/web3';
 import { ApiMarket, MarketIndex } from './api-types';
 import BlockStore from './block-store';
@@ -10,11 +11,9 @@ import Logger from './logger';
 import Pageable from './pageable';
 
 export default class MarketStore {
-  private blockStore: BlockStore;
   private marketMap: { [marketId: string]: ApiMarket };
 
-  constructor(blockStore: BlockStore) {
-    this.blockStore = blockStore;
+  constructor(private readonly blockStore: BlockStore) {
     this.marketMap = {};
   }
 
@@ -101,6 +100,11 @@ export default class MarketStore {
     });
 
     this.marketMap = nextDolomiteMarkets.reduce<{ [marketId: string]: ApiMarket }>((memo, market) => {
+      if (isMarketIgnored(market.marketId)) {
+        // If any of the market IDs are ignored, then just return
+        return memo;
+      }
+
       memo[market.marketId.toString()] = market;
       return memo;
     }, {});

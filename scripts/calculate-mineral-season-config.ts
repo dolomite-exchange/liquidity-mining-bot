@@ -23,12 +23,12 @@ export async function calculateMineralSeasonConfig(
   if (Number.isNaN(epochNumber)) {
     maxKey = Object.keys(configFile.epochs).reduce((max, key) => {
       const value = parseInt(key, 10);
-      if (value >= MAX_MINERALS_KEY_BEFORE_MIGRATIONS) {
+      if (Number.isNaN(value) || value >= MAX_MINERALS_KEY_BEFORE_MIGRATIONS) {
         return max
       }
-      if (configFile.epochs[key].isTimeElapsed && configFile.epochs[key].isMerkleRootGenerated) {
+      if (configFile.epochs[value].isTimeElapsed && configFile.epochs[value].isMerkleRootGenerated) {
         // Only go higher if the epoch has past and the merkle root is generated
-        return Math.max(max, parseInt(key, 10));
+        return Math.max(max, value);
       } else {
         return max;
       }
@@ -39,20 +39,13 @@ export async function calculateMineralSeasonConfig(
     Logger.info({
       at: 'calculateMineralSeasonConfig',
       message: 'Skipping config update...',
-      epochNumber: maxKey,
+      maxFinalizedEpochNumber: maxKey,
     });
     return {
       epochNumber: maxKey,
       endTimestamp: configFile.epochs[maxKey].endTimestamp,
       isEpochElapsed: configFile.epochs[maxKey].isTimeElapsed,
     };
-  } else {
-    Logger.info({
-      at: 'calculateMineralSeasonConfig',
-      epochNumber: maxKey,
-      endTimestamp: configFile.epochs[maxKey].endTimestamp,
-      isEpochElapsed: configFile.epochs[maxKey].isTimeElapsed,
-    })
   }
 
   const oldEpoch = configFile.epochs[maxKey];
@@ -72,6 +65,13 @@ export async function calculateMineralSeasonConfig(
     marketIdToRewardMap: oldEpoch.marketIdToRewardMap,
   };
   await writeMineralConfigToGitHub(configFile, epochData);
+
+  Logger.info({
+    at: 'calculateMineralSeasonConfig',
+    epochNumber: epochData.epoch,
+    endTimestamp: epochData.endTimestamp,
+    isEpochElapsed: epochData.isTimeElapsed,
+  });
 
   return { epochNumber: epochData.epoch, endTimestamp: epochData.endTimestamp, isEpochElapsed: isTimeElapsed };
 }

@@ -72,8 +72,18 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     endBlockNumber,
     endTimestamp,
     isTimeElapsed,
+    isMerkleRootGenerated,
     marketIdToRewardMap
   } = liquidityMiningConfig.epochs[epoch];
+
+  if (isTimeElapsed && isMerkleRootGenerated && !isScript()) {
+    // If this epoch is finalized, and we're not in a script, return.
+    Logger.info({
+      at: 'calculateMineralRewards',
+      message: `Epoch ${epoch} has passed and merkle root was generated, skipping...`,
+    });
+    return;
+  }
 
   if (!Object.keys(marketIdToRewardMap).every(m => !Number.isNaN(parseInt(m)))) {
     return Promise.reject('Invalid market ID in map');
@@ -104,6 +114,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     blockRewardEnd: endBlockNumber,
     blockRewardEndTimestamp: endTimestamp,
     dolomiteMargin: libraryDolomiteMargin,
+    epochNumber: epoch,
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     isTimeElapsed,

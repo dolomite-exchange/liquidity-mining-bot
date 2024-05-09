@@ -12,10 +12,12 @@ import GasPriceUpdater from './lib/gas-price-updater';
 import {
   checkBigNumber,
   checkBooleanValue,
+  checkConditionally,
   checkDuration,
   checkEthereumAddress,
   checkExists,
   checkJsNumber,
+  checkMarketIdList,
   checkPrivateKey,
 } from './lib/invariants';
 import LevelUpdateRequestCache from './lib/level-update-request-cache';
@@ -39,6 +41,7 @@ checkBigNumber('GAS_PRICE_ADDITION');
 checkBigNumber('GAS_PRICE_MULTIPLIER');
 checkBigNumber('GAS_PRICE_POLL_INTERVAL_MS');
 checkBooleanValue('GAS_PRICE_UPDATER_ENABLED');
+checkConditionally(!!process.env.IGNORED_MARKETS, () => checkMarketIdList('IGNORED_MARKETS', 0));
 checkBigNumber('INITIAL_GAS_PRICE_WEI');
 checkBooleanValue('LEVEL_REQUESTS_ENABLED');
 checkDuration('LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS', 1, false);
@@ -105,6 +108,7 @@ async function start() {
     gasPricePollIntervalMillis: process.env.GAS_PRICE_POLL_INTERVAL_MS,
     gasPriceUpdaterEnabled: process.env.GAS_PRICE_UPDATER_ENABLED,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
+    ignoredMarketsList: process.env.IGNORED_MARKETS?.split(',').map(m => parseInt(m, 10)) ?? [],
     initialGasPriceWei: process.env.INITIAL_GAS_PRICE_WEI,
     levelRequestsEnabled: process.env.LEVEL_REQUESTS_ENABLED,
     levelRequestsKeyExpirationSeconds: process.env.LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS,

@@ -24,8 +24,24 @@ export function checkBooleanValue(key: string) {
   }
 }
 
+export function checkMarketIdList(key: string, minLength: number) {
+  const list = _checkList(key, minLength);
+
+  list.forEach((preference, i) => {
+    if (new BigNumber(preference.trim()).isNaN()) {
+      throw new Error(`${key} at index=${i} is invalid`);
+    }
+  });
+}
+
 export function checkBigNumber(key: string) {
   if (!process.env[key] || new BigNumber(process.env[key]!).isNaN()) {
+    throw new Error(`${key} is not provided or invalid`);
+  }
+}
+
+export function checkBigNumberAndGreaterThan(key: string, minValue: string) {
+  if (!process.env[key] || new BigNumber(process.env[key]!).isNaN() || new BigNumber(process.env[key]!).lte(minValue)) {
     throw new Error(`${key} is not provided or invalid`);
   }
 }
@@ -40,4 +56,26 @@ export function checkExists(key: string) {
   if (!process.env[key]) {
     throw new Error(`${key} is not provided`);
   }
+}
+
+export function checkConditionally(condition: boolean, checker: () => void) {
+  if (condition) {
+    checker();
+  }
+}
+
+// =================================================
+// =============== Private Functions ===============
+// =================================================
+
+function _checkList(key: string, minLength: number): string[] {
+  if (!process.env[key]) {
+    throw new Error(`${key} is not provided`);
+  }
+  const list = process.env[key]!.split(',');
+  if (list.length < minLength) {
+    throw new Error(`${key} length is less than ${minLength}`);
+  }
+
+  return list;
 }
