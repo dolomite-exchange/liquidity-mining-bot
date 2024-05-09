@@ -108,6 +108,7 @@ export async function writeFileToGitHub(
 export function writeOutputFile(
   fileName: string,
   fileContent: object,
+  space?: string | number,
 ): void {
   if (!fs.existsSync(`${__dirname}/../output`)) {
     fs.mkdirSync(`${__dirname}/../output`);
@@ -115,7 +116,7 @@ export function writeOutputFile(
 
   fs.writeFileSync(
     `${__dirname}/../output/${fileName}`,
-    JSON.stringify(fileContent),
+    JSON.stringify(fileContent, undefined, space),
     { encoding: 'utf8', flag: 'w' },
   );
 }

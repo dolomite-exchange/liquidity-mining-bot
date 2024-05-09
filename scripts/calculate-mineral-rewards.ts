@@ -3,7 +3,6 @@ import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
 import BlockStore from '../src/lib/block-store';
-import { ONE_ETH_WEI } from '../src/lib/constants';
 import { isScript, shouldForceUpload } from '../src/lib/env';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
@@ -13,9 +12,11 @@ import {
   EpochMetadata,
   getMineralConfigFileNameWithPath,
   getMineralFinalizedFileNameWithPath,
-  getMineralMetadataFileNameWithPath, MINERAL_SEASON,
+  getMineralMetadataFileNameWithPath,
+  MINERAL_SEASON,
   MineralConfigFile,
-  MineralOutputFile, UserMineralAllocationForFile,
+  MineralOutputFile,
+  UserMineralAllocationForFile,
   writeMineralConfigToGitHub,
 } from './lib/config-helper';
 import {
@@ -73,7 +74,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     endTimestamp,
     isTimeElapsed,
     isMerkleRootGenerated,
-    marketIdToRewardMap
+    marketIdToRewardMap,
   } = liquidityMiningConfig.epochs[epoch];
 
   if (isTimeElapsed && isMerkleRootGenerated && !isScript()) {
@@ -176,14 +177,18 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     endTimestamp,
   );
 
-  const { userToPointsMap, marketToPointsMap } = calculateFinalPoints(
+  const { userToPointsMap, marketToPointsMap }: {
+    userToPointsMap: Record<string, Integer>;
+    userToMarketToPointsMap: Record<string, Record<string, Integer>>;
+    marketToPointsMap: Record<string, Integer>;
+  } = calculateFinalPoints(
     networkId,
     accountToDolomiteBalanceMap,
     validRewardMultipliersMap,
     poolToVirtualLiquidityPositionsAndEvents,
     poolToTotalSubLiquidityPoints,
   );
-  const totalMinerals = Object.keys(marketToPointsMap).reduce((acc, market) => {
+  const totalMinerals: Integer = Object.keys(marketToPointsMap).reduce((acc, market) => {
     if (validRewardMultipliersMap[market]) {
       acc = acc.plus(marketToPointsMap[market])
     }
@@ -246,7 +251,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
       endTimestamp,
       startBlockNumber,
       endBlockNumber,
-      totalAmount: totalMinerals.times(ONE_ETH_WEI).toFixed(0),
+      totalAmount: totalMinerals.toFixed(0),
       totalUsers: Object.keys(userToMineralsDataMap).length,
       marketIds: validMarketIds,
     },
@@ -257,7 +262,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     Logger.info({
       message: 'Skipping file upload due to script execution',
     });
-    writeOutputFile(`mineral-season-${MINERAL_SEASON}-epoch-${epoch}-output.json`, mineralOutputFile);
+    writeOutputFile(`mineral-${networkId}-season-${MINERAL_SEASON}-epoch-${epoch}-output.json`, mineralOutputFile);
   }
 
   if ((!isScript() || shouldForceUpload()) && merkleRoot) {

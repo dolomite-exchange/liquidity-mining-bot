@@ -3,12 +3,12 @@ import { isScript } from '../src/lib/env';
 import Logger from '../src/lib/logger';
 import {
   getMineralConfigFileNameWithPath,
-  getNextConfigIfNeeded,
+  getNextConfigIfNeeded, MINERAL_SEASON,
   MineralConfigEpoch,
   MineralConfigFile,
   writeMineralConfigToGitHub,
 } from './lib/config-helper';
-import { readFileFromGitHub } from './lib/file-helpers';
+import { readFileFromGitHub, writeOutputFile } from './lib/file-helpers';
 
 export const MAX_MINERALS_KEY_BEFORE_MIGRATIONS = 900
 
@@ -64,7 +64,19 @@ export async function calculateMineralSeasonConfig(
     isMerkleRootWrittenOnChain: false,
     marketIdToRewardMap: oldEpoch.marketIdToRewardMap,
   };
-  await writeMineralConfigToGitHub(configFile, epochData);
+
+  if (!isScript()) {
+    await writeMineralConfigToGitHub(configFile, epochData);
+  } else {
+    const data = {
+      ...configFile,
+      epochs: {
+        ...configFile.epochs,
+        [epochData.epoch]: epochData
+      }
+    }
+    writeOutputFile(`mineral-season-${MINERAL_SEASON}-epoch-${epochData.epoch}-config.json`, data, 2);
+  }
 
   Logger.info({
     at: 'calculateMineralSeasonConfig',
