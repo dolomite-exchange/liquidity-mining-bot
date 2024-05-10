@@ -14,6 +14,10 @@ const NETWORK_TO_ENV_FILE_MAP: Record<ChainId, string> = {
 const ENV_FILENAME = process.env.ENV_FILENAME;
 const NETWORK = process.env.NETWORK_ID ?? '';
 
+if (!NETWORK && !ENV_FILENAME) {
+  throw new Error('No NETWORK_ID or ENV_FILENAME specified!');
+}
+
 if (ENV_FILENAME || (NETWORK_TO_ENV_FILE_MAP[NETWORK] && fs.existsSync(NETWORK_TO_ENV_FILE_MAP[NETWORK]))) {
   // eslint-disable-next-line
   require('dotenv').config({ path: [ENV_FILENAME ?? NETWORK_TO_ENV_FILE_MAP[NETWORK], '.env'] });

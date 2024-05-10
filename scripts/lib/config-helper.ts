@@ -93,7 +93,7 @@ interface NextConfig {
 
 const ONE_WEEK_SECONDS = 86_400 * 7;
 
-export async function getNextConfigIfNeeded(oldEpoch: EpochConfig): Promise<NextConfig> {
+export async function getNextConfigIfNeeded<T extends EpochConfig>(oldEpoch: T): Promise<NextConfig> {
   const isReadyForNext = oldEpoch.isTimeElapsed && oldEpoch.isMerkleRootGenerated;
   const newStartBlockNumber = isReadyForNext ? oldEpoch.endBlockNumber : oldEpoch.startBlockNumber;
   const newStartTimestamp = isReadyForNext ? oldEpoch.endTimestamp : oldEpoch.startTimestamp;
@@ -107,6 +107,7 @@ export async function getNextConfigIfNeeded(oldEpoch: EpochConfig): Promise<Next
     newEndTimestamp,
     actualEndBlockNumber: newEndBlockNumberResult.blockNumber,
     actualEndTimestamp: newEndBlockNumberResult.timestamp,
+
   };
 }
 

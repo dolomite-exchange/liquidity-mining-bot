@@ -62,7 +62,7 @@ export async function calculateMineralSeasonConfig(
     isTimeElapsed,
     isMerkleRootGenerated: false,
     isMerkleRootWrittenOnChain: false,
-    marketIdToRewardMap: oldEpoch.marketIdToRewardMap,
+    marketIdToRewardMap: (configFile.epochs[maxKey + 1] ?? oldEpoch).marketIdToRewardMap,
   };
 
   if (!isScript()) {

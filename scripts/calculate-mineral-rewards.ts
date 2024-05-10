@@ -119,8 +119,8 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     isTimeElapsed,
-    networkId,
     marketIds: Object.keys(marketIdToRewardMap),
+    networkId,
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
 
