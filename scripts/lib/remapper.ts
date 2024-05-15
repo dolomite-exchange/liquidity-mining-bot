@@ -30,7 +30,7 @@ export async function setupRemapping(chainId: ChainId, endBlockNumber: number): 
   const filePath = `config/${chainId}/external-remapping.json`;
   const remapping = await readFileFromGitHub<RemappingConfig>(filePath);
   if (remapping.lastUpdatedAtBlockNumber < endBlockNumber) {
-    Logger.error({
+    Logger.info({
       at: '#setupRemapping',
       message: 'Updating the remapping file...',
     });
@@ -56,6 +56,10 @@ export async function setupRemapping(chainId: ChainId, endBlockNumber: number): 
       console.log('Writing external remapping to file:', fileName);
       writeOutputFile(fileName, remapping);
     } else {
+      Logger.info({
+        at: '#setupRemapping',
+        message: 'Finished updating the remapping file. Uploading...',
+      });
       await writeFileToGitHub(filePath, remapping, false);
     }
   }
