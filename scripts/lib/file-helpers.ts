@@ -110,12 +110,13 @@ export function writeOutputFile(
   fileContent: object,
   space?: string | number,
 ): void {
-  if (!fs.existsSync(`${__dirname}/../output`)) {
-    fs.mkdirSync(`${__dirname}/../output`);
+  const directory = `${process.cwd()}/scripts/output`;
+  if (!fs.existsSync(directory)) {
+    fs.mkdirSync(directory);
   }
 
   fs.writeFileSync(
-    `${__dirname}/../output/${fileName}`,
+    `${directory}/${fileName}`,
     JSON.stringify(fileContent, undefined, space),
     { encoding: 'utf8', flag: 'w' },
   );

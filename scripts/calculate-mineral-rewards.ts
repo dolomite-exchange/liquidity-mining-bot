@@ -26,6 +26,7 @@ import {
   getBalanceChangingEvents,
 } from './lib/event-parser';
 import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
+import { setupRemapping } from './lib/remapper';
 import {
   ARB_VESTER_PROXY,
   BLACKLIST_ADDRESSES,
@@ -136,6 +137,8 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     const result = await getAllDolomiteAccountsWithSupplyValue(startMarketIndexMap, startBlockNumber, lastId);
     return result.accounts;
   });
+
+  await setupRemapping(networkId, endBlockNumber);
 
   const accountToDolomiteBalanceMap = getAccountBalancesByMarket(
     apiAccounts,

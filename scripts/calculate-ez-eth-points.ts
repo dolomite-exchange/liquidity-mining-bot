@@ -12,6 +12,7 @@ import TokenAbi from './abis/isolation-mode-factory.json';
 import '../src/lib/env'
 import { getAccountBalancesByMarket, getBalanceChangingEvents } from './lib/event-parser';
 import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
+import { setupRemapping } from './lib/remapper';
 import { calculateFinalPoints, InterestOperation, processEventsUntilEndTimestamp } from './lib/rewards';
 
 /* eslint-enable */
@@ -102,6 +103,8 @@ export async function calculateEzEthPoints(appendResults: boolean) {
     return result.accounts;
   });
 
+  await setupRemapping(networkId, endBlockNumber);
+
   const accountToDolomiteBalanceMap = getAccountBalancesByMarket(
     apiAccounts,
     startTimestamp,
@@ -152,7 +155,7 @@ export async function calculateEzEthPoints(appendResults: boolean) {
   } else {
     const fileName = `${__dirname}/output/ez-points.json`;
     console.log('Writing ez points to file', fileName);
-    writeOutputFile(fileName, dataToWrite)
+    writeOutputFile(fileName, dataToWrite);
   }
 
   return true;

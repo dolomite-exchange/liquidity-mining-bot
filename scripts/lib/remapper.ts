@@ -1,20 +1,65 @@
+import axios from 'axios';
 import { ChainId } from '../../src/lib/chain-id';
+import { isScript } from '../../src/lib/env';
+import Logger from '../../src/lib/logger';
+import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './file-helpers';
 
-const PERFECT_SWAP_MULTISIG = '0x986aFdBd5FD682655361FE0d08b7C9a2d28caDe9'.toLowerCase();
+type ProxyUser = string;
+type EffectiveUser = string;
 
-const ACCOUNT_MAP: Record<ChainId, Record<string, string | undefined>> = {
-  [ChainId.ArbitrumOne]: {
-    ['0xc21e703B4077DB4f11b1D9FA2694Bb5Fc03ab480'.toLowerCase()]: PERFECT_SWAP_MULTISIG, // ARB vault
-    ['0x4165427a868C0136a98A1e818287B648b33d6a88'.toLowerCase()]: PERFECT_SWAP_MULTISIG, // ETH vault
-    ['0x81e4143527aaE64E6B55806D89A132D233A46AC4'.toLowerCase()]: PERFECT_SWAP_MULTISIG, // USDC vault
-    ['0xaAe6C4F82185810C7ACC36C0Fe9c2B5D07FeE188'.toLowerCase()]: PERFECT_SWAP_MULTISIG, // WBTC vault
-  },
-  [ChainId.Base]: {},
-  [ChainId.Mantle]: {},
-  [ChainId.PolygonZkEvm]: {},
-  [ChainId.XLayer]: {},
+export interface RemappingConfig {
+  proxyUsers: Record<ProxyUser, EffectiveUser | undefined>
+  lastUpdatedAtBlockNumber: number;
 }
 
+interface ContangoData {
+  owner: string;
+  proxy: string;
+}
+
+const ACCOUNT_MAP: Record<number, Record<string, string | undefined>> = {}
+
 export function remapAccountToClaimableAccount(chainId: ChainId, account: string): string {
+  if (!ACCOUNT_MAP[chainId]) {
+    throw new Error(`Account remapping is not setup for ${chainId}`);
+  }
   return ACCOUNT_MAP[chainId][account] ?? account;
+}
+
+export async function setupRemapping(chainId: ChainId, endBlockNumber: number): Promise<void> {
+  const filePath = `config/${chainId}/external-remapping.json`;
+  const remapping = await readFileFromGitHub<RemappingConfig>(filePath);
+  console.log('remapping', remapping);
+  if (remapping.lastUpdatedAtBlockNumber < endBlockNumber) {
+    Logger.error({
+      at: '#setupRemapping',
+      message: 'Updating the remapping file...',
+    });
+    remapping.lastUpdatedAtBlockNumber = endBlockNumber;
+
+    if (chainId === ChainId.ArbitrumOne) {
+      try {
+        const response = await axios.get<ContangoData[]>(`https://points.contango.xyz:6060/dolomite?block=${endBlockNumber}`);
+        response.data.forEach(({ owner, proxy }) => {
+          remapping.proxyUsers[proxy.toLowerCase()] = owner.toLowerCase();
+        });
+      } catch (e) {
+        Logger.error({
+          at: '#setupRemapping',
+          message: 'Could not get Contango remapping',
+          error: e,
+        });
+      }
+    }
+
+    if (isScript()) {
+      const fileName = 'external-remapping.json';
+      console.log('Writing external remapping to file:', fileName);
+      writeOutputFile(fileName, remapping);
+    } else {
+      await writeFileToGitHub(filePath, remapping, false);
+    }
+  }
+
+  ACCOUNT_MAP[chainId] = remapping.proxyUsers;
 }

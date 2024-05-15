@@ -17,6 +17,7 @@ import {
   getBalanceChangingEvents,
 } from './lib/event-parser';
 import { readFileFromGitHub } from './lib/file-helpers';
+import { setupRemapping } from './lib/remapper';
 import {
   ARB_VESTER_PROXY,
   calculateFinalPoints,
@@ -109,6 +110,8 @@ async function start() {
     const result = await getAllDolomiteAccountsWithSupplyValue(startMarketIndexMap, startBlockNumber, lastId);
     return result.accounts;
   });
+
+  await setupRemapping(networkId, endBlockNumber);
 
   const accountToDolomiteBalanceMap = getAccountBalancesByMarket(
     apiAccounts,
