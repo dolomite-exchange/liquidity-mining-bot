@@ -29,7 +29,6 @@ export function remapAccountToClaimableAccount(chainId: ChainId, account: string
 export async function setupRemapping(chainId: ChainId, endBlockNumber: number): Promise<void> {
   const filePath = `config/${chainId}/external-remapping.json`;
   const remapping = await readFileFromGitHub<RemappingConfig>(filePath);
-  console.log('remapping', remapping);
   if (remapping.lastUpdatedAtBlockNumber < endBlockNumber) {
     Logger.error({
       at: '#setupRemapping',
