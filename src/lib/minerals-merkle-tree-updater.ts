@@ -89,7 +89,7 @@ export default class MineralsMerkleTreeUpdater {
             distributor.methods.handlerSetMerkleRoot(configForEpoch.epoch, merkleRoot),
             {
               gasPrice: getGasPriceWei().toFixed(),
-              confirmationType: ConfirmationType.Confirmed,
+              confirmationType: ConfirmationType.Hash,
             }
           );
           Logger.info({
