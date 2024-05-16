@@ -23,6 +23,7 @@ import {
 import LevelUpdateRequestCache from './lib/level-update-request-cache';
 import LevelUpdateRequestStore from './lib/level-update-request-store';
 import Logger from './lib/logger';
+import MineralsMerkleTreeUpdater from './lib/minerals-merkle-tree-updater';
 import MineralsUpdater from './lib/minerals-updater';
 import VestingPositionCache from './lib/vesting-position-cache';
 import VestingPositionStore from './lib/vesting-position-store';
@@ -77,6 +78,7 @@ async function start() {
   const networkId = await dolomite.web3.eth.net.getId();
   const ezPointsUpdater = new EzPointsUpdater();
   const mineralsUpdater = new MineralsUpdater();
+  const mineralsMerkleTreeUpdater = new MineralsMerkleTreeUpdater(networkId);
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address
   if (riskParams.dolomiteMargin !== libraryDolomiteMargin) {
@@ -138,6 +140,7 @@ async function start() {
   }
   if (process.env.MINERALS_ENABLED === 'true') {
     mineralsUpdater.start();
+    mineralsMerkleTreeUpdater.start();
   }
   return true
 }
