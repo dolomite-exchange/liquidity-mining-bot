@@ -1,5 +1,5 @@
 import '../../src/lib/env';
-import { getLatestBlockNumberByTimestamp } from '../../src/clients/blocks';
+import { getBlockDataByBlockNumber, getLatestBlockDataByTimestamp } from '../../src/clients/blocks';
 import { writeFileToGitHub } from './file-helpers';
 
 export interface UserMineralAllocationForFile {
@@ -89,6 +89,10 @@ interface NextConfig {
    * The latest seen block timestamp. Not necessarily be ONE WEEK after the start timestamp
    */
   actualEndTimestamp: number;
+  /**
+   * True if the week is over and the next block occurs in the next week
+   */
+  isTimeElapsed: boolean;
 }
 
 const ONE_WEEK_SECONDS = 86_400 * 7;
@@ -98,7 +102,13 @@ export async function getNextConfigIfNeeded<T extends EpochConfig>(oldEpoch: T):
   const newStartBlockNumber = isReadyForNext ? oldEpoch.endBlockNumber : oldEpoch.startBlockNumber;
   const newStartTimestamp = isReadyForNext ? oldEpoch.endTimestamp : oldEpoch.startTimestamp;
   const newEndTimestamp = newStartTimestamp + ONE_WEEK_SECONDS;
-  const newEndBlockNumberResult = await getLatestBlockNumberByTimestamp(newEndTimestamp);
+  const newEndBlockNumberResult = await getLatestBlockDataByTimestamp(newEndTimestamp);
+
+  // We need to check if `newEndBlockNumberResult` is the last block of the week
+  const nextBlockData = await getBlockDataByBlockNumber(newEndBlockNumberResult.blockNumber + 1)
+
+  // The week is over if the block is at the end OR if the next block goes into next week
+  const isTimeElapsed = newEndTimestamp === newEndBlockNumberResult.timestamp || nextBlockData.timestamp > newEndTimestamp;
 
   return {
     isReadyForNext,
@@ -107,7 +117,7 @@ export async function getNextConfigIfNeeded<T extends EpochConfig>(oldEpoch: T):
     newEndTimestamp,
     actualEndBlockNumber: newEndBlockNumberResult.blockNumber,
     actualEndTimestamp: newEndBlockNumberResult.timestamp,
-
+    isTimeElapsed,
   };
 }
 

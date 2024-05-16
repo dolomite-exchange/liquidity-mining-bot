@@ -17,24 +17,44 @@ interface LatestBlockNumberAndTimestamp {
   timestamp: number;
 }
 
-export async function getLatestBlockNumberByTimestamp(
+export async function getLatestBlockDataByTimestamp(
   timestamp: number,
 ): Promise<LatestBlockNumberAndTimestamp> {
   const query = `
-  query getLatestBlockNumberByTimestamp($timestamp: BigInt) {
+  query getLatestBlockDataByTimestamp($timestamp: BigInt) {
     blocks(first: 1, orderBy: number orderDirection: desc where: { timestamp_lte: $timestamp }) {
       timestamp
       number
     }
   }
   `;
+  return getBlockDataFromQuery(query, { timestamp });
+}
+
+export async function getBlockDataByBlockNumber(
+  blockNumber: number,
+): Promise<LatestBlockNumberAndTimestamp> {
+  const query = `
+  query getBlockDataByBlockNumber($blockNumber: BigInt) {
+    blocks(first: 1 where: { number: $blockNumber }) {
+      timestamp
+      number
+    }
+  }
+  `;
+
+  return getBlockDataFromQuery(query, { blockNumber });
+}
+
+async function getBlockDataFromQuery(
+  query: string,
+  variables: Record<string, any>,
+): Promise<LatestBlockNumberAndTimestamp> {
   const result: any = await axios.post(
     subgraphUrl,
     {
       query,
-      variables: {
-        timestamp,
-      },
+      variables,
     },
     defaultAxiosConfig,
   )

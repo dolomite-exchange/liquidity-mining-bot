@@ -3,7 +3,8 @@ import { isScript } from '../src/lib/env';
 import Logger from '../src/lib/logger';
 import {
   getMineralConfigFileNameWithPath,
-  getNextConfigIfNeeded, MINERAL_SEASON,
+  getNextConfigIfNeeded,
+  MINERAL_SEASON,
   MineralConfigEpoch,
   MineralConfigFile,
   writeMineralConfigToGitHub,
@@ -51,15 +52,13 @@ export async function calculateMineralSeasonConfig(
   const oldEpoch = configFile.epochs[maxKey];
   const nextEpochData = await getNextConfigIfNeeded(oldEpoch);
 
-  const isTimeElapsed = nextEpochData.newEndTimestamp === nextEpochData.actualEndTimestamp;
-
   const epochData: MineralConfigEpoch = {
     epoch: nextEpochData.isReadyForNext ? maxKey + 1 : maxKey,
     startBlockNumber: nextEpochData.newStartBlockNumber,
     startTimestamp: nextEpochData.newStartTimestamp,
     endBlockNumber: nextEpochData.actualEndBlockNumber,
     endTimestamp: nextEpochData.actualEndTimestamp,
-    isTimeElapsed,
+    isTimeElapsed: nextEpochData.isTimeElapsed,
     isMerkleRootGenerated: false,
     isMerkleRootWrittenOnChain: false,
     marketIdToRewardMap: (configFile.epochs[maxKey + 1] ?? oldEpoch).marketIdToRewardMap,
@@ -72,8 +71,8 @@ export async function calculateMineralSeasonConfig(
       ...configFile,
       epochs: {
         ...configFile.epochs,
-        [epochData.epoch]: epochData
-      }
+        [epochData.epoch]: epochData,
+      },
     }
     writeOutputFile(`mineral-season-${MINERAL_SEASON}-epoch-${epochData.epoch}-config.json`, data, 2);
   }
@@ -85,7 +84,11 @@ export async function calculateMineralSeasonConfig(
     isEpochElapsed: epochData.isTimeElapsed,
   });
 
-  return { epochNumber: epochData.epoch, endTimestamp: epochData.endTimestamp, isEpochElapsed: isTimeElapsed };
+  return {
+    epochNumber: epochData.epoch,
+    endTimestamp: epochData.endTimestamp,
+    isEpochElapsed: epochData.isTimeElapsed,
+  };
 }
 
 if (isScript()) {

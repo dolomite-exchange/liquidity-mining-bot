@@ -1,7 +1,7 @@
 import { BigNumber, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import fs from 'fs';
 import v8 from 'v8';
-import { getLatestBlockNumberByTimestamp } from '../src/clients/blocks';
+import { getLatestBlockDataByTimestamp } from '../src/clients/blocks';
 import { getAllDolomiteAccountsWithToken } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
 import { MarketIndex } from '../src/lib/api-types';
@@ -65,7 +65,7 @@ export async function calculateEzEthPoints(appendResults: boolean) {
   const {
     blockNumber: endBlockNumber,
     timestamp: endTimestamp,
-  } = await getLatestBlockNumberByTimestamp(rawEndTimestamp);
+  } = await getLatestBlockDataByTimestamp(rawEndTimestamp);
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address;
   if (networkId !== Number(process.env.NETWORK_ID)) {

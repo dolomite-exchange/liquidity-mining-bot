@@ -61,7 +61,7 @@ async function calculateOTokenSeasonConfig(
     startTimestamp: nextEpochData.newStartTimestamp,
     endBlockNumber: nextEpochData.actualEndBlockNumber,
     endTimestamp: nextEpochData.actualEndTimestamp,
-    isTimeElapsed: nextEpochData.newEndTimestamp === nextEpochData.actualEndTimestamp,
+    isTimeElapsed: nextEpochData.isTimeElapsed,
     oTokenAmount: oldEpoch.oTokenAmount,
     rewardWeights: oldEpoch.rewardWeights,
     isMerkleRootGenerated: false,
