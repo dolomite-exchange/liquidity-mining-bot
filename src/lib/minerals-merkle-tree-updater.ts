@@ -103,7 +103,6 @@ export default class MineralsMerkleTreeUpdater {
       }
     }
 
-
     Logger.info({
       at: 'MineralsMerkleTreeUpdater#_update',
       message: `Finished checking for merkle tree root updates`,
