@@ -325,15 +325,10 @@
     enabled "2.0.x"
     kuler "^2.0.0"
 
-"@dolomite-exchange/dolomite-margin-modules@^0.0.13":
-  version "0.0.13"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/dolomite-margin-modules/-/dolomite-margin-modules-0.0.13.tgz#83fa027a250208d2ca4276f9a52c826baffa8d53"
-  integrity sha512-kZg7vvQRdJ8Z1B2LmTyFMYp6gqRYyqzcGNzCecdHyXo+fNIygO0K5jta/r8o1Hn4c+DTwDtvRSsuMKAQgRZh9Q==
-
-"@dolomite-exchange/dolomite-margin@^0.12.2":
-  version "0.12.2"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/dolomite-margin/-/dolomite-margin-0.12.2.tgz#92cba633cb0d0ca5bf37d1d91ee455d686f412ba"
-  integrity sha512-V5ej0eK19SNwdknHhp0EWIoKi/gDqu/wRcDjaDjC4Qd3rcc7PipK+XxZ8UjNqSCCTjVNvj/aISNMLVqlDfeZWA==
+"@dolomite-exchange/dolomite-margin@^0.12.3":
+  version "0.12.3"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/dolomite-margin/-/dolomite-margin-0.12.3.tgz#9c51c2aca1419ed9cf33a9a4c2227bc04b98ec34"
+  integrity sha512-pUlzdE+SGePVPV9CeAAGNrT9vkMDTy/u0NAw5etbWXCe5WW8lFdJ6EdDIxxtxghbotVe628iyeWiE/yeQuuN9w==
   dependencies:
     "@openzeppelin/contracts" "^2.5.1"
     "@poanet/solidity-flattener" "^3.0.9"
@@ -348,17 +343,17 @@
     query-string "^6.9.0"
     web3 "1.2.1"
 
-"@dolomite-exchange/modules-deployments@^0.0.15":
-  version "0.0.15"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/modules-deployments/-/modules-deployments-0.0.15.tgz#1987b1d3b5b78565af6f6f79d261a950a595b72f"
-  integrity sha512-5bFLIZtcxkUzQSV2oG1eaa6TuRKmRX8pDpBv0/nmaCuR00l5B+2B+CrpotBL7FmrzYkTPPa8+YKvBfbY8S3jyw==
+"@dolomite-exchange/modules-deployments@^0.0.17":
+  version "0.0.17"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/modules-deployments/-/modules-deployments-0.0.17.tgz#cfb910b733794ce716ccdac62c478af59427a367"
+  integrity sha512-6iNKuEHZBysPRuJbtTZTVpDN+Q5fGxOsDMsG5mqo8U0rluoql0piGQk7f7QktVPnnKmbtLzRYvzja+F82HoYQA==
 
-"@dolomite-exchange/zap-sdk@^0.3.2":
-  version "0.3.2"
-  resolved "https://registry.yarnpkg.com/@dolomite-exchange/zap-sdk/-/zap-sdk-0.3.2.tgz#0ce605920d36e1a71b190789ac84e1dc8b47e990"
-  integrity sha512-5Ve4gqZKPhaRng3TcRsF2cPLAU1f0mvarztwvKtRHq6T/ua7eUYOgz8c5Tknwo9l1Mrke5Tf3rQDbZojtIcigw==
+"@dolomite-exchange/zap-sdk@^0.3.6":
+  version "0.3.6"
+  resolved "https://registry.yarnpkg.com/@dolomite-exchange/zap-sdk/-/zap-sdk-0.3.6.tgz#ecdd3959d7cc47a0a51e463928ec2a5d5c307ed1"
+  integrity sha512-6aM946yfVj9Z5vrSrpthJ5FSMMwpgDiF4KN00WMqa/h+ATOkg8HoRHSk4QQ7tMMx7LvKnQy9fkFg5vD6i69ovw==
   dependencies:
-    "@dolomite-exchange/modules-deployments" "^0.0.15"
+    "@dolomite-exchange/modules-deployments" "^0.0.17"
     axios "^1.6.2"
     bignumber.js "^9.1.1"
     dotenv-flow "^0.4.0"

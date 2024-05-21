@@ -1,5 +1,5 @@
 /* eslint-disable import/no-extraneous-dependencies */
-import Deploments from '@dolomite-exchange/dolomite-margin-modules/scripts/deployments.json';
+import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import { TxResult } from '@dolomite-exchange/dolomite-margin/dist/src/types';
 import axios from 'axios';
 import { DateTime } from 'luxon';
@@ -42,7 +42,7 @@ export async function detonateAccount(
 
   const detonationContract = new dolomite.web3.eth.Contract(
     VesterExploderAbi,
-    Deploments.VesterExploder[network].address,
+    ModuleDeployments.VesterExploder[network].address,
   );
   return dolomite.contracts.callContractFunction(
     detonationContract.methods.explodePosition(position.id),
@@ -68,7 +68,7 @@ export async function fulfillLevelUpdateRequest(
 
   const vesterContract = new dolomite.web3.eth.Contract(
     VesterProxyAbi,
-    Deploments.VesterProxy[network].address,
+    ModuleDeployments.VesterProxy[network].address,
   );
   return dolomite.contracts.callContractFunction(
     vesterContract.methods.handlerUpdateLevel(request.requestId.toFixed(), request.effectiveUser, level),
