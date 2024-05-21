@@ -108,7 +108,8 @@ export async function getNextConfigIfNeeded<T extends EpochConfig>(oldEpoch: T):
   const nextBlockData = await getBlockDataByBlockNumber(newEndBlockNumberResult.blockNumber + 1)
 
   // The week is over if the block is at the end OR if the next block goes into next week
-  const isTimeElapsed = newEndTimestamp === newEndBlockNumberResult.timestamp || nextBlockData.timestamp > newEndTimestamp;
+  const isTimeElapsed = newEndTimestamp === newEndBlockNumberResult.timestamp
+    || (!!nextBlockData && nextBlockData.timestamp > newEndTimestamp);
 
   return {
     isReadyForNext,

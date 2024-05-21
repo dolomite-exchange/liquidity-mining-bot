@@ -28,12 +28,12 @@ export async function getLatestBlockDataByTimestamp(
     }
   }
   `;
-  return getBlockDataFromQuery(query, { timestamp });
+  return (await getBlockDataFromQuery(query, { timestamp }))!;
 }
 
 export async function getBlockDataByBlockNumber(
   blockNumber: number,
-): Promise<LatestBlockNumberAndTimestamp> {
+): Promise<LatestBlockNumberAndTimestamp | undefined> {
   const query = `
   query getBlockDataByBlockNumber($blockNumber: BigInt) {
     blocks(first: 1 where: { number: $blockNumber }) {
@@ -49,7 +49,7 @@ export async function getBlockDataByBlockNumber(
 async function getBlockDataFromQuery(
   query: string,
   variables: Record<string, any>,
-): Promise<LatestBlockNumberAndTimestamp> {
+): Promise<LatestBlockNumberAndTimestamp | undefined> {
   const result: any = await axios.post(
     subgraphUrl,
     {
@@ -65,7 +65,7 @@ async function getBlockDataFromQuery(
     return Promise.reject(result.errors[0]);
   }
   if (result.data.blocks.length === 0) {
-    return Promise.reject(new Error('No blocks found'));
+    return undefined;
   }
 
   return {
