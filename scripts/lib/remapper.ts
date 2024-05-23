@@ -43,6 +43,7 @@ export async function setupRemapping(chainId: ChainId, endBlockNumber: number): 
           remapping.proxyUsers[proxy.toLowerCase()] = owner.toLowerCase();
         });
       } catch (e) {
+        // Swallow the error. We don't want to Contango to halt processing
         Logger.error({
           at: '#setupRemapping',
           message: 'Could not get Contango remapping',

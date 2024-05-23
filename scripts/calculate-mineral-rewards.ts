@@ -273,12 +273,6 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     await writeMineralConfigToGitHub(liquidityMiningConfig, liquidityMiningConfig.epochs[epoch]);
   }
 
-  if (!isScript() && merkleRoot) {
-    // TODO: write merkle root to chain
-    // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds
-    //  for an update)
-  }
-
   const metadataFilePath = getMineralMetadataFileNameWithPath(networkId);
   const metadata = await readFileFromGitHub<EpochMetadata>(metadataFilePath);
 
