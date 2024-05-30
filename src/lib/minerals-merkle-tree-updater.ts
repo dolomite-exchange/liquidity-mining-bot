@@ -48,10 +48,18 @@ export default class MineralsMerkleTreeUpdater {
   };
 
   _update = async () => {
-    Logger.info({
-      at: 'MineralsMerkleTreeUpdater#_update',
-      message: 'Starting update...',
-    });
+    if (this.networkId === 5000) {
+      Logger.info({
+        at: 'MineralsMerkleTreeUpdater#_update',
+        message: 'Skipping update for Mantle until boost is checked...',
+      });
+      return;
+    } else {
+      Logger.info({
+        at: 'MineralsMerkleTreeUpdater#_update',
+        message: 'Starting update...',
+      });
+    }
 
     const mineralConfigFile = await readFileFromGitHub<MineralConfigFile>(getMineralConfigFileNameWithPath(this.networkId));
     const epochs = Object.keys(mineralConfigFile.epochs);

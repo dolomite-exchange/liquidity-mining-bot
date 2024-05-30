@@ -61,6 +61,7 @@ export async function calculateMineralSeasonConfig(
     isTimeElapsed: nextEpochData.isTimeElapsed,
     isMerkleRootGenerated: false,
     isMerkleRootWrittenOnChain: false,
+    boostedMultiplier: (configFile.epochs[maxKey + 1] ?? oldEpoch).boostedMultiplier,
     marketIdToRewardMap: (configFile.epochs[maxKey + 1] ?? oldEpoch).marketIdToRewardMap,
   };
 

@@ -76,6 +76,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     isTimeElapsed,
     isMerkleRootGenerated,
     marketIdToRewardMap,
+    boostedMultiplier,
   } = liquidityMiningConfig.epochs[epoch];
 
   if (isTimeElapsed && isMerkleRootGenerated && !isScript()) {
@@ -198,7 +199,13 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     return acc;
   }, INTEGERS.ZERO);
 
-  const userToMineralsDataMap = await calculateFinalMinerals(userToPointsMap, networkId, epoch, isTimeElapsed);
+  const userToMineralsDataMap = await calculateFinalMinerals(
+    userToPointsMap,
+    networkId,
+    epoch,
+    isTimeElapsed,
+    boostedMultiplier,
+  );
 
   let merkleRoot: string | null;
   let userToMineralsMapForFile: Record<string, UserMineralAllocationForFile>;
@@ -254,6 +261,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
       endTimestamp,
       startBlockNumber,
       endBlockNumber,
+      boostedMultiplier,
       totalAmount: totalMinerals.toFixed(0),
       totalUsers: Object.keys(userToMineralsDataMap).length,
       marketIds: validMarketIds,
@@ -290,11 +298,12 @@ async function calculateFinalMinerals(
   networkId: number,
   epoch: number,
   isTimeElapsed: boolean,
+  boostedMultiplier: string | undefined | null,
 ): Promise<Record<string, UserMineralAllocation>> {
   if (epoch === 0) {
     return Object.keys(userToPointsMap).reduce((memo, user) => {
       memo[user] = {
-        amount: userToPointsMap[user],
+        amount: userToPointsMap[user].times(boostedMultiplier ?? '1'),
         multiplier: INTEGERS.ONE,
       };
       return memo;
@@ -304,10 +313,11 @@ async function calculateFinalMinerals(
   const previousMinerals = await readFileFromGitHub<MineralOutputFile>(
     getMineralFinalizedFileNameWithPath(networkId, epoch - 1),
   );
+  const previousBoost = previousMinerals.metadata.boostedMultiplier ?? '1';
   return Object.keys(userToPointsMap).reduce((memo, user) => {
     const userCurrent = userToPointsMap[user];
     const userPrevious = new BigNumber(previousMinerals.users[user]?.amount ?? '0');
-    const userPreviousMultiplier = new BigNumber(previousMinerals.users[user]?.multiplier ?? '1');
+    const userPreviousMultiplier = new BigNumber(previousMinerals.users[user]?.multiplier ?? '1').times(previousBoost);
     const userPreviousNormalized = userPrevious.dividedToIntegerBy(userPreviousMultiplier);
     let newMultiplier = INTEGERS.ONE;
     if (isTimeElapsed && userCurrent.gt(userPreviousNormalized) && userPreviousNormalized.gt(INTEGERS.ZERO)) {
@@ -316,9 +326,10 @@ async function calculateFinalMinerals(
         newMultiplier = MAX_MULTIPLIER
       }
     }
+    const multiplierWithBoost = newMultiplier.times(boostedMultiplier ?? '1');
 
     memo[user] = {
-      amount: userCurrent.times(newMultiplier),
+      amount: userCurrent.times(multiplierWithBoost),
       multiplier: newMultiplier,
     };
     return memo;

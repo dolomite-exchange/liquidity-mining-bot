@@ -23,6 +23,7 @@ export interface MineralOutputFile {
     endBlockNumber: number;
     startTimestamp: number;
     endTimestamp: number;
+    boostedMultiplier: string | null | undefined;
   };
 }
 
@@ -30,6 +31,7 @@ export interface MineralConfigEpoch extends EpochConfig {
   marketIdToRewardMap: {
     [marketId: string]: string;
   };
+  boostedMultiplier: string | undefined | null;
 }
 
 export interface MineralConfigFile extends ConfigFile<MineralConfigEpoch> {

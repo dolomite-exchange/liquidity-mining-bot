@@ -1,53 +1,22 @@
-import { BigNumber, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import '../src/lib/env'
-import { MineralOutputFile, UserMineralAllocationForFile } from './lib/config-helper';
-import { writeOutputFile } from './lib/file-helpers';
-import { calculateMerkleRootAndProofs } from './lib/rewards';
+import { getMineralFinalizedFileNameWithPath, MineralOutputFile } from './lib/config-helper';
+import { readFileFromGitHub, writeOutputFile } from './lib/file-helpers';
 
 const DELTA_NUMBER = '9999';
 
-function toInteger(amount: BigNumber): BigNumber {
-  return amount.times(INTEGERS.INTEREST_RATE_BASE);
-}
-
 async function start() {
-  const walletToDeltasMap: Record<string, BigNumber> = {
-    ['0x9aebea73d2af4cd33557f491545d8be97874021e'.toLowerCase()]: toInteger(new BigNumber(5000)),
-    ['0x0000000000000000000000000000000000000000'.toLowerCase()]: INTEGERS.ZERO,
-    ['0x0000000000000000000000000000000000000001'.toLowerCase()]: INTEGERS.ZERO,
-    // ['0x28c08da0fd81815a216ca1b57d10b9326b2d4fa3'.toLowerCase()]: toInteger(new BigNumber(5000)),
-  };
-  const totalAmount = Object.keys(walletToDeltasMap).reduce((acc, key) => {
-    return acc.plus(walletToDeltasMap[key])
-  }, INTEGERS.ZERO);
+  const networkId = parseInt(process.env.NETWORK_ID ?? '', 10);
+  const outputFile = await readFileFromGitHub<MineralOutputFile>(getMineralFinalizedFileNameWithPath(networkId, 1));
+  outputFile.metadata.epoch = 9999;
+  outputFile.metadata.startTimestamp = 0;
+  outputFile.metadata.endTimestamp = 0;
+  outputFile.metadata.startBlockNumber = 0;
+  outputFile.metadata.endBlockNumber = 0;
 
-  const merkleTree = calculateMerkleRootAndProofs(walletToDeltasMap);
-  console.log('merkleTree.walletAddressToLeavesMap', merkleTree.walletAddressToLeavesMap);
-  const outputData: MineralOutputFile = {
-    users: Object.keys(merkleTree.walletAddressToLeavesMap).reduce((memo, user) => {
-      memo[user] = {
-        ...merkleTree.walletAddressToLeavesMap[user],
-        multiplier: '1.0',
-      };
-      return memo;
-    }, {} as Record<string, UserMineralAllocationForFile>),
-    metadata: {
-      epoch: parseInt(DELTA_NUMBER, 10),
-      merkleRoot: merkleTree.merkleRoot,
-      startTimestamp: 0,
-      startBlockNumber: 0,
-      endTimestamp: 0,
-      endBlockNumber: 0,
-      marketIds: [],
-      marketNames: [],
-      totalAmount: totalAmount.toFixed(),
-      totalUsers: Object.keys(walletToDeltasMap).length,
-    },
-  };
   console.log(`Created delta for ${DELTA_NUMBER}!`);
 
-  const outputFileName = `delta-${process.env.NETWORK_ID}-${DELTA_NUMBER}.json`;
-  writeOutputFile(outputFileName, outputData);
+  const outputFileName = `delta-${networkId}-${DELTA_NUMBER}.json`;
+  writeOutputFile(outputFileName, outputFile);
 }
 
 start()
