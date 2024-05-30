@@ -14,6 +14,7 @@
     "compose-clean": "docker-compose rm -f",
     "migrate": "echo 'Nothing to migrate'",
     "seed": "echo 'Nothing to seed'",
+    "execute:add-mineral-deltas": "SCRIPT=true npx ts-node scripts/add-mineral-deltas.ts",
     "execute:calculate-assets-held-for-duration": "SCRIPT=true npx ts-node scripts/calculate-assets-held-for-duration.ts",
     "execute:calculate-ez-eth-points": "SCRIPT=true npx ts-node scripts/calculate-ez-eth-points.ts",
     "execute:calculate-mineral-rewards": "SCRIPT=true npx ts-node scripts/calculate-mineral-rewards.ts",
