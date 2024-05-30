@@ -12,17 +12,16 @@ function toInteger(amount: BigNumber): BigNumber {
 
 async function start() {
   const walletToDeltasMap: Record<string, BigNumber> = {
-    ['0x9aebea73d2af4cd33557f491545d8be97874021e'.toLowerCase()]: toInteger(new BigNumber(5000)),
+    // ['0x9aebea73d2af4cd33557f491545d8be97874021e'.toLowerCase()]: toInteger(new BigNumber(5000)),
     ['0x0000000000000000000000000000000000000000'.toLowerCase()]: INTEGERS.ZERO,
     ['0x0000000000000000000000000000000000000001'.toLowerCase()]: INTEGERS.ZERO,
-    // ['0x28c08da0fd81815a216ca1b57d10b9326b2d4fa3'.toLowerCase()]: toInteger(new BigNumber(5000)),
+    ['0x28c08da0fd81815a216ca1b57d10b9326b2d4fa3'.toLowerCase()]: toInteger(new BigNumber(5000)),
   };
   const totalAmount = Object.keys(walletToDeltasMap).reduce((acc, key) => {
     return acc.plus(walletToDeltasMap[key])
   }, INTEGERS.ZERO);
 
   const merkleTree = calculateMerkleRootAndProofs(walletToDeltasMap);
-  console.log('merkleTree.walletAddressToLeavesMap', merkleTree.walletAddressToLeavesMap);
   const outputData: MineralOutputFile = {
     users: Object.keys(merkleTree.walletAddressToLeavesMap).reduce((memo, user) => {
       memo[user] = {
