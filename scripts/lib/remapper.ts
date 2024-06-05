@@ -17,6 +17,8 @@ interface ContangoData {
   proxy: string;
 }
 
+const CONTANGO_PROXY_GETTER_URL = 'https://points-external.contango.xyz/dolomite/arbitrum';
+
 const ACCOUNT_MAP: Record<number, Record<string, string | undefined>> = {}
 
 export function remapAccountToClaimableAccount(chainId: ChainId, account: string): string {
@@ -38,7 +40,7 @@ export async function setupRemapping(chainId: ChainId, endBlockNumber: number): 
 
     if (chainId === ChainId.ArbitrumOne) {
       try {
-        const response = await axios.get<ContangoData[]>(`https://points.contango.xyz:6060/dolomite?block=${endBlockNumber}`);
+        const response = await axios.get<ContangoData[]>(`${CONTANGO_PROXY_GETTER_URL}?block=${endBlockNumber}`);
         response.data.forEach(({ owner, proxy }) => {
           remapping.proxyUsers[proxy.toLowerCase()] = owner.toLowerCase();
         });
