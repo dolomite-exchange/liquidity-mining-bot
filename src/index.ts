@@ -27,6 +27,7 @@ import MineralsMerkleTreeUpdater from './lib/minerals-merkle-tree-updater';
 import MineralsUpdater from './lib/minerals-updater';
 import VestingPositionCache from './lib/vesting-position-cache';
 import VestingPositionStore from './lib/vesting-position-store';
+import MarketStore from './lib/market-store';
 
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
@@ -62,12 +63,18 @@ if (!Number.isNaN(Number(process.env.AUTO_DOWN_FREQUENCY_SECONDS))) {
 
 async function start() {
   const blockStore = new BlockStore();
+  const marketStore = new MarketStore(blockStore, false);
   const vestingPositionStore = new VestingPositionStore(blockStore);
   const vestingPositionCache = new VestingPositionCache();
   const dolomiteDetonator = new DolomiteDetonator(vestingPositionStore, vestingPositionCache, blockStore);
   const requestUpdaterStore = new LevelUpdateRequestStore(blockStore);
   const requestUpdaterCache = new LevelUpdateRequestCache();
-  const dolomiteRequestUpdater = new DolomiteLevelRequestUpdater(requestUpdaterStore, requestUpdaterCache, blockStore);
+  const dolomiteRequestUpdater = new DolomiteLevelRequestUpdater(
+    requestUpdaterStore,
+    requestUpdaterCache,
+    blockStore,
+    marketStore,
+  );
   const gasPriceUpdater = new GasPriceUpdater();
 
   await loadAccounts();
@@ -132,6 +139,7 @@ async function start() {
     dolomiteDetonator.start();
   }
   if (process.env.LEVEL_REQUESTS_ENABLED === 'true') {
+    marketStore.start();
     requestUpdaterStore.start();
     dolomiteRequestUpdater.start();
   }

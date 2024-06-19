@@ -81,6 +81,7 @@ export interface ApiMarket {
   decimals: number
   marginPremium: Integer
   liquidationRewardPremium: Integer
+  oraclePrice: Integer | undefined
 }
 
 export interface ApiRiskParam {

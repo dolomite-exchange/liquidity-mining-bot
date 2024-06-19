@@ -14,7 +14,10 @@ import { chunkArray } from './utils';
 export default class MarketStore {
   private marketMap: { [marketId: string]: ApiMarket };
 
-  constructor(private readonly blockStore: BlockStore) {
+  constructor(
+    private readonly blockStore: BlockStore,
+    public skipOraclePriceRetrieval: boolean,
+  ) {
     this.marketMap = {};
   }
 
@@ -39,7 +42,7 @@ export default class MarketStore {
     );
 
     const indexResults: string[] = [];
-    for (let i = 0; i < indexCalls.length; i++) {
+    for (let i = 0; i < indexCalls.length; i += 1) {
       const { results: chunkedResults } = await dolomite.multiCall.aggregate(indexCalls[i], options);
       indexResults.push(...chunkedResults);
     }
@@ -106,7 +109,7 @@ export default class MarketStore {
       return result.markets
     });
 
-    this.marketMap = nextDolomiteMarkets.reduce<{ [marketId: string]: ApiMarket }>((memo, market) => {
+    const nextMarketMap = nextDolomiteMarkets.reduce<{ [marketId: string]: ApiMarket }>((memo, market) => {
       if (isMarketIgnored(market.marketId)) {
         // If any of the market IDs are ignored, then just return
         return memo;
@@ -115,6 +118,24 @@ export default class MarketStore {
       memo[market.marketId.toString()] = market;
       return memo;
     }, {});
+
+    if (!this.skipOraclePriceRetrieval) {
+      const marketPriceCalls = Object.values(nextMarketMap).map(market => {
+        return {
+          target: dolomite.address,
+          callData: dolomite.contracts.dolomiteMargin.methods.getMarketPrice(market.marketId).encodeABI(),
+        };
+      });
+
+      const { results: marketPriceResults } = await dolomite.multiCall.aggregate(marketPriceCalls, { blockNumber });
+
+      Object.values(nextMarketMap).forEach((market, i) => {
+        const oraclePrice = dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i]);
+        market.oraclePrice = new BigNumber(oraclePrice);
+      });
+    }
+
+    this.marketMap = nextMarketMap
 
     Logger.info({
       at: 'MarketStore#_update',

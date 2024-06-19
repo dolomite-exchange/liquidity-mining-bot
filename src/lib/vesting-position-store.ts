@@ -3,6 +3,7 @@ import { ApiLiquidityMiningVestingPosition } from './api-types';
 import BlockStore from './block-store';
 import { delay } from './delay';
 import Logger from './logger';
+import { DETONATION_WINDOW_SECONDS } from './dolomite-detonator';
 
 export default class VestingPositionStore {
   public explodablePositions: ApiLiquidityMiningVestingPosition[];
@@ -22,6 +23,7 @@ export default class VestingPositionStore {
       at: 'VestingPositionStore#start',
       message: 'Starting vesting position store',
     });
+
     this._poll();
   };
 
@@ -60,7 +62,7 @@ export default class VestingPositionStore {
 
     const { liquidityMiningVestingPositions } = await getExpiredLiquidityMiningVestingPositions(
       blockNumber,
-      blockTimestamp,
+      blockTimestamp - DETONATION_WINDOW_SECONDS,
     );
 
     // don't set the field variables until both values have been retrieved from the network

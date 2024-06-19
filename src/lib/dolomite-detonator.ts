@@ -7,6 +7,8 @@ import VestingPositionStore from './vesting-position-store';
 
 const WAIT_DURATION = 5_000;
 
+export const DETONATION_WINDOW_SECONDS = 86_400 * 7 * 4; // 4 weeks
+
 export default class DolomiteDetonator {
   public vestingPositionStore: VestingPositionStore;
   public vestingPositionCache: VestingPositionCache;
@@ -70,7 +72,7 @@ export default class DolomiteDetonator {
     for (let i = 0; i < explodablePositions.length; i += 1) {
       const position = explodablePositions[i];
       try {
-        await detonateAccount(position, lastBlockTimestamp);
+        await detonateAccount(position, lastBlockTimestamp, DETONATION_WINDOW_SECONDS);
         await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
       } catch (error: any) {
         Logger.error({
