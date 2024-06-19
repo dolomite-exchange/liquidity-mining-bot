@@ -74,7 +74,7 @@ async function start() {
   const blockStore = new BlockStore();
   await blockStore._update();
 
-  const marketStore = new MarketStore(blockStore);
+  const marketStore = new MarketStore(blockStore, true);
 
   const {
     startBlockNumber,

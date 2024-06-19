@@ -2,7 +2,6 @@
 import { BigNumber, Decimal, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import { decimalToString } from '@dolomite-exchange/dolomite-margin/dist/src/lib/Helpers';
 import axios from 'axios';
-import { DETONATION_WINDOW_SECONDS } from '../helpers/dolomite-helpers';
 import { isMarketIgnored } from '../helpers/market-helpers';
 import {
   ApiAccount,
@@ -468,7 +467,7 @@ export async function getLiquidityMiningVestingPositions(
 
 export async function getExpiredLiquidityMiningVestingPositions(
   blockNumber: number,
-  lastBlockTimestamp: number,
+  expirationTimestampWithBuffer: number,
 ): Promise<{ liquidityMiningVestingPositions: ApiLiquidityMiningVestingPosition[] }> {
   const query = `
     query getExpiredLiquidityMiningVestingPositions($blockNumber: Int, $timestamp: BigInt!) {
@@ -500,8 +499,8 @@ export async function getExpiredLiquidityMiningVestingPositions(
     {
       query,
       variables: {
-        blockNumber: blockNumber,
-        timestamp: (lastBlockTimestamp - DETONATION_WINDOW_SECONDS).toString(),
+        blockNumber,
+        timestamp: expirationTimestampWithBuffer.toString(),
       },
     },
     defaultAxiosConfig,
@@ -1107,6 +1106,44 @@ export async function getAllDolomiteAccountsWithSupplyValue(
   return getAccounts(marketIndexMap, query, blockNumber, lastId);
 }
 
+export async function getAllDolomiteAccountsByWalletAddress(
+  walletAddress: string,
+  marketIndexMap: { [marketId: string]: MarketIndex },
+  blockNumber: number,
+  lastId: string | undefined,
+): Promise<{ accounts: ApiAccount[] }> {
+  const query = `
+            query getActiveMarginAccounts($blockNumber: Int, $walletAddress: ID, $lastId: ID) {
+                marginAccounts(
+                  where: { effectiveUser: $walletAddress hasSupplyValue: true id_gt: $lastId }
+                  block: { number: $blockNumber }
+                  orderBy: id
+                  first: ${Pageable.MAX_PAGE_SIZE}
+                ) {
+                  id
+                  user {
+                    id
+                    effectiveUser {
+                      id
+                    }
+                  }
+                  accountNumber
+                  tokenValues {
+                    token {
+                      id
+                      marketId
+                      decimals
+                      symbol
+                    }
+                    valuePar
+                    expirationTimestamp
+                    expiryAddress
+                  }
+                }
+              }`;
+  return getAccounts(marketIndexMap, query, blockNumber, lastId, { walletAddress });
+}
+
 export async function getAllDolomiteAccountsWithToken(
   tokenAddress: string,
   marketIndexMap: { [marketId: string]: MarketIndex },
@@ -1201,6 +1238,7 @@ export async function getDolomiteMarkets(
       tokenAddress: market.token.id,
       marginPremium: new BigNumber(decimalToString(market.marginPremium)),
       liquidationRewardPremium: new BigNumber(decimalToString(market.liquidationRewardPremium)),
+      oraclePrice: undefined,
     };
     return apiMarket;
   });
@@ -1282,9 +1320,7 @@ function _mapGraphqlAccountToApiAccount(
       return memo;
     }
 
-    const index = (new BigNumber(valuePar).lt('0')
-      ? indexObject.borrow
-      : indexObject.supply).times(INTEGERS.INTEREST_RATE_BASE);
+    const index = valuePar.lt(INTEGERS.ZERO) ? indexObject.borrow : indexObject.supply;
     memo[value.token.marketId] = {
       marketId: Number(value.token.marketId),
       tokenName: value.token.name,
@@ -1292,8 +1328,7 @@ function _mapGraphqlAccountToApiAccount(
       tokenDecimals: Number.parseInt(value.token.decimals, 10),
       tokenAddress: value.token.id.toLowerCase(),
       par: valuePar,
-      wei: new BigNumber(valuePar).times(index)
-        .dividedToIntegerBy(INTEGERS.INTEREST_RATE_BASE, BigNumber.ROUND_HALF_UP),
+      wei: valuePar.times(index).integerValue(),
       expiresAt: value.expirationTimestamp ? new BigNumber(value.expirationTimestamp) : null,
       expiryAddress: value.expiryAddress,
     };

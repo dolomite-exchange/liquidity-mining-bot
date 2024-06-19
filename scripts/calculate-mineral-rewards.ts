@@ -66,7 +66,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
 
   const blockStore = new BlockStore();
   await blockStore._update();
-  const marketStore = new MarketStore(blockStore);
+  const marketStore = new MarketStore(blockStore, true);
 
   const {
     startBlockNumber,

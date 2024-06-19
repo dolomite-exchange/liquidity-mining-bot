@@ -4,30 +4,25 @@ import { delay } from './delay';
 import LevelUpdateRequestCache from './level-update-request-cache';
 import LevelUpdateRequestStore from './level-update-request-store';
 import Logger from './logger';
+import MarketStore from './market-store';
 
 const WAIT_DURATION = 1_000;
 
 export default class DolomiteLevelRequestUpdater {
-  public levelUpdateRequestStore: LevelUpdateRequestStore;
-  public levelUpdateRequestCache: LevelUpdateRequestCache;
-  public blockStore: BlockStore;
-
   constructor(
-    levelUpdateRequestStore: LevelUpdateRequestStore,
-    levelUpdateRequestCache: LevelUpdateRequestCache,
-    blockStore: BlockStore,
-  ) {
-    this.levelUpdateRequestStore = levelUpdateRequestStore;
-    this.levelUpdateRequestCache = levelUpdateRequestCache;
-    this.blockStore = blockStore;
-  }
+    private readonly levelUpdateRequestStore: LevelUpdateRequestStore,
+    private readonly levelUpdateRequestCache: LevelUpdateRequestCache,
+    private readonly blockStore: BlockStore,
+    private readonly marketStore: MarketStore,
+  ) {}
 
   start = () => {
     Logger.info({
       at: 'DolomiteLevelRequestUpdater#start',
       message: 'Starting DolomiteMargin request updater',
     });
-    delay(Number(WAIT_DURATION))
+
+    delay(Number(process.env.MARKET_POLL_INTERVAL_MS))
       .then(() => this._poll())
       .catch(() => this._poll());
   };
@@ -65,12 +60,15 @@ export default class DolomiteLevelRequestUpdater {
       return;
     }
 
+    const marketMap = this.marketStore.getMarketMap();
+    const marketIndexMap = await this.marketStore.getMarketIndexMap(marketMap);
+
     requests.forEach(a => this.levelUpdateRequestCache.add(a));
 
     for (let i = 0; i < requests.length; i += 1) {
       const request = requests[i];
       try {
-        await fulfillLevelUpdateRequest(request);
+        await fulfillLevelUpdateRequest(request, marketMap, marketIndexMap, this.blockStore.getBlockNumber());
         await delay(Number(process.env.SEQUENTIAL_TRANSACTION_DELAY_MS));
       } catch (error: any) {
         Logger.error({

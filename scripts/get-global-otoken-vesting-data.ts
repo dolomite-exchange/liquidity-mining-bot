@@ -22,7 +22,7 @@ function getDiscountsToDolomite(positions: ApiLiquidityMiningVestingPosition[]):
 async function start() {
   const blockStore = new BlockStore();
   await blockStore._update();
-  const marketStore = new MarketStore(blockStore);
+  const marketStore = new MarketStore(blockStore, true);
 
   const networkId = await dolomite.web3.eth.net.getId();
 
