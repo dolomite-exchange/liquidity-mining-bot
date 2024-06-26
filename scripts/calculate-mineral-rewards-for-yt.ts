@@ -1,43 +1,23 @@
-import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import v8 from 'v8';
-import { getAllDolomiteAccountsWithSupplyValue } from '../src/clients/dolomite';
+import { getTimestampToBlockNumberMap } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
-import BlockStore from '../src/lib/block-store';
 import { isScript, shouldForceUpload } from '../src/lib/env';
 import Logger from '../src/lib/logger';
-import MarketStore from '../src/lib/market-store';
-import Pageable from '../src/lib/pageable';
-import TokenAbi from './abis/isolation-mode-factory.json';
+import { PENDLE_TREASURY_ADDRESS } from '../src/lib/pendle/configuration';
+import { fetchPendleYtUserBalanceSnapshotBatch } from '../src/lib/pendle/main';
 import {
   EpochMetadata,
-  getMineralConfigFileNameWithPath,
   getMineralFinalizedFileNameWithPath,
   getMineralMetadataFileNameWithPath,
+  getMineralYtConfigFileNameWithPath,
   MINERAL_SEASON,
-  MineralConfigFile,
-  MineralOutputFile,
-  UserMineralAllocationForFile,
-  writeMineralConfigToGitHub,
+  MineralYtConfigFile,
+  MineralYtOutputFile,
+  writeMineralYtConfigToGitHub,
 } from './lib/config-helper';
-import {
-  getAccountBalancesByMarket,
-  getAmmLiquidityPositionAndEvents,
-  getArbVestingLiquidityPositionAndEvents,
-  getBalanceChangingEvents,
-} from './lib/event-parser';
 import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
-import { setupRemapping } from './lib/remapper';
-import {
-  ARB_VESTER_PROXY,
-  BLACKLIST_ADDRESSES,
-  calculateFinalPoints,
-  calculateMerkleRootAndProofs,
-  calculateVirtualLiquidityPoints,
-  ETH_USDC_POOL,
-  InterestOperation,
-  LiquidityPositionsAndEvents,
-  processEventsUntilEndTimestamp,
-} from './lib/rewards';
+import { BLACKLIST_ADDRESSES, calculateMerkleRootAndProofs } from './lib/rewards';
 
 /* eslint-enable */
 
@@ -46,27 +26,21 @@ interface UserMineralAllocation {
    * The amount of minerals earned by the user
    */
   amount: Integer; // big int
-  /**
-   * The user's multiplier to apply. Scales from 1x to 5x, with 0.5x being gained each week
-   */
-  multiplier: Decimal; // decimal
 }
 
-const SECONDS_PER_WEEK = 86_400 * 7;
-const MAX_MULTIPLIER = new BigNumber('5');
+const ONE_WEEK_SECONDS = 86_400 * 7;
+const ONE_HOUR_SECONDS = 60 * 60;
+// Subtract 15 minutes since last fetch occurs at 23:45:00
+const WEEK_DURATION_FOR_FETCHES = ONE_WEEK_SECONDS;
 
 export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)): Promise<void> {
   const networkId = await dolomite.web3.eth.net.getId();
-  const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>(
-    getMineralConfigFileNameWithPath(networkId),
+  const mineralYtConfigFile = await readFileFromGitHub<MineralYtConfigFile>(
+    getMineralYtConfigFileNameWithPath(networkId),
   );
-  if (Number.isNaN(epoch) || !liquidityMiningConfig.epochs[epoch]) {
+  if (Number.isNaN(epoch) || !mineralYtConfigFile.epochs[epoch]) {
     return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
   }
-
-  const blockStore = new BlockStore();
-  await blockStore._update();
-  const marketStore = new MarketStore(blockStore);
 
   const {
     startBlockNumber,
@@ -74,12 +48,11 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     endBlockNumber,
     endTimestamp,
     isTimeElapsed,
-    isMerkleRootGenerated,
-    marketIdToRewardMap,
     boostedMultiplier,
-  } = liquidityMiningConfig.epochs[epoch];
+    marketId,
+  } = mineralYtConfigFile.epochs[epoch];
 
-  if (isTimeElapsed && isMerkleRootGenerated && !isScript()) {
+  if (isTimeElapsed) {
     // If this epoch is finalized, and we're not in a script, return.
     Logger.info({
       at: 'calculateMineralRewards',
@@ -88,18 +61,9 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     return;
   }
 
-  if (!Object.keys(marketIdToRewardMap).every(m => !Number.isNaN(parseInt(m)))) {
-    return Promise.reject('Invalid market ID in map');
-  } else if (!Object.values(marketIdToRewardMap).every(m => !new BigNumber(m).isNaN())) {
-    return Promise.reject('Reward amounts are invalid');
-  } else if (!Object.values(marketIdToRewardMap).every(m => new BigNumber(m).lt(1_000_000))) {
-    return Promise.reject('Reward amounts are too large. Is this a bug?');
+  if (new BigNumber(marketId).isNaN()) {
+    return Promise.reject(`marketId is invalid: ${marketId}`);
   }
-
-  const validRewardMultipliersMap = Object.keys(marketIdToRewardMap).reduce((memo, marketId) => {
-    memo[marketId] = new BigNumber(marketIdToRewardMap[marketId]).div(SECONDS_PER_WEEK)
-    return memo;
-  }, {} as Record<string, Decimal>)
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address;
   if (networkId !== Number(process.env.NETWORK_ID)) {
@@ -121,97 +85,88 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     isTimeElapsed,
-    marketIds: Object.keys(marketIdToRewardMap),
+    marketId: marketId,
+    multiplier: boostedMultiplier,
     networkId,
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
 
-  await marketStore._update(startBlockNumber);
-  const startMarketMap = marketStore.getMarketMap();
-  const startMarketIndexMap = await marketStore.getMarketIndexMap(startMarketMap, { blockNumber: startBlockNumber });
+  const maxTimestamp = Math.min(startTimestamp + WEEK_DURATION_FOR_FETCHES, Math.floor(Date.now() / 1000));
+  const numberOfTimestampsToFetch = Math.floor((maxTimestamp - endTimestamp) / ONE_HOUR_SECONDS);
+  if (numberOfTimestampsToFetch <= 0) {
+    Logger.warning({
+      message: 'Skipping fetch, since the number of required fetches is <= 0',
+    })
+  }
+  const timestamps = Array.from(
+    { length: numberOfTimestampsToFetch },
+    (_, i) => endTimestamp + (ONE_HOUR_SECONDS * i),
+  );
+  console.log('timestamps', timestamps[0], timestamps[1], timestamps[2], timestamps[timestamps.length - 1]);
 
-  await marketStore._update(endBlockNumber);
-  const endMarketMap = marketStore.getMarketMap();
-  const endMarketIndexMap = await marketStore.getMarketIndexMap(endMarketMap, { blockNumber: endBlockNumber });
+  const blockNumbers = Object.values(await getTimestampToBlockNumberMap(timestamps));
 
-  const apiAccounts = await Pageable.getPageableValues(async (lastId) => {
-    const result = await getAllDolomiteAccountsWithSupplyValue(startMarketIndexMap, startBlockNumber, lastId);
-    return result.accounts;
+  const userToBalanceMapForBlockNumbers = await fetchPendleYtUserBalanceSnapshotBatch(marketId, blockNumbers);
+
+  const userToMineralsMaps = userToBalanceMapForBlockNumbers.map(userRecord => calculateFinalMinerals(
+    userRecord,
+    boostedMultiplier,
+  ));
+
+  userToMineralsMaps[PENDLE_TREASURY_ADDRESS!] = INTEGERS.ZERO;
+  userToMineralsMaps.forEach(userToMineralsMap => {
+    Object.keys(userToMineralsMap).forEach(user => {
+      const amountToPendle = userToMineralsMap[user].amount.times(3).times(3).dividedToIntegerBy(100);
+
+      userToMineralsMap[PENDLE_TREASURY_ADDRESS!].amount = userToMineralsMap[PENDLE_TREASURY_ADDRESS!].amount.plus(
+        amountToPendle);
+      userToMineralsMap[user].amount = userToMineralsMap[user].amount.times(3).times(97).dividedToIntegerBy(100);
+    });
   });
 
-  await setupRemapping(networkId, endBlockNumber);
+  const mineralFileName = getMineralFinalizedFileNameWithPath(networkId, epoch);
+  let mineralOutputFile: MineralYtOutputFile;
+  try {
+    mineralOutputFile = await readFileFromGitHub<MineralYtOutputFile>(mineralFileName);
+  } catch (e) {
+    mineralOutputFile = {
+      users: {},
+      metadata: {
+        epoch,
+        merkleRoot: null,
+        startTimestamp,
+        endTimestamp,
+        startBlockNumber,
+        endBlockNumber,
+        boostedMultiplier,
+        totalAmount: '0',
+        totalUsers: 0,
+        marketId: mineralYtConfigFile.epochs[epoch].marketId,
+      },
+    };
+  }
 
-  const accountToDolomiteBalanceMap = getAccountBalancesByMarket(
-    apiAccounts,
-    startTimestamp,
-    validRewardMultipliersMap,
-  );
+  userToMineralsMaps.forEach(userToMineralsMap => {
+    Object.keys(userToMineralsMap).forEach(user => {
+      if (!mineralOutputFile.users[user]) {
+        mineralOutputFile.users[user] = {
+          amount: '0',
+          proofs: [],
+        };
+      }
 
-  const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
+      const originalUserAmount = new BigNumber(mineralOutputFile.users[user].amount);
+      const originalTotalAmount = new BigNumber(mineralOutputFile.metadata.totalAmount);
+      const amountToAdd = userToMineralsMap[user].amount;
 
-  processEventsUntilEndTimestamp(
-    accountToDolomiteBalanceMap,
-    accountToAssetToEventsMap,
-    endMarketIndexMap,
-    validRewardMultipliersMap,
-    endTimestamp,
-    InterestOperation.ADD_POSITIVE,
-  );
+      mineralOutputFile.users[user].amount = originalUserAmount.plus(amountToAdd).toFixed(0);
+      mineralOutputFile.metadata.totalAmount = originalTotalAmount.plus(amountToAdd).toFixed(0);
+    });
+  });
 
-  const ammLiquidityBalancesAndEvents = await getAmmLiquidityPositionAndEvents(
-    startBlockNumber,
-    startTimestamp,
-    endTimestamp,
-  );
-
-  const vestingPositionsAndEvents = await getArbVestingLiquidityPositionAndEvents(
-    startBlockNumber,
-    startTimestamp,
-    endTimestamp,
-  );
-
-  const poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents> = {
-    [ETH_USDC_POOL]: ammLiquidityBalancesAndEvents,
-    [ARB_VESTER_PROXY]: vestingPositionsAndEvents,
-  };
-
-  const poolToTotalSubLiquidityPoints = calculateVirtualLiquidityPoints(
-    poolToVirtualLiquidityPositionsAndEvents,
-    startTimestamp,
-    endTimestamp,
-  );
-
-  const { userToPointsMap, marketToPointsMap }: {
-    userToPointsMap: Record<string, Integer>;
-    userToMarketToPointsMap: Record<string, Record<string, Integer>>;
-    marketToPointsMap: Record<string, Integer>;
-  } = calculateFinalPoints(
-    networkId,
-    accountToDolomiteBalanceMap,
-    validRewardMultipliersMap,
-    poolToVirtualLiquidityPositionsAndEvents,
-    poolToTotalSubLiquidityPoints,
-  );
-  const totalMinerals: Integer = Object.keys(marketToPointsMap).reduce((acc, market) => {
-    if (validRewardMultipliersMap[market]) {
-      acc = acc.plus(marketToPointsMap[market])
-    }
-    return acc;
-  }, INTEGERS.ZERO);
-
-  const userToMineralsDataMap = await calculateFinalMinerals(
-    userToPointsMap,
-    networkId,
-    epoch,
-    isTimeElapsed,
-    boostedMultiplier,
-  );
-
-  let merkleRoot: string | null;
-  let userToMineralsMapForFile: Record<string, UserMineralAllocationForFile>;
   if (isTimeElapsed) {
-    const userToAmountMap = Object.keys(userToMineralsDataMap).reduce((memo, k) => {
-      memo[k] = userToMineralsDataMap[k].amount;
+    const userToAmountMap = Object.keys(mineralOutputFile.users).reduce((memo, k) => {
+      memo[k] = mineralOutputFile.users[k].amount;
       return memo;
     }, {});
     const {
@@ -219,56 +174,17 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
       walletAddressToLeavesMap,
     } = calculateMerkleRootAndProofs(userToAmountMap);
 
-    merkleRoot = calculatedMerkleRoot;
-    userToMineralsMapForFile = Object.keys(walletAddressToLeavesMap).reduce((memo, k) => {
-      memo[k] = {
-        amount: walletAddressToLeavesMap[k].amount,
-        multiplier: userToMineralsDataMap[k].multiplier.toFixed(2),
-        proofs: walletAddressToLeavesMap[k].proofs,
+    Object.keys(mineralOutputFile.users).forEach((user) => {
+      mineralOutputFile.users[user] = {
+        amount: walletAddressToLeavesMap[user].amount,
+        proofs: walletAddressToLeavesMap[user].proofs,
       }
-      return memo;
-    }, {} as Record<string, UserMineralAllocationForFile>);
-  } else {
-    merkleRoot = null;
-    userToMineralsMapForFile = Object.keys(userToMineralsDataMap).reduce((memo, k) => {
-      memo[k] = {
-        amount: userToMineralsDataMap[k].amount.toFixed(),
-        multiplier: userToMineralsDataMap[k].multiplier.toFixed(2),
-        proofs: [],
-      }
-      return memo;
-    }, {} as Record<string, UserMineralAllocationForFile>);
+    });
+    mineralOutputFile.metadata.merkleRoot = calculatedMerkleRoot;
   }
 
-  const validMarketIds = Object.keys(validRewardMultipliersMap).map(m => parseInt(m, 10));
-  const marketNames = await Promise.all(
-    validMarketIds.map<Promise<string>>(async validMarketId => {
-      const tokenAddress = await dolomite.getters.getMarketTokenAddress(new BigNumber(validMarketId));
-      const token = new dolomite.web3.eth.Contract(TokenAbi, tokenAddress);
-      return dolomite.contracts.callConstantContractFunction(token.methods.symbol())
-    }),
-  );
-
-  // eslint-disable-next-line max-len
-  const fileName = getMineralFinalizedFileNameWithPath(networkId, epoch);
-  const mineralOutputFile: MineralOutputFile = {
-    users: userToMineralsMapForFile,
-    metadata: {
-      epoch,
-      merkleRoot,
-      marketNames,
-      startTimestamp,
-      endTimestamp,
-      startBlockNumber,
-      endBlockNumber,
-      boostedMultiplier,
-      totalAmount: totalMinerals.toFixed(0),
-      totalUsers: Object.keys(userToMineralsDataMap).length,
-      marketIds: validMarketIds,
-    },
-  };
   if (!isScript() || shouldForceUpload()) {
-    await writeFileToGitHub(fileName, mineralOutputFile, false);
+    await writeFileToGitHub(mineralFileName, mineralOutputFile, false);
   } else {
     Logger.info({
       message: 'Skipping file upload due to script execution',
@@ -276,9 +192,9 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     writeOutputFile(`mineral-${networkId}-season-${MINERAL_SEASON}-epoch-${epoch}-output.json`, mineralOutputFile);
   }
 
-  if ((!isScript() || shouldForceUpload()) && merkleRoot) {
-    liquidityMiningConfig.epochs[epoch].isMerkleRootGenerated = true;
-    await writeMineralConfigToGitHub(liquidityMiningConfig, liquidityMiningConfig.epochs[epoch]);
+  if ((!isScript() || shouldForceUpload()) && mineralOutputFile.metadata.merkleRoot) {
+    mineralYtConfigFile.epochs[epoch].isMerkleRootGenerated = true;
+    await writeMineralYtConfigToGitHub(mineralYtConfigFile, mineralYtConfigFile.epochs[epoch]);
   }
 
   const metadataFilePath = getMineralMetadataFileNameWithPath(networkId);
@@ -293,47 +209,16 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
   return undefined;
 }
 
-async function calculateFinalMinerals(
+function calculateFinalMinerals(
   userToPointsMap: Record<string, Integer>,
-  networkId: number,
-  epoch: number,
-  isTimeElapsed: boolean,
-  boostedMultiplier: string | undefined | null,
-): Promise<Record<string, UserMineralAllocation>> {
-  if (epoch === 0) {
-    return Object.keys(userToPointsMap).reduce((memo, user) => {
-      memo[user] = {
-        amount: userToPointsMap[user].times(boostedMultiplier ?? '1'),
-        multiplier: INTEGERS.ONE,
-      };
-      return memo;
-    }, {} as Record<string, UserMineralAllocation>)
-  }
-
-  const previousMinerals = await readFileFromGitHub<MineralOutputFile>(
-    getMineralFinalizedFileNameWithPath(networkId, epoch - 1),
-  );
-  const previousBoost = previousMinerals.metadata.boostedMultiplier ?? '1';
+  boostedMultiplier: string,
+): Record<string, UserMineralAllocation> {
   return Object.keys(userToPointsMap).reduce((memo, user) => {
-    const userCurrent = userToPointsMap[user];
-    const userPrevious = new BigNumber(previousMinerals.users[user]?.amount ?? '0');
-    const userPreviousMultiplier = new BigNumber(previousMinerals.users[user]?.multiplier ?? '1').times(previousBoost);
-    const userPreviousNormalized = userPrevious.dividedToIntegerBy(userPreviousMultiplier);
-    let newMultiplier = INTEGERS.ONE;
-    if (isTimeElapsed && userCurrent.gt(userPreviousNormalized) && userPreviousNormalized.gt(INTEGERS.ZERO)) {
-      newMultiplier = userPreviousMultiplier.plus(0.5);
-      if (newMultiplier.gt(MAX_MULTIPLIER)) {
-        newMultiplier = MAX_MULTIPLIER
-      }
-    }
-    const multiplierWithBoost = newMultiplier.times(boostedMultiplier ?? '1');
-
     memo[user] = {
-      amount: userCurrent.times(multiplierWithBoost),
-      multiplier: newMultiplier,
+      amount: userToPointsMap[user].times(boostedMultiplier),
     };
     return memo;
-  }, {} as Record<string, UserMineralAllocation>)
+  }, {} as Record<string, UserMineralAllocation>);
 }
 
 if (isScript()) {

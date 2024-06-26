@@ -18,11 +18,13 @@
     "execute:calculate-assets-held-for-duration": "SCRIPT=true npx ts-node scripts/calculate-assets-held-for-duration.ts",
     "execute:calculate-ez-eth-points": "SCRIPT=true npx ts-node scripts/calculate-ez-eth-points.ts",
     "execute:calculate-mineral-rewards": "SCRIPT=true npx ts-node scripts/calculate-mineral-rewards.ts",
+    "execute:calculate-mineral-rewards-for-yt": "SCRIPT=true npx ts-node scripts/calculate-mineral-rewards-for-yt.ts",
     "execute:calculate-mineral-season-config": "SCRIPT=true npx ts-node scripts/calculate-mineral-season-config.ts",
     "execute:calculate-otoken-rewards": "SCRIPT=true npx ts-node scripts/calculate-otoken-rewards.ts",
     "execute:calculate-otoken-season-config": "SCRIPT=true npx ts-node scripts/calculate-otoken-season-config.ts",
     "execute:get-global-otoken-data": "SCRIPT=true npx ts-node scripts/get-global-otoken-vesting-data.ts",
     "execute:migrate-oarb-finalized-outputs": "SCRIPT=true npx ts-node scripts/migrate-oarb-finalized-output.ts",
+    "execute:pendle-balance-fetcher": "SCRIPT=true npx ts-node src/lib/pendle/main.ts",
     "execute:rectify-oarb-rewards-for-arb": "SCRIPT=true npx ts-node scripts/rectify-oarb-rewards-for-arb.ts",
     "execute:rectify-oarb-rewards-for-deltas": "SCRIPT=true npx ts-node scripts/rectify-oarb-rewards-for-deltas.ts"
   },
@@ -72,6 +74,6 @@
     "supertest": "^4.0.2",
     "ts-jest": "^26.3.0",
     "ts-node": "^10.9.1",
-    "typescript": "^4.7.4"
+    "typescript": "^5.4.5"
   }
 }

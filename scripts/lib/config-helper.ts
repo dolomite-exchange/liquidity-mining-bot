@@ -8,6 +8,29 @@ export interface UserMineralAllocationForFile {
   proofs: string[];
 }
 
+export interface UserYtMineralAllocationForFile {
+  amount: string; // big int
+  proofs: string[];
+}
+
+export interface MineralYtOutputFile {
+  users: {
+    [walletAddressLowercase: string]: UserYtMineralAllocationForFile;
+  };
+  metadata: {
+    epoch: number;
+    merkleRoot: string | null;
+    marketId: number;
+    totalAmount: string; // big int
+    totalUsers: number; // big int
+    startBlockNumber: number;
+    endBlockNumber: number;
+    startTimestamp: number;
+    endTimestamp: number;
+    boostedMultiplier: string; // decimal
+  };
+}
+
 export interface MineralOutputFile {
   users: {
     [walletAddressLowercase: string]: UserMineralAllocationForFile;
@@ -31,10 +54,18 @@ export interface MineralConfigEpoch extends EpochConfig {
   marketIdToRewardMap: {
     [marketId: string]: string;
   };
-  boostedMultiplier: string | undefined | null;
+  boostedMultiplier: string | undefined | null; // decimal
+}
+
+export interface MineralYtConfigEpoch extends EpochConfig {
+  boostedMultiplier: string; // decimal
+  marketId: number;
 }
 
 export interface MineralConfigFile extends ConfigFile<MineralConfigEpoch> {
+}
+
+export interface MineralYtConfigFile extends ConfigFile<MineralYtConfigEpoch> {
 }
 
 export enum OTokenType {
@@ -135,6 +166,10 @@ export function getMineralConfigFileNameWithPath(networkId: number): string {
   return getConfigFilePath(networkId, 'mineral', MINERAL_SEASON);
 }
 
+export function getMineralYtConfigFileNameWithPath(networkId: number): string {
+  return getConfigFilePath(networkId, 'mineral', MINERAL_SEASON, '-yt');
+}
+
 /**
  * path cannot start with a "/"
  */
@@ -190,8 +225,8 @@ function getSeasonForOTokenType(oTokenType: OTokenType): number {
   throw new Error(`Invalid oTokenType, found ${oTokenType}`);
 }
 
-function getConfigFilePath(networkId: number, type: OTokenType | 'mineral', season: number): string {
-  return `config/${networkId}/${type}-season-${season}.json`
+function getConfigFilePath(networkId: number, type: OTokenType | 'mineral', season: number, extra: string = ''): string {
+  return `config/${networkId}/${type}-season-${season}${extra}.json`
 }
 
 function getMetadataFilePath(networkId: number, type: OTokenType | 'mineral'): string {
@@ -209,6 +244,18 @@ export async function writeMineralConfigToGitHub(
   configFile.epochs[epochData.epoch] = epochData;
   await writeFileToGitHub(
     getMineralConfigFileNameWithPath(configFile.metadata.networkId),
+    configFile,
+    true,
+  );
+}
+
+export async function writeMineralYtConfigToGitHub(
+  configFile: MineralYtConfigFile,
+  epochData: MineralYtConfigEpoch,
+): Promise<void> {
+  configFile.epochs[epochData.epoch] = epochData;
+  await writeFileToGitHub(
+    getMineralYtConfigFileNameWithPath(configFile.metadata.networkId),
     configFile,
     true,
   );
