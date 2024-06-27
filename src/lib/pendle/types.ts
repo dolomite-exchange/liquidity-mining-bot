@@ -1,4 +1,4 @@
-import { Integer } from '@dolomite-exchange/dolomite-margin';
+import { Decimal } from '@dolomite-exchange/dolomite-margin';
 import { ethers } from 'ethers';
 
 type Market = {
@@ -22,13 +22,9 @@ export interface PoolConfiguration {
   SY: string;
   YT: string;
   LPs: Market[];
+  decimals: number;
   liquidLockers: LiquidLocker[];
 }
 
 export type UserRecord = Record<string, ethers.BigNumber>;
-export type UserRecordWithInteger = Record<string, Integer>;
-
-export enum CHAINS {
-  ETHEREUM = 1,
-  ARBITRUM = 42161
-}
+export type UserRecordWithDecimal = Record<string, Decimal>;

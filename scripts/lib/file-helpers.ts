@@ -1,8 +1,7 @@
 import axios from 'axios';
 import fs from 'fs';
 import Logger from '../../src/lib/logger';
-import { OTokenOutputFile } from '../calculate-otoken-rewards';
-import { MineralOutputFile } from './config-helper';
+import { MineralOutputFile, OTokenOutputFile } from './data-types';
 
 const GITHUB_REPOSITORY_API_URL = 'https://api.github.com/repos/dolomite-exchange/liquidity-mining-data';
 
@@ -70,6 +69,8 @@ export async function writeFileToGitHub(
   await axios.patch(`${GITHUB_REPOSITORY_API_URL}/git/refs/heads/master`, {
     sha: commit.data.sha,
   }, headers);
+
+  return Promise.resolve();
 }
 
 export function writeOutputFile(
@@ -116,9 +117,9 @@ function _getCommitMessage(filePath: string, fileContent: any): string {
         return `AUTOMATED: Updated oARB for epoch ${oArbData.metadata.epoch}`;
       }
     } else if (filePath.includes('mineral') && filePath.includes('metadata')) {
-      return `AUTOMATED: Updated finalized mineral metadata`;
+      return 'AUTOMATED: Updated finalized mineral metadata';
     } else if (filePath.includes('oarb') && filePath.includes('metadata')) {
-      return `AUTOMATED: Updated finalized oARB metadata`;
+      return 'AUTOMATED: Updated finalized oARB metadata';
     } else {
       return 'AUTOMATED: Added finalized data';
     }

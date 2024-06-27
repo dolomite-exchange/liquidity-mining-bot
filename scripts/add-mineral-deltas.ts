@@ -1,6 +1,7 @@
 import '../src/lib/env'
-import { getMineralFinalizedFileNameWithPath, MineralOutputFile } from './lib/config-helper';
+import { getMineralFinalizedFileNameWithPath } from './lib/config-helper';
 import { readFileFromGitHub, writeOutputFile } from './lib/file-helpers';
+import { MineralOutputFile } from './lib/data-types';
 
 const DELTA_NUMBER = '9999';
 

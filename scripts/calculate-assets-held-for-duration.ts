@@ -1,7 +1,7 @@
 import { BigNumber, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import fs from 'fs';
 import v8 from 'v8';
-import { getAllDolomiteAccountsWithSupplyValue } from '../src/clients/dolomite';
+import { getAllDolomiteAccountsWithToken } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
 import BlockStore from '../src/lib/block-store';
 import Logger from '../src/lib/logger';
@@ -9,7 +9,7 @@ import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
 import '../src/lib/env'
-import { getMineralConfigFileNameWithPath, MineralConfigFile } from './lib/config-helper';
+import { getMineralConfigFileNameWithPath } from './lib/config-helper';
 import {
   getAccountBalancesByMarket,
   getAmmLiquidityPositionAndEvents,
@@ -27,6 +27,7 @@ import {
   LiquidityPositionsAndEvents,
   processEventsUntilEndTimestamp,
 } from './lib/rewards';
+import { MineralConfigFile } from './lib/data-types';
 
 /* eslint-enable */
 
@@ -107,7 +108,7 @@ async function start() {
   const endMarketIndexMap = await marketStore.getMarketIndexMap(endMarketMap, { blockNumber: endBlockNumber });
 
   const apiAccounts = await Pageable.getPageableValues(async (lastId) => {
-    const result = await getAllDolomiteAccountsWithSupplyValue(startMarketIndexMap, startBlockNumber, lastId);
+    const result = await getAllDolomiteAccountsWithToken(tokenAddress, startMarketIndexMap, startBlockNumber, lastId);
     return result.accounts;
   });
 

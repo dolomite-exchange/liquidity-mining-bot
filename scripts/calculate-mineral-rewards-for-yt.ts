@@ -1,23 +1,22 @@
-import { BigNumber, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import v8 from 'v8';
 import { getTimestampToBlockNumberMap } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
 import { isScript, shouldForceUpload } from '../src/lib/env';
 import Logger from '../src/lib/logger';
 import { PENDLE_TREASURY_ADDRESS } from '../src/lib/pendle/configuration';
-import { fetchPendleYtUserBalanceSnapshotBatch } from '../src/lib/pendle/main';
 import {
-  EpochMetadata,
   getMineralFinalizedFileNameWithPath,
   getMineralMetadataFileNameWithPath,
   getMineralYtConfigFileNameWithPath,
   MINERAL_SEASON,
-  MineralYtConfigFile,
-  MineralYtOutputFile,
   writeMineralYtConfigToGitHub,
 } from './lib/config-helper';
 import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
 import { BLACKLIST_ADDRESSES, calculateMerkleRootAndProofs } from './lib/rewards';
+import { fetchPendleYtUserBalanceSnapshotBatch } from '../src/lib/pendle/fetcher';
+import { MineralEpochMetadata } from './calculate-mineral-rewards';
+import { MineralYtConfigFile, MineralYtOutputFile } from './lib/data-types';
 
 /* eslint-enable */
 
@@ -25,15 +24,17 @@ interface UserMineralAllocation {
   /**
    * The amount of minerals earned by the user
    */
-  amount: Integer; // big int
+  amount: Integer;
 }
 
 const ONE_WEEK_SECONDS = 86_400 * 7;
-const ONE_HOUR_SECONDS = 60 * 60;
-// Subtract 15 minutes since last fetch occurs at 23:45:00
+const FETCH_FREQUENCY = 60 * 60; // one hour in seconds
 const WEEK_DURATION_FOR_FETCHES = ONE_WEEK_SECONDS;
+const ONE_MINERAL_IN_WEI = new BigNumber('1000000000000000000');
 
-export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)): Promise<void> {
+export async function calculateMineralYtRewards(
+  epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10),
+): Promise<void> {
   const networkId = await dolomite.web3.eth.net.getId();
   const mineralYtConfigFile = await readFileFromGitHub<MineralYtConfigFile>(
     getMineralYtConfigFileNameWithPath(networkId),
@@ -45,24 +46,24 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
   const {
     startBlockNumber,
     startTimestamp,
-    endBlockNumber,
     endTimestamp,
+    endBlockNumber,
     isTimeElapsed,
     boostedMultiplier,
     marketId,
   } = mineralYtConfigFile.epochs[epoch];
 
-  if (isTimeElapsed) {
+  if (isTimeElapsed && !isScript()) {
     // If this epoch is finalized, and we're not in a script, return.
     Logger.info({
       at: 'calculateMineralRewards',
       message: `Epoch ${epoch} has passed and merkle root was generated, skipping...`,
     });
-    return;
+    return Promise.resolve();
   }
 
   if (new BigNumber(marketId).isNaN()) {
-    return Promise.reject(`marketId is invalid: ${marketId}`);
+    return Promise.reject(new Error(`marketId is invalid: ${marketId}`));
   }
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address;
@@ -74,7 +75,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
   }
 
   Logger.info({
-    message: 'Mineral rewards data',
+    message: 'Mineral YT rewards data',
     blacklistAddresses: BLACKLIST_ADDRESSES,
     blockRewardStart: startBlockNumber,
     blockRewardStartTimestamp: startTimestamp,
@@ -91,60 +92,55 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
 
+  const { mineralOutputFile, mineralFileName } = await getOrCreateMineralOutputFile(
+    networkId,
+    epoch,
+    startBlockNumber,
+    startTimestamp,
+    endBlockNumber,
+    endTimestamp,
+    boostedMultiplier,
+    mineralYtConfigFile.epochs[epoch].marketId,
+  );
+
   const maxTimestamp = Math.min(startTimestamp + WEEK_DURATION_FOR_FETCHES, Math.floor(Date.now() / 1000));
-  const numberOfTimestampsToFetch = Math.floor((maxTimestamp - endTimestamp) / ONE_HOUR_SECONDS);
+  const numberOfTimestampsToFetch = Math.floor(
+    (maxTimestamp - mineralOutputFile.metadata.syncTimestamp) / FETCH_FREQUENCY,
+  );
   if (numberOfTimestampsToFetch <= 0) {
-    Logger.warning({
+    Logger.warn({
       message: 'Skipping fetch, since the number of required fetches is <= 0',
     })
   }
   const timestamps = Array.from(
     { length: numberOfTimestampsToFetch },
-    (_, i) => endTimestamp + (ONE_HOUR_SECONDS * i),
+    (_, i) => mineralOutputFile.metadata.syncTimestamp + (FETCH_FREQUENCY * i),
   );
-  console.log('timestamps', timestamps[0], timestamps[1], timestamps[2], timestamps[timestamps.length - 1]);
-
   const blockNumbers = Object.values(await getTimestampToBlockNumberMap(timestamps));
+
+  mineralOutputFile.metadata.syncTimestamp = timestamps[timestamps.length - 1];
+  mineralOutputFile.metadata.syncBlockNumber = blockNumbers[blockNumbers.length - 1];
 
   const userToBalanceMapForBlockNumbers = await fetchPendleYtUserBalanceSnapshotBatch(marketId, blockNumbers);
 
-  const userToMineralsMaps = userToBalanceMapForBlockNumbers.map(userRecord => calculateFinalMinerals(
-    userRecord,
-    boostedMultiplier,
-  ));
-
-  userToMineralsMaps[PENDLE_TREASURY_ADDRESS!] = INTEGERS.ZERO;
-  userToMineralsMaps.forEach(userToMineralsMap => {
-    Object.keys(userToMineralsMap).forEach(user => {
-      const amountToPendle = userToMineralsMap[user].amount.times(3).times(3).dividedToIntegerBy(100);
-
-      userToMineralsMap[PENDLE_TREASURY_ADDRESS!].amount = userToMineralsMap[PENDLE_TREASURY_ADDRESS!].amount.plus(
-        amountToPendle);
-      userToMineralsMap[user].amount = userToMineralsMap[user].amount.times(3).times(97).dividedToIntegerBy(100);
-    });
+  const userToMineralsMaps = userToBalanceMapForBlockNumbers.map(userRecord => {
+    const mineralsPerUnit = ONE_MINERAL_IN_WEI.times(mineralYtConfigFile.epochs[epoch].marketIdReward).integerValue();
+    return calculateFinalMinerals(userRecord, boostedMultiplier, mineralsPerUnit);
   });
 
-  const mineralFileName = getMineralFinalizedFileNameWithPath(networkId, epoch);
-  let mineralOutputFile: MineralYtOutputFile;
-  try {
-    mineralOutputFile = await readFileFromGitHub<MineralYtOutputFile>(mineralFileName);
-  } catch (e) {
-    mineralOutputFile = {
-      users: {},
-      metadata: {
-        epoch,
-        merkleRoot: null,
-        startTimestamp,
-        endTimestamp,
-        startBlockNumber,
-        endBlockNumber,
-        boostedMultiplier,
-        totalAmount: '0',
-        totalUsers: 0,
-        marketId: mineralYtConfigFile.epochs[epoch].marketId,
-      },
-    };
-  }
+  userToMineralsMaps.forEach(userToMineralsMap => {
+    Object.keys(userToMineralsMap).forEach(user => {
+      const pendleTreasuryAmount = userToMineralsMap[PENDLE_TREASURY_ADDRESS!] ?? { amount: INTEGERS.ZERO };
+      const mineralsAmount = userToMineralsMap[user].amount;
+      const timeWeightedBalance = mineralsAmount.times(FETCH_FREQUENCY).dividedToIntegerBy(ONE_WEEK_SECONDS);
+
+      const mineralsForUser = timeWeightedBalance.times(97).dividedToIntegerBy(100);
+      const mineralsForPendle = timeWeightedBalance.times(3).dividedToIntegerBy(100);
+
+      userToMineralsMap[PENDLE_TREASURY_ADDRESS!] = { amount: pendleTreasuryAmount.amount.plus(mineralsForPendle) };
+      userToMineralsMap[user].amount = mineralsForUser;
+    });
+  });
 
   userToMineralsMaps.forEach(userToMineralsMap => {
     Object.keys(userToMineralsMap).forEach(user => {
@@ -159,16 +155,22 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
       const originalTotalAmount = new BigNumber(mineralOutputFile.metadata.totalAmount);
       const amountToAdd = userToMineralsMap[user].amount;
 
-      mineralOutputFile.users[user].amount = originalUserAmount.plus(amountToAdd).toFixed(0);
-      mineralOutputFile.metadata.totalAmount = originalTotalAmount.plus(amountToAdd).toFixed(0);
+      if (amountToAdd.gt(INTEGERS.ZERO)) {
+        mineralOutputFile.users[user].amount = originalUserAmount.plus(amountToAdd).toFixed(0);
+        mineralOutputFile.metadata.totalAmount = originalTotalAmount.plus(amountToAdd).toFixed(0);
+      } else if (originalUserAmount.eq(INTEGERS.ZERO)) {
+        delete mineralOutputFile.users[user];
+      }
     });
   });
 
+  mineralOutputFile.metadata.totalUsers = Object.keys(mineralOutputFile.users).length;
+
   if (isTimeElapsed) {
     const userToAmountMap = Object.keys(mineralOutputFile.users).reduce((memo, k) => {
-      memo[k] = mineralOutputFile.users[k].amount;
+      memo[k] = new BigNumber(mineralOutputFile.users[k].amount);
       return memo;
-    }, {});
+    }, {} as Record<string, Integer>);
     const {
       merkleRoot: calculatedMerkleRoot,
       walletAddressToLeavesMap,
@@ -187,7 +189,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     await writeFileToGitHub(mineralFileName, mineralOutputFile, false);
   } else {
     Logger.info({
-      message: 'Skipping file upload due to script execution',
+      message: 'Skipping output file upload due to script execution',
     });
     writeOutputFile(`mineral-${networkId}-season-${MINERAL_SEASON}-epoch-${epoch}-output.json`, mineralOutputFile);
   }
@@ -195,34 +197,87 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
   if ((!isScript() || shouldForceUpload()) && mineralOutputFile.metadata.merkleRoot) {
     mineralYtConfigFile.epochs[epoch].isMerkleRootGenerated = true;
     await writeMineralYtConfigToGitHub(mineralYtConfigFile, mineralYtConfigFile.epochs[epoch]);
+  } else if (mineralOutputFile.metadata.merkleRoot) {
+    Logger.info({
+      message: 'Skipping config file upload due to script execution',
+    });
+    mineralYtConfigFile.epochs[epoch].isMerkleRootGenerated = true;
+    writeOutputFile(`mineral-${networkId}-season-${MINERAL_SEASON}-epoch-${epoch}-config.json`, mineralYtConfigFile, 2);
   }
 
   const metadataFilePath = getMineralMetadataFileNameWithPath(networkId);
-  const metadata = await readFileFromGitHub<EpochMetadata>(metadataFilePath);
+  const metadata = await readFileFromGitHub<MineralEpochMetadata>(metadataFilePath);
 
   // Once the merkle root is written, update the metadata to the new highest epoch that is finalized
-  if (metadata.maxEpochNumber < epoch) {
-    metadata.maxEpochNumber = epoch;
+  if ((!isScript() || shouldForceUpload()) && metadata.pendleMetadata.maxEpochNumber < epoch) {
+    metadata.pendleMetadata.maxEpochNumber = epoch;
     await writeFileToGitHub(metadataFilePath, metadata, true);
+  } else if (metadata.pendleMetadata.maxEpochNumber < epoch) {
+    Logger.info({
+      message: 'Skipping config file upload due to script execution',
+    });
+    metadata.pendleMetadata.maxEpochNumber = epoch;
+    writeOutputFile(`mineral-${networkId}-season-${MINERAL_SEASON}-metadata.json`, metadata, 2);
   }
 
   return undefined;
 }
 
-function calculateFinalMinerals(
-  userToPointsMap: Record<string, Integer>,
+async function getOrCreateMineralOutputFile(
+  networkId: number,
+  epoch: number,
+  startBlockNumber: number,
+  startTimestamp: number,
+  endBlockNumber: number,
+  endTimestamp: number,
   boostedMultiplier: string,
+  marketId: number,
+): Promise<{ mineralOutputFile: MineralYtOutputFile, mineralFileName: string }> {
+  const mineralFileName = getMineralFinalizedFileNameWithPath(networkId, epoch);
+  try {
+    return {
+      mineralFileName,
+      mineralOutputFile: await readFileFromGitHub<MineralYtOutputFile>(mineralFileName),
+    };
+  } catch (e) {
+    return {
+      mineralFileName,
+      mineralOutputFile: {
+        users: {},
+        metadata: {
+          epoch,
+          merkleRoot: null,
+          startTimestamp,
+          syncTimestamp: startTimestamp,
+          endTimestamp,
+          startBlockNumber,
+          syncBlockNumber: startBlockNumber,
+          endBlockNumber,
+          boostedMultiplier,
+          totalAmount: '0',
+          totalUsers: 0,
+          marketId,
+        },
+      },
+    };
+  }
+}
+
+function calculateFinalMinerals(
+  userToBalanceMap: Record<string, Decimal>,
+  boostedMultiplier: string,
+  mineralsPerUnit: Integer,
 ): Record<string, UserMineralAllocation> {
-  return Object.keys(userToPointsMap).reduce((memo, user) => {
+  return Object.keys(userToBalanceMap).reduce((memo, user) => {
     memo[user] = {
-      amount: userToPointsMap[user].times(boostedMultiplier),
+      amount: userToBalanceMap[user].times(boostedMultiplier).times(mineralsPerUnit).integerValue(),
     };
     return memo;
   }, {} as Record<string, UserMineralAllocation>);
 }
 
 if (isScript()) {
-  calculateMineralRewards()
+  calculateMineralYtRewards()
     .then(() => {
       console.log('Finished executing script!');
     })

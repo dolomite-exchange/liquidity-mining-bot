@@ -8,6 +8,7 @@ import { remapAccountToClaimableAccount } from './remapper';
 
 export const ETH_USDC_POOL = '0xb77a493a4950cad1b049e222d62bce14ff423c6f'.toLowerCase();
 export const ARB_VESTER_PROXY = '0x531BC6E97b65adF8B3683240bd594932Cfb63797'.toLowerCase();
+export const SY_D_USDC = '0x84e0efc0633041aac9d0196b7ac8af3505e8cc32'.toLowerCase();
 
 export const BLACKLIST_ADDRESSES = process.env.BLACKLIST_ADDRESSES?.split(',') ?? []
 
@@ -17,7 +18,7 @@ const blacklistMap: Record<string, boolean> = BLACKLIST_ADDRESSES.reduce((map, a
   }
   map[address.toLowerCase()] = true;
   return map;
-}, {})
+}, {});
 
 export interface BalanceChangeEvent {
   amountDeltaPar: Decimal;
@@ -30,7 +31,6 @@ export interface BalanceChangeEvent {
 interface AmountAndProof {
   amount: string;
   proofs: string[];
-
 }
 
 export type VirtualLiquiditySnapshot = VirtualLiquiditySnapshotBalance;
@@ -371,7 +371,8 @@ export function calculateFinalPoints(
           const points = balanceStruct.rewardPoints.times(ONE_ETH_WEI).dividedToIntegerBy(INTEGERS.ONE);
           userToPointsMap[remappedAccount] = userToPointsMap[remappedAccount].plus(points);
           marketToPointsMap[market] = marketToPointsMap[market].plus(points);
-          userToMarketToPointsMap[remappedAccount][market] = userToMarketToPointsMap[remappedAccount][market].plus(points);
+          userToMarketToPointsMap[remappedAccount][market] = userToMarketToPointsMap[remappedAccount][market].plus(
+            points);
         }
       });
     });
@@ -410,7 +411,8 @@ export function calculateFinalPoints(
       marketToPointsMap[market] = marketToPointsMap[market].minus(blacklistPoints);
     })
     delete userToPointsMap[pool];
-  });1
+  });
+  1
 
   // Remove all users with 0 points
   Object.keys(userToPointsMap).forEach(user => {

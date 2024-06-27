@@ -2,23 +2,14 @@ import { isScript } from '../src/lib/env'
 import { dolomite } from '../src/helpers/web3';
 import Logger from '../src/lib/logger';
 import {
-  ConfigFile,
-  EpochConfig,
   getNextConfigIfNeeded,
   getOTokenConfigFileNameWithPath,
-  OTokenType,
+
 } from './lib/config-helper';
 import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
+import { OTokenConfigEpoch, OTokenConfigFile, OTokenType } from './lib/data-types';
 
 export const MAX_OARB_KEY_BEFORE_MIGRATIONS = 701;
-
-interface OTokenConfigEpoch extends EpochConfig {
-  oTokenAmount: string;
-  rewardWeights: Record<string, string>;
-}
-
-export interface OTokenConfigFile extends ConfigFile<OTokenConfigEpoch> {
-}
 
 async function calculateOTokenSeasonConfig(
   skipConfigUpdate: boolean = false,

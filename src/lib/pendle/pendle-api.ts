@@ -12,18 +12,18 @@ export class PendleAPI {
           return Promise.resolve([]);
         } else {
           const result = this.query(token);
-          await sleep(SLEEP_DURATION_BETWEEN_QUERIES);
           return result;
         }
-      })
+      }),
     );
     const allUniqueUsers = new Set<string>(allResults.flat());
     return Array.from(allUniqueUsers);
   }
 
   static async query(token: string): Promise<string[]> {
+    await sleep(SLEEP_DURATION_BETWEEN_QUERIES);
     const resp = await axios.get(
-      `https://api-v2.pendle.finance/core/v1/statistics/get-distinct-user-from-token?token=${token.toLowerCase()}&size=100000`
+      `https://api-v2.pendle.finance/core/v1/statistics/get-distinct-user-from-token?token=${token.toLowerCase()}&size=100000`,
     );
     return resp.data.users;
   }

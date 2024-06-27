@@ -4,9 +4,10 @@ import { dolomite } from '../../helpers/web3';
 import * as constants from './consts';
 import { YTInterestData } from './types';
 
-const SLEEP_DURATION_BETWEEN_BATCHES = 500; // 500 ms
+const RETRY_ATTEMPTS = 5;
+const SLEEP_DURATION_BETWEEN_BATCHES_MS = 1_000; // 1,000 ms
 
-export async function aggregateMulticall(
+export async function aggregateMultiCall(
   callDatas: { target: string; callData: string }[],
   blockNumber: number,
 ) {
@@ -16,18 +17,47 @@ export async function aggregateMulticall(
     start < callDatas.length;
     start += constants.MULTICALL_BATCH_SIZE
   ) {
-    const resp = (
+    const resp = await doCall(callDatas, start, blockNumber);
+    result.push(...resp);
+    if (start + constants.MULTICALL_BATCH_SIZE < callDatas.length) {
+      await sleep(SLEEP_DURATION_BETWEEN_BATCHES_MS);
+    }
+  }
+  return result;
+}
+
+async function doCall(
+  callDatas: { target: string, callData: string }[],
+  start: number,
+  blockNumber: number,
+  retry: number = 0,
+  mostRecentError?: Error,
+): Promise<string[]> {
+  if (retry === RETRY_ATTEMPTS) {
+    return Promise.reject(
+      new Error(
+        `Could not do call after ${retry} attempts due to error at block ${blockNumber}: ${mostRecentError?.message}`,
+      ),
+    );
+  }
+  try {
+    return (
       await dolomite.multiCall.aggregate(
         callDatas.slice(start, start + constants.MULTICALL_BATCH_SIZE),
         { blockNumber },
       )
     ).results;
-    result.push(...resp);
-    if (start + constants.MULTICALL_BATCH_SIZE < callDatas.length) {
-      await sleep(SLEEP_DURATION_BETWEEN_BATCHES);
-    }
+  } catch (error: any) {
+    // await sleep(((retry + 1) ** 2) * 1_000);
+    await sleep((retry + 1) * 1_000);
+    return doCall(
+      callDatas,
+      start,
+      blockNumber,
+      retry + 1,
+      error,
+    );
   }
-  return result;
 }
 
 export async function getAllERC20Balances(
@@ -42,10 +72,8 @@ export async function getAllERC20Balances(
       [address],
     ),
   }));
-  const balances = await aggregateMulticall(callDatas, blockNumber);
-  return balances.map((b) =>
-    BigNumber.from(utils.defaultAbiCoder.decode(['uint256'], b)[0]),
-  );
+  const balances = await aggregateMultiCall(callDatas, blockNumber);
+  return balances.map((b) => BigNumber.from(utils.defaultAbiCoder.decode(['uint256'], b)[0]));
 }
 
 export async function getAllMarketActiveBalances(
@@ -60,10 +88,8 @@ export async function getAllMarketActiveBalances(
       [address],
     ),
   }));
-  const balances = await aggregateMulticall(callDatas, blockNumber);
-  return balances.map((b) =>
-    BigNumber.from(utils.defaultAbiCoder.decode(['uint256'], b)[0]),
-  );
+  const balances = await aggregateMultiCall(callDatas, blockNumber);
+  return balances.map((b) => BigNumber.from(utils.defaultAbiCoder.decode(['uint256'], b)[0]));
 }
 
 export async function getAllYTInterestData(
@@ -78,7 +104,7 @@ export async function getAllYTInterestData(
       [address],
     ),
   }));
-  const interests = await aggregateMulticall(callDatas, blockNumber);
+  const interests = await aggregateMultiCall(callDatas, blockNumber);
   return interests.map((b) => {
     const rawData = utils.defaultAbiCoder.decode(['uint128', 'uint128'], b);
     return {

@@ -3,7 +3,7 @@ import { checkJsNumber } from '../invariants';
 import { PoolConfiguration } from './types';
 
 checkJsNumber('NETWORK_ID');
-export const CHAIN = parseInt(process.env.NETWORK_ID!) as ChainId;
+export const CHAIN = parseInt(process.env.NETWORK_ID!, 10) as ChainId;
 
 const USDC_MARKET_ID = 17;
 
@@ -28,6 +28,7 @@ export const POOL_INFO: Record<ChainId, Record<string, PoolConfiguration>> = {
           deployedBlock: 220_943_848,
         },
       ],
+      decimals: 6,
       liquidLockers: [
         {
           // penpie
@@ -51,7 +52,7 @@ export const POOL_INFO: Record<ChainId, Record<string, PoolConfiguration>> = {
           deployedBlock: 0,
         },
       ],
-    }
+    },
   },
   [ChainId.Base]: {},
   [ChainId.Mantle]: {},

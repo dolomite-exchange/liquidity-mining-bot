@@ -37,6 +37,10 @@ import {
   VirtualLiquiditySnapshotBalance,
   VirtualLiquiditySnapshotDeltaPar,
 } from './rewards';
+import { readFileFromGitHub } from './file-helpers';
+import { MineralYtConfigFile, MineralYtOutputFile } from './data-types';
+import { getMineralFinalizedFileNameWithPath, getMineralYtConfigFileNameWithPath } from './config-helper';
+import { ONE_ETH_WEI } from '../../src/lib/constants';
 
 const TEN = new BigNumber(10);
 
@@ -234,6 +238,40 @@ export async function getArbVestingLiquidityPositionAndEvents(
   parseVirtualLiquiditySnapshots(userToLiquiditySnapshots, vestingPositionSnapshots, virtualLiquidityBalances);
 
   return { virtualLiquidityBalances, userToLiquiditySnapshots };
+}
+
+export async function getPendleDUsdcLiquidityPositionAndEvents(
+  networkId: number,
+  startTimestamp: number,
+  endTimestamp: number,
+): Promise<LiquidityPositionsAndEvents> {
+  const virtualLiquidityBalances: AccountToVirtualLiquidityBalanceMap = {};
+  const ytConfig = await readFileFromGitHub<MineralYtConfigFile>(getMineralYtConfigFileNameWithPath(networkId));
+  const epoch = Object.values(ytConfig.epochs).find(e => {
+    return e.startTimestamp === startTimestamp && e.endTimestamp === endTimestamp;
+  });
+  if (!epoch) {
+    return Promise.reject(new Error(`Invalid epoch, could not find for ${startTimestamp}, ${endTimestamp}`));
+  }
+
+  const outputFile = await readFileFromGitHub<MineralYtOutputFile>(
+    getMineralFinalizedFileNameWithPath(networkId, epoch.epoch),
+  );
+  const positions = Object.keys(outputFile.users).map(user => {
+    return {
+      id: user,
+      marketId: outputFile.metadata.marketId,
+      effectiveUser: user,
+      balancePar: new BigNumber(outputFile.users[user].amount).div(ONE_ETH_WEI),
+    }
+  });
+  parseVirtualLiquidityPositions(
+    virtualLiquidityBalances,
+    positions,
+    startTimestamp,
+  );
+
+  return { virtualLiquidityBalances, userToLiquiditySnapshots: {} };
 }
 
 export function parseDeposits(
@@ -516,8 +554,7 @@ function addEventToUser(
   marketId: number,
   event: BalanceChangeEvent,
 ): void {
-  const user = marginAccount.user;
-  const accountNumber = marginAccount.accountNumber;
+  const { user, accountNumber } = marginAccount;
   accountToAssetToEventsMap[user] = accountToAssetToEventsMap[user] ?? {};
   accountToAssetToEventsMap[user]![accountNumber] = accountToAssetToEventsMap[user]![accountNumber] ?? {};
   if (accountToAssetToEventsMap[user]![accountNumber]![marketId]) {

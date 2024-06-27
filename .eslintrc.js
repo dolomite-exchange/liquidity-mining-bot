@@ -37,9 +37,12 @@ module.exports = {
     '@typescript-eslint/semi': 0,
     '@typescript-eslint/lines-between-class-members': 0,
     'object-curly-newline': 0,
+    'object-shorthand': 0,
     'arrow-body-style': 0,
     'arrow-parens': 0,
+    'no-continue': 0,
     'no-else-return': 0,
+    'no-nested-ternary': 0,
     'no-param-reassign': 0,
     '@typescript-eslint/naming-convention': ['error',
       {
