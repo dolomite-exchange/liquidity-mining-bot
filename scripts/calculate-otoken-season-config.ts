@@ -1,17 +1,20 @@
-import { isScript } from '../src/lib/env'
+import { isScript, shouldForceUpload } from '../src/lib/env'
 import { dolomite } from '../src/helpers/web3';
 import Logger from '../src/lib/logger';
 import {
   getNextConfigIfNeeded,
   getOTokenConfigFileNameWithPath,
+  getOTokenTypeFromEnvironment,
+  getSeasonForOTokenType,
   writeOTokenConfigToGitHub,
 } from './lib/config-helper';
-import { readFileFromGitHub } from './lib/file-helpers';
+import { readFileFromGitHub, writeOutputFile } from './lib/file-helpers';
 import { OTokenConfigEpoch, OTokenConfigFile, OTokenType } from './lib/data-types';
 
 export const MAX_OARB_KEY_BEFORE_MIGRATIONS = 701;
 
 async function calculateOTokenSeasonConfig(
+  oTokenType: OTokenType = getOTokenTypeFromEnvironment(),
   skipConfigUpdate: boolean = false,
 ): Promise<number> {
   const { networkId } = dolomite;
@@ -21,7 +24,7 @@ async function calculateOTokenSeasonConfig(
 
   const oTokenConfigFile = await readFileFromGitHub<OTokenConfigFile>(getOTokenConfigFileNameWithPath(
     networkId,
-    OTokenType.oARB,
+    oTokenType,
   ));
   const selectedEpoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   let maxKey = selectedEpoch
@@ -59,13 +62,22 @@ async function calculateOTokenSeasonConfig(
     isMerkleRootWrittenOnChain: false,
   };
 
-  await writeOTokenConfigToGitHub(oTokenConfigFile, epochData);
+  if (!isScript() || shouldForceUpload()) {
+    await writeOTokenConfigToGitHub(oTokenConfigFile, epochData);
+  } else {
+    Logger.info({
+      message: 'Skipping config file upload due to script execution',
+    });
+    oTokenConfigFile.epochs[epochData.epoch] = epochData;
+    const season = getSeasonForOTokenType(oTokenType);
+    writeOutputFile(`${oTokenType}-${networkId}-season-${season}-output.json`, oTokenConfigFile);
+  }
 
   return epochData.epoch;
 }
 
 if (isScript()) {
-  calculateOTokenSeasonConfig()
+  calculateOTokenSeasonConfig(OTokenType.oARB)
     .then(() => {
       console.log('Finished executing script!');
       process.exit(0);
