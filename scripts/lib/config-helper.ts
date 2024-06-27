@@ -8,6 +8,8 @@ import {
   MineralYtConfigEpoch,
   MineralYtConfigFile,
   NextConfig,
+  OTokenConfigEpoch,
+  OTokenConfigFile,
   OTokenType,
 } from './data-types';
 
@@ -98,7 +100,7 @@ export function getOTokenTypeFromEnvironment(): OTokenType {
   return oTokenType as OTokenType;
 }
 
-function getSeasonForOTokenType(oTokenType: OTokenType): number {
+export function getSeasonForOTokenType(oTokenType: OTokenType): number {
   if (oTokenType === OTokenType.oARB) {
     return OARB_SEASON;
   } else if (oTokenType === OTokenType.oMATIC) {
@@ -144,6 +146,21 @@ export async function writeMineralYtConfigToGitHub(
   configFile.epochs[epochData.epoch] = epochData;
   await writeFileToGitHub(
     getMineralYtConfigFileNameWithPath(configFile.metadata.networkId),
+    configFile,
+    true,
+  );
+}
+
+export async function writeOTokenConfigToGitHub(
+  configFile: OTokenConfigFile,
+  epochData: OTokenConfigEpoch,
+): Promise<void> {
+  configFile.epochs[epochData.epoch] = epochData;
+  await writeFileToGitHub(
+    getOTokenConfigFileNameWithPath(
+      configFile.metadata.networkId,
+      OTokenType.oARB,
+    ),
     configFile,
     true,
   );

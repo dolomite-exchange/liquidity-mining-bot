@@ -64,7 +64,7 @@ export async function writeFileToGitHub(
     message: 'Committing upload to GitHub',
     commitMessage: message,
     commitHash: commit.data.sha,
-  })
+  });
 
   await axios.patch(`${GITHUB_REPOSITORY_API_URL}/git/refs/heads/master`, {
     sha: commit.data.sha,

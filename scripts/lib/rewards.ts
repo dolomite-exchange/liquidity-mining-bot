@@ -142,10 +142,8 @@ export class BalanceAndRewardPoints {
       pointsUpdate = pointsUpdate.plus(positiveInterestDelta.minus(negativeInterestDelta)
         .times(timeDelta)
         .times(this.pointsPerSecond));
-    } else {
-      if (operation !== InterestOperation.NOTHING) {
-        throw new Error(`Invalid operation, found: ${operation}`);
-      }
+    } else if (operation !== InterestOperation.NOTHING) {
+      throw new Error(`Invalid operation, found: ${operation}`);
     }
 
     this.rewardPoints = this.rewardPoints.plus(pointsUpdate);
@@ -204,7 +202,6 @@ export function processEventsUntilEndTimestamp(
       }
       const marketToEventsMap = accountToMarketToEventsMap[account]![subAccount]!;
       Object.keys(marketToEventsMap).forEach(market => {
-
         // Sort and process events
         marketToEventsMap[market]!.sort((a, b) => a.serialId - b.serialId);
         marketToEventsMap[market]!.forEach(event => {
@@ -329,24 +326,24 @@ export function calculateFinalPoints(
   oldUserToPointsMap: Record<string, string> = {},
   oldUserToMarketToPointsMap: Record<string, string> = {},
 ): {
-  userToPointsMap: Record<string, Integer>;
-  userToMarketToPointsMap: Record<string, Record<string, Integer>>;
-  marketToPointsMap: Record<string, Integer>;
-} {
+    userToPointsMap: Record<string, Integer>;
+    userToMarketToPointsMap: Record<string, Record<string, Integer>>;
+    marketToPointsMap: Record<string, Integer>;
+  } {
   const marketToPointsMap: Record<string, Integer> = {};
   const userToPointsMap: Record<string, Integer> = Object.keys(oldUserToPointsMap)
     .reduce<Record<string, Integer>>((memo, key) => {
-      memo[key] = new BigNumber(oldUserToPointsMap[key]);
-      return memo;
-    }, {});
+    memo[key] = new BigNumber(oldUserToPointsMap[key]);
+    return memo;
+  }, {});
   const userToMarketToPointsMap: Record<string, Record<string, Integer>> = Object.keys(oldUserToMarketToPointsMap)
     .reduce<Record<string, Record<string, Integer>>>((memo1, user) => {
-      memo1[user] = Object.keys(userToMarketToPointsMap[user]).reduce<Record<string, Integer>>((memo2, market) => {
-        memo2[market] = new BigNumber(oldUserToMarketToPointsMap[user][market]);
-        return memo2;
-      }, {});
-      return memo1;
+    memo1[user] = Object.keys(userToMarketToPointsMap[user]).reduce<Record<string, Integer>>((memo2, market) => {
+      memo2[market] = new BigNumber(oldUserToMarketToPointsMap[user][market]);
+      return memo2;
     }, {});
+    return memo1;
+  }, {});
 
   Object.keys(accountToDolomiteBalanceMap).forEach(account => {
     Object.keys(accountToDolomiteBalanceMap[account]!).forEach(subAccount => {
@@ -372,7 +369,8 @@ export function calculateFinalPoints(
           userToPointsMap[remappedAccount] = userToPointsMap[remappedAccount].plus(points);
           marketToPointsMap[market] = marketToPointsMap[market].plus(points);
           userToMarketToPointsMap[remappedAccount][market] = userToMarketToPointsMap[remappedAccount][market].plus(
-            points);
+            points,
+          );
         }
       });
     });
@@ -412,7 +410,6 @@ export function calculateFinalPoints(
     })
     delete userToPointsMap[pool];
   });
-  1
 
   // Remove all users with 0 points
   Object.keys(userToPointsMap).forEach(user => {

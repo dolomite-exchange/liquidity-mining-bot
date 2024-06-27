@@ -8,17 +8,19 @@ import { isScript, shouldForceUpload } from '../src/lib/env'
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
-import { writeOTokenConfigToGitHub } from './calculate-otoken-season-config';
 import {
   getOTokenConfigFileNameWithPath,
   getOTokenFinalizedFileNameWithPath,
   getOTokenTypeFromEnvironment,
+  getSeasonForOTokenType,
+  writeOTokenConfigToGitHub,
 } from './lib/config-helper';
 import {
   getAccountBalancesByMarket,
   getAmmLiquidityPositionAndEvents,
   getArbVestingLiquidityPositionAndEvents,
-  getBalanceChangingEvents, getPendleDUsdcLiquidityPositionAndEvents,
+  getBalanceChangingEvents,
+  getPendleDUsdcLiquidityPositionAndEvents,
 } from './lib/event-parser';
 import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
 import { setupRemapping } from './lib/remapper';
@@ -30,7 +32,8 @@ import {
   ETH_USDC_POOL,
   InterestOperation,
   LiquidityPositionsAndEvents,
-  processEventsUntilEndTimestamp, SY_D_USDC,
+  processEventsUntilEndTimestamp,
+  SY_D_USDC,
 } from './lib/rewards';
 import { OTokenConfigFile, OTokenOutputFile, OTokenType } from './lib/data-types';
 import { ChainId } from '../src/lib/chain-id';
@@ -73,6 +76,10 @@ async function calculateOTokenRewards(oTokenType: OTokenType = getOTokenTypeFrom
   if (!totalOTokenAmount.eq(sumOfWeights)) {
     return Promise.reject(new Error(`Invalid reward weights sum, found: ${sumOfWeights.toString()}`));
   }
+  const defaultEquityPerSecond = Object.keys(rewardWeights).reduce((memo, key) => {
+    memo[key] = INTEGERS.ONE;
+    return memo;
+  }, {} as Record<string, Decimal>);
 
   const { riskParams } = await getDolomiteRiskParams(startBlockNumber);
 
@@ -90,12 +97,13 @@ async function calculateOTokenRewards(oTokenType: OTokenType = getOTokenTypeFrom
   }
 
   Logger.info({
-    message: 'DolomiteMargin data',
+    message: `DolomiteMargin data for ${oTokenType} rewards`,
     blockRewardStart: startBlockNumber,
     blockRewardStartTimestamp: startTimestamp,
     blockRewardEnd: endBlockNumber,
     blockRewardEndTimestamp: endTimestamp,
     dolomiteMargin: libraryDolomiteMargin,
+    epochNumber: epoch,
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     networkId,
@@ -127,7 +135,7 @@ async function calculateOTokenRewards(oTokenType: OTokenType = getOTokenTypeFrom
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
     endMarketIndexMap,
-    REWARD_MULTIPLIERS_MAP,
+    defaultEquityPerSecond,
     endTimestamp,
     InterestOperation.NOTHING,
   );
@@ -145,7 +153,7 @@ async function calculateOTokenRewards(oTokenType: OTokenType = getOTokenTypeFrom
   );
 
   const syTokenPositions = await getPendleDUsdcLiquidityPositionAndEvents(
-    startBlockNumber,
+    networkId,
     startTimestamp,
     endTimestamp,
   );
@@ -168,6 +176,7 @@ async function calculateOTokenRewards(oTokenType: OTokenType = getOTokenTypeFrom
     endTimestamp,
   );
 
+  console.log('Points for SY', accountToDolomiteBalanceMap[SY_D_USDC]!['0']!['17']!.rewardPoints.toFixed());
   const { userToMarketToPointsMap, marketToPointsMap } = calculateFinalPoints(
     networkId,
     accountToDolomiteBalanceMap,
@@ -211,7 +220,8 @@ async function calculateOTokenRewards(oTokenType: OTokenType = getOTokenTypeFrom
     Logger.info({
       message: 'Skipping output file upload due to script execution',
     });
-    writeOutputFile(oTokenFileName, oTokenOutputFile);
+    const season = getSeasonForOTokenType(oTokenType);
+    writeOutputFile(`${oTokenType}-${networkId}-season-${season}-epoch-${epoch}-output.json`, oTokenOutputFile);
   }
 
   if (merkleRoot) {
@@ -222,8 +232,9 @@ async function calculateOTokenRewards(oTokenType: OTokenType = getOTokenTypeFrom
       Logger.info({
         message: 'Skipping config file upload due to script execution',
       });
+      const season = getSeasonForOTokenType(oTokenType);
       writeOutputFile(
-        getOTokenConfigFileNameWithPath(networkId, oTokenType),
+        `${oTokenType}-${networkId}-season-${season}-config.json`,
         oTokenConfig,
         2,
       );

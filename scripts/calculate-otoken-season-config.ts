@@ -4,9 +4,9 @@ import Logger from '../src/lib/logger';
 import {
   getNextConfigIfNeeded,
   getOTokenConfigFileNameWithPath,
-
+  writeOTokenConfigToGitHub,
 } from './lib/config-helper';
-import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
+import { readFileFromGitHub } from './lib/file-helpers';
 import { OTokenConfigEpoch, OTokenConfigFile, OTokenType } from './lib/data-types';
 
 export const MAX_OARB_KEY_BEFORE_MIGRATIONS = 701;
@@ -62,21 +62,6 @@ async function calculateOTokenSeasonConfig(
   await writeOTokenConfigToGitHub(oTokenConfigFile, epochData);
 
   return epochData.epoch;
-}
-
-export async function writeOTokenConfigToGitHub(
-  configFile: OTokenConfigFile,
-  epochData: OTokenConfigEpoch,
-): Promise<void> {
-  configFile.epochs[epochData.epoch] = epochData;
-  await writeFileToGitHub(
-    getOTokenConfigFileNameWithPath(
-      configFile.metadata.networkId,
-      OTokenType.oARB,
-    ),
-    configFile,
-    true,
-  );
 }
 
 if (isScript()) {
