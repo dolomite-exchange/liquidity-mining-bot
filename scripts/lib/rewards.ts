@@ -326,24 +326,24 @@ export function calculateFinalPoints(
   oldUserToPointsMap: Record<string, string> = {},
   oldUserToMarketToPointsMap: Record<string, string> = {},
 ): {
-    userToPointsMap: Record<string, Integer>;
-    userToMarketToPointsMap: Record<string, Record<string, Integer>>;
-    marketToPointsMap: Record<string, Integer>;
-  } {
+  userToPointsMap: Record<string, Integer>;
+  userToMarketToPointsMap: Record<string, Record<string, Integer>>;
+  marketToPointsMap: Record<string, Integer>;
+} {
   const marketToPointsMap: Record<string, Integer> = {};
   const userToPointsMap: Record<string, Integer> = Object.keys(oldUserToPointsMap)
     .reduce<Record<string, Integer>>((memo, key) => {
-    memo[key] = new BigNumber(oldUserToPointsMap[key]);
-    return memo;
-  }, {});
+      memo[key] = new BigNumber(oldUserToPointsMap[key]);
+      return memo;
+    }, {});
   const userToMarketToPointsMap: Record<string, Record<string, Integer>> = Object.keys(oldUserToMarketToPointsMap)
     .reduce<Record<string, Record<string, Integer>>>((memo1, user) => {
-    memo1[user] = Object.keys(userToMarketToPointsMap[user]).reduce<Record<string, Integer>>((memo2, market) => {
-      memo2[market] = new BigNumber(oldUserToMarketToPointsMap[user][market]);
-      return memo2;
+      memo1[user] = Object.keys(userToMarketToPointsMap[user]).reduce<Record<string, Integer>>((memo2, market) => {
+        memo2[market] = new BigNumber(oldUserToMarketToPointsMap[user][market]);
+        return memo2;
+      }, {});
+      return memo1;
     }, {});
-    return memo1;
-  }, {});
 
   Object.keys(accountToDolomiteBalanceMap).forEach(account => {
     Object.keys(accountToDolomiteBalanceMap[account]!).forEach(subAccount => {
@@ -365,7 +365,7 @@ export function calculateFinalPoints(
             userToMarketToPointsMap[remappedAccount][market] = INTEGERS.ZERO;
           }
 
-          const points = balanceStruct.rewardPoints.times(ONE_ETH_WEI).dividedToIntegerBy(INTEGERS.ONE);
+          const points = balanceStruct.rewardPoints.times(ONE_ETH_WEI).integerValue();
           userToPointsMap[remappedAccount] = userToPointsMap[remappedAccount].plus(points);
           marketToPointsMap[market] = marketToPointsMap[market].plus(points);
           userToMarketToPointsMap[remappedAccount][market] = userToMarketToPointsMap[remappedAccount][market].plus(
@@ -379,9 +379,10 @@ export function calculateFinalPoints(
   // Distribute liquidity pool rewards
   Object.keys(poolToVirtualLiquidityPositionsAndEvents).forEach(pool => {
     const totalLiquidityPoolPoints = userToPointsMap[pool];
+    const totalMarketToLiquidityPoolPointsMap = userToMarketToPointsMap[pool];
     const totalPoolEquityPoints = poolToTotalSubLiquidityPoints[pool];
     let totalWhitelistPoints = INTEGERS.ZERO;
-    if (totalLiquidityPoolPoints && totalPoolEquityPoints) {
+    if (totalLiquidityPoolPoints && totalPoolEquityPoints && totalMarketToLiquidityPoolPointsMap) {
       const events = poolToVirtualLiquidityPositionsAndEvents[pool];
       Object.keys(events.virtualLiquidityBalances).forEach(account => {
         if (!blacklistMap[account]) {
@@ -396,6 +397,18 @@ export function calculateFinalPoints(
           }
           userToPointsMap[remappedAccount] = userToPointsMap[remappedAccount].plus(points);
           totalWhitelistPoints = totalWhitelistPoints.plus(points);
+
+          Object.keys(totalMarketToLiquidityPoolPointsMap).forEach(market => {
+            if (!userToMarketToPointsMap[remappedAccount]) {
+              userToMarketToPointsMap[remappedAccount] = {};
+            }
+            if (!userToMarketToPointsMap[remappedAccount][market]) {
+              userToMarketToPointsMap[remappedAccount][market] = INTEGERS.ZERO;
+            }
+
+            userToMarketToPointsMap[remappedAccount][market] = userToMarketToPointsMap[remappedAccount][market]
+              .plus(points);
+          });
         }
       });
     }
@@ -407,8 +420,13 @@ export function calculateFinalPoints(
         .dividedToIntegerBy(totalLiquidityPoolPoints);
       const blacklistPoints = pointsFromMarket.minus(whitelistPointsFromMarket);
       marketToPointsMap[market] = marketToPointsMap[market].minus(blacklistPoints);
-    })
+    });
+
     delete userToPointsMap[pool];
+
+    if (Object.keys(userToMarketToPointsMap[pool]).length === 0) {
+      delete userToMarketToPointsMap[pool];
+    }
   });
 
   // Remove all users with 0 points

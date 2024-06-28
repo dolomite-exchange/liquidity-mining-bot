@@ -23,7 +23,11 @@ import {
   ApiTransfer,
   ApiWithdrawal,
 } from '../../src/lib/api-types';
+import { ONE_ETH_WEI } from '../../src/lib/constants';
 import Pageable from '../../src/lib/pageable';
+import { getMineralFinalizedFileNameWithPath, getMineralYtConfigFileNameWithPath } from './config-helper';
+import { MineralYtConfigFile, MineralYtOutputFile } from './data-types';
+import { readFileFromGitHub } from './file-helpers';
 import {
   AccountToSubAccountToMarketToBalanceChangeMap,
   AccountToSubAccountToMarketToBalanceMap,
@@ -37,10 +41,6 @@ import {
   VirtualLiquiditySnapshotBalance,
   VirtualLiquiditySnapshotDeltaPar,
 } from './rewards';
-import { readFileFromGitHub } from './file-helpers';
-import { MineralYtConfigFile, MineralYtOutputFile } from './data-types';
-import { getMineralFinalizedFileNameWithPath, getMineralYtConfigFileNameWithPath } from './config-helper';
-import { ONE_ETH_WEI } from '../../src/lib/constants';
 
 const TEN = new BigNumber(10);
 
@@ -257,7 +257,7 @@ export async function getPendleDUsdcLiquidityPositionAndEvents(
   const outputFile = await readFileFromGitHub<MineralYtOutputFile>(
     getMineralFinalizedFileNameWithPath(networkId, epoch.epoch),
   );
-  const positions = Object.keys(outputFile.users).map(user => {
+  const positions = Object.keys(outputFile.users).map<VirtualLiquidityPosition>(user => {
     return {
       id: user,
       marketId: outputFile.metadata.marketId,

@@ -176,8 +176,6 @@ async function calculateOTokenRewards(oTokenType: OTokenType = getOTokenTypeFrom
     endTimestamp,
   );
 
-  // TODO: delete
-  console.log('Points for SY', accountToDolomiteBalanceMap[SY_D_USDC]!['0']!['17']!.rewardPoints.toFixed());
   const { userToMarketToPointsMap, marketToPointsMap } = calculateFinalPoints(
     networkId,
     accountToDolomiteBalanceMap,
@@ -193,6 +191,7 @@ async function calculateOTokenRewards(oTokenType: OTokenType = getOTokenTypeFrom
       if (!memo[user]) {
         memo[user] = INTEGERS.ZERO;
       }
+
       memo[user] = memo[user].plus(oTokenRewardWeiMap[market].times(userPoints).div(totalPoints));
     });
     return memo;

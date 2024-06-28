@@ -123,8 +123,8 @@ export async function calculateMineralYtRewards(
 
   const userToBalanceMapForBlockNumbers = await fetchPendleYtUserBalanceSnapshotBatch(marketId, blockNumbers);
 
+  const mineralsPerUnit = ONE_MINERAL_IN_WEI.times(mineralYtConfigFile.epochs[epoch].marketIdReward).integerValue();
   const userToMineralsMaps = userToBalanceMapForBlockNumbers.map(userRecord => {
-    const mineralsPerUnit = ONE_MINERAL_IN_WEI.times(mineralYtConfigFile.epochs[epoch].marketIdReward).integerValue();
     return calculateFinalMinerals(userRecord, boostedMultiplier, mineralsPerUnit);
   });
 
