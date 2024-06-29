@@ -8,7 +8,7 @@ export const CHAIN = parseInt(process.env.NETWORK_ID!, 10) as ChainId;
 const USDC_MARKET_ID = 17;
 
 const PENDLE_TREASURY_MAP: Record<ChainId, string | undefined> = {
-  [ChainId.ArbitrumOne]: '0x7877AdFaDEd756f3248a0EBfe8Ac2E2eF87b75Ac'.toLowerCase(),
+  [ChainId.ArbitrumOne]: '0xCbcb48e22622a3778b6F14C2f5d258Ba026b05e6'.toLowerCase(),
   [ChainId.Base]: undefined,
   [ChainId.Mantle]: '0x9F72a06084EdD040E973C32Bf026b1ACf65db9aB'.toLowerCase(),
   [ChainId.PolygonZkEvm]: undefined,

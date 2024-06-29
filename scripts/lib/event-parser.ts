@@ -251,7 +251,11 @@ export async function getPendleDUsdcLiquidityPositionAndEvents(
     return e.startTimestamp === startTimestamp && e.endTimestamp === endTimestamp;
   });
   if (!epoch) {
-    return Promise.reject(new Error(`Invalid epoch, could not find for ${startTimestamp}, ${endTimestamp}`));
+    console.warn(`Invalid epoch, could not find for [${startTimestamp}, ${endTimestamp}]`)
+    return Promise.resolve({
+      userToLiquiditySnapshots: {},
+      virtualLiquidityBalances: {}
+    });
   }
 
   const outputFile = await readFileFromGitHub<MineralYtOutputFile>(

@@ -164,6 +164,16 @@ export async function calculateMineralYtRewards(
     });
   });
 
+  if (epoch === 10_010) {
+    const pendleTreasuryAmount = new BigNumber(mineralOutputFile.users[PENDLE_TREASURY_ADDRESS!].amount);
+    const totalAmount = new BigNumber(mineralOutputFile.metadata.totalAmount);
+    // Add the amounts issued to the deprecated Pendle Treasury address to this epoch
+    const amountToAdd = new BigNumber('43108167014060357125734').plus('214830609695506871097676');
+
+    mineralOutputFile.users[PENDLE_TREASURY_ADDRESS!].amount = pendleTreasuryAmount.plus(amountToAdd).toFixed(0);
+    mineralOutputFile.metadata.totalAmount = totalAmount.plus(amountToAdd).toFixed(0);
+  }
+
   mineralOutputFile.metadata.totalUsers = Object.keys(mineralOutputFile.users).length;
 
   if (isTimeElapsed) {

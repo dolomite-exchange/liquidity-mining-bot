@@ -266,6 +266,10 @@ export function processEventsUntilEndTimestamp(
   });
 }
 
+export function addToBlacklist(account: string): void {
+  blacklistMap[account.toLowerCase()] = true;
+}
+
 export function calculateVirtualLiquidityPoints(
   poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
   startTimestamp: number,
@@ -320,7 +324,7 @@ export function calculateVirtualLiquidityPoints(
 export function calculateFinalPoints(
   networkId: number,
   accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceMap,
-  validMarketIdsMap: Record<string, any>,
+  validMarketIdsMap: Record<string, Integer | Decimal>,
   poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
   poolToTotalSubLiquidityPoints: Record<string, Decimal>,
   oldUserToPointsMap: Record<string, string> = {},
@@ -424,7 +428,7 @@ export function calculateFinalPoints(
 
     delete userToPointsMap[pool];
 
-    if (Object.keys(userToMarketToPointsMap[pool]).length === 0) {
+    if (userToMarketToPointsMap[pool] && Object.keys(userToMarketToPointsMap[pool]).length === 0) {
       delete userToMarketToPointsMap[pool];
     }
   });
