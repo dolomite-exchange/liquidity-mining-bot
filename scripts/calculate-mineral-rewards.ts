@@ -15,26 +15,22 @@ import {
   MINERAL_SEASON,
   writeMineralConfigToGitHub,
 } from './lib/config-helper';
+import { EpochMetadata, MineralConfigFile, MineralOutputFile, UserMineralAllocationForFile } from './lib/data-types';
 import {
   getAccountBalancesByMarket,
-  getAmmLiquidityPositionAndEvents,
-  getArbVestingLiquidityPositionAndEvents,
   getBalanceChangingEvents,
+  getPoolAddressToVirtualLiquidityPositionsAndEvents,
 } from './lib/event-parser';
 import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
 import { setupRemapping } from './lib/remapper';
 import {
-  ARB_VESTER_PROXY,
   BLACKLIST_ADDRESSES,
   calculateFinalPoints,
   calculateMerkleRootAndProofs,
   calculateVirtualLiquidityPoints,
-  ETH_USDC_POOL,
   InterestOperation,
-  LiquidityPositionsAndEvents,
   processEventsUntilEndTimestamp,
 } from './lib/rewards';
-import { EpochMetadata, MineralConfigFile, MineralOutputFile, UserMineralAllocationForFile } from './lib/data-types';
 
 /* eslint-enable */
 
@@ -163,22 +159,13 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     InterestOperation.ADD_POSITIVE,
   );
 
-  const ammLiquidityBalancesAndEvents = await getAmmLiquidityPositionAndEvents(
+  const poolToVirtualLiquidityPositionsAndEvents = await getPoolAddressToVirtualLiquidityPositionsAndEvents(
+    networkId,
     startBlockNumber,
     startTimestamp,
     endTimestamp,
+    true,
   );
-
-  const vestingPositionsAndEvents = await getArbVestingLiquidityPositionAndEvents(
-    startBlockNumber,
-    startTimestamp,
-    endTimestamp,
-  );
-
-  const poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents> = {
-    [ETH_USDC_POOL]: ammLiquidityBalancesAndEvents,
-    [ARB_VESTER_PROXY]: vestingPositionsAndEvents,
-  };
 
   const poolToTotalSubLiquidityPoints = calculateVirtualLiquidityPoints(
     poolToVirtualLiquidityPositionsAndEvents,

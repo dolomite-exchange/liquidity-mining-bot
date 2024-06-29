@@ -6,9 +6,7 @@ import { MarketIndex } from '../../src/lib/api-types';
 import { ONE_ETH_WEI } from '../../src/lib/constants';
 import { remapAccountToClaimableAccount } from './remapper';
 
-export const ETH_USDC_POOL = '0xb77a493a4950cad1b049e222d62bce14ff423c6f'.toLowerCase();
 export const ARB_VESTER_PROXY = '0x531BC6E97b65adF8B3683240bd594932Cfb63797'.toLowerCase();
-export const SY_D_USDC = '0x84e0efc0633041aac9d0196b7ac8af3505e8cc32'.toLowerCase();
 
 export const BLACKLIST_ADDRESSES = process.env.BLACKLIST_ADDRESSES?.split(',') ?? []
 

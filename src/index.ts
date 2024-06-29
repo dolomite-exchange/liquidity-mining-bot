@@ -7,7 +7,6 @@ import { dolomite, loadAccounts } from './helpers/web3';
 import BlockStore from './lib/block-store';
 import DolomiteDetonator from './lib/dolomite-detonator';
 import DolomiteLevelRequestUpdater from './lib/dolomite-level-request-updater';
-import EzPointsUpdater from './lib/ez-points-updater';
 import GasPriceUpdater from './lib/gas-price-updater';
 import {
   checkBigNumber,
@@ -23,11 +22,11 @@ import {
 import LevelUpdateRequestCache from './lib/level-update-request-cache';
 import LevelUpdateRequestStore from './lib/level-update-request-store';
 import Logger from './lib/logger';
+import MarketStore from './lib/market-store';
 import MineralsMerkleTreeUpdater from './lib/minerals-merkle-tree-updater';
 import MineralsUpdater from './lib/minerals-updater';
 import VestingPositionCache from './lib/vesting-position-cache';
 import VestingPositionStore from './lib/vesting-position-store';
-import MarketStore from './lib/market-store';
 
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
@@ -38,7 +37,6 @@ checkBooleanValue('DETONATIONS_ENABLED');
 checkDuration('DETONATIONS_KEY_EXPIRATION_SECONDS', 1, false);
 checkDuration('DETONATIONS_POLL_INTERVAL_MS', 1000);
 checkExists('ETHEREUM_NODE_URL');
-checkExists('EZ_POINTS_ENABLED');
 checkBigNumber('GAS_PRICE_ADDITION');
 checkBigNumber('GAS_PRICE_MULTIPLIER');
 checkBigNumber('GAS_PRICE_POLL_INTERVAL_MS');
@@ -83,7 +81,6 @@ async function start() {
   const subgraphBlockNumber = blockStore.getBlockNumber();
   const { riskParams } = await getDolomiteRiskParams(subgraphBlockNumber);
   const networkId = await dolomite.web3.eth.net.getId();
-  const ezPointsUpdater = new EzPointsUpdater();
   const mineralsUpdater = new MineralsUpdater();
   const mineralsMerkleTreeUpdater = new MineralsMerkleTreeUpdater(networkId);
 
@@ -111,7 +108,6 @@ async function start() {
     detonationsPollIntervalMillis: process.env.DETONATIONS_POLL_INTERVAL_MS,
     dolomiteMargin: libraryDolomiteMargin,
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
-    ezPointsEnabled: process.env.EZ_POINTS_ENABLED,
     gasPriceAddition: process.env.GAS_PRICE_ADDITION,
     gasPriceMultiplier: process.env.GAS_PRICE_MULTIPLIER,
     gasPricePollIntervalMillis: process.env.GAS_PRICE_POLL_INTERVAL_MS,
@@ -142,9 +138,6 @@ async function start() {
     marketStore.start();
     requestUpdaterStore.start();
     dolomiteRequestUpdater.start();
-  }
-  if (process.env.EZ_POINTS_ENABLED === 'true') {
-    ezPointsUpdater.start();
   }
   if (process.env.MINERALS_ENABLED === 'true') {
     mineralsUpdater.start();

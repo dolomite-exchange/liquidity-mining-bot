@@ -16,23 +16,17 @@ import { getMineralConfigFileNameWithPath } from './lib/config-helper';
 import { MineralConfigFile } from './lib/data-types';
 import {
   getAccountBalancesByMarket,
-  getAmmLiquidityPositionAndEvents,
-  getArbVestingLiquidityPositionAndEvents,
   getBalanceChangingEvents,
-  getPendleDUsdcLiquidityPositionAndEvents,
+  getPoolAddressToVirtualLiquidityPositionsAndEvents,
 } from './lib/event-parser';
 import { readFileFromGitHub } from './lib/file-helpers';
 import { setupRemapping } from './lib/remapper';
 import {
   addToBlacklist,
-  ARB_VESTER_PROXY,
   calculateFinalPoints,
   calculateVirtualLiquidityPoints,
-  ETH_USDC_POOL,
   InterestOperation,
-  LiquidityPositionsAndEvents,
   processEventsUntilEndTimestamp,
-  SY_D_USDC,
 } from './lib/rewards';
 
 /* eslint-enable */
@@ -181,29 +175,13 @@ async function start() {
     InterestOperation.NOTHING,
   );
 
-  const ammLiquidityBalancesAndEvents = await getAmmLiquidityPositionAndEvents(
-    startBlockNumber,
-    startTimestamp,
-    endTimestamp,
-  );
-
-  const vestingPositionsAndEvents = await getArbVestingLiquidityPositionAndEvents(
-    startBlockNumber,
-    startTimestamp,
-    endTimestamp,
-  );
-
-  const pendleEvents = await getPendleDUsdcLiquidityPositionAndEvents(
+  const poolToVirtualLiquidityPositionsAndEvents = await getPoolAddressToVirtualLiquidityPositionsAndEvents(
     networkId,
+    startBlockNumber,
     startTimestamp,
     endTimestamp,
+    false,
   );
-
-  const poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents> = {
-    [ETH_USDC_POOL]: ammLiquidityBalancesAndEvents,
-    [ARB_VESTER_PROXY]: vestingPositionsAndEvents,
-    [SY_D_USDC]: pendleEvents,
-  };
 
   const poolToTotalSubLiquidityPoints = calculateVirtualLiquidityPoints(
     poolToVirtualLiquidityPositionsAndEvents,

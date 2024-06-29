@@ -15,28 +15,21 @@ import {
   getSeasonForOTokenType,
   writeOTokenConfigToGitHub,
 } from './lib/config-helper';
+import { OTokenConfigFile, OTokenOutputFile, OTokenType } from './lib/data-types';
 import {
   getAccountBalancesByMarket,
-  getAmmLiquidityPositionAndEvents,
-  getArbVestingLiquidityPositionAndEvents,
   getBalanceChangingEvents,
-  getPendleDUsdcLiquidityPositionAndEvents,
+  getPoolAddressToVirtualLiquidityPositionsAndEvents,
 } from './lib/event-parser';
 import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
 import { setupRemapping } from './lib/remapper';
 import {
-  ARB_VESTER_PROXY,
   calculateFinalPoints,
   calculateMerkleRootAndProofs,
   calculateVirtualLiquidityPoints,
-  ETH_USDC_POOL,
   InterestOperation,
-  LiquidityPositionsAndEvents,
   processEventsUntilEndTimestamp,
-  SY_D_USDC,
 } from './lib/rewards';
-import { OTokenConfigFile, OTokenOutputFile, OTokenType } from './lib/data-types';
-import { ChainId } from '../src/lib/chain-id';
 
 const REWARD_MULTIPLIERS_MAP = {};
 
@@ -140,38 +133,16 @@ async function calculateOTokenRewards(oTokenType: OTokenType = getOTokenTypeFrom
     InterestOperation.NOTHING,
   );
 
-  const ammLiquidityBalancesAndEvents = await getAmmLiquidityPositionAndEvents(
-    startBlockNumber,
-    startTimestamp,
-    endTimestamp,
-  );
-
-  const vestingPositionsAndEvents = await getArbVestingLiquidityPositionAndEvents(
-    startBlockNumber,
-    startTimestamp,
-    endTimestamp,
-  );
-
-  const syTokenPositions = await getPendleDUsdcLiquidityPositionAndEvents(
+  const poolToVirtualLiquidityPositionsAndEvents = await getPoolAddressToVirtualLiquidityPositionsAndEvents(
     networkId,
+    startBlockNumber,
     startTimestamp,
     endTimestamp,
+    false,
   );
-
-  const poolToVirtualLiquidityPositionsAndEvents: Record<ChainId, Record<string, LiquidityPositionsAndEvents>> = {
-    [ChainId.ArbitrumOne]: {
-      [ETH_USDC_POOL]: ammLiquidityBalancesAndEvents,
-      [ARB_VESTER_PROXY]: vestingPositionsAndEvents,
-      [SY_D_USDC]: syTokenPositions,
-    },
-    [ChainId.Base]: {},
-    [ChainId.Mantle]: {},
-    [ChainId.PolygonZkEvm]: {},
-    [ChainId.XLayer]: {},
-  };
 
   const poolToTotalSubLiquidityPoints: Record<string, Decimal> = calculateVirtualLiquidityPoints(
-    poolToVirtualLiquidityPositionsAndEvents[networkId],
+    poolToVirtualLiquidityPositionsAndEvents,
     startTimestamp,
     endTimestamp,
   );
@@ -180,7 +151,7 @@ async function calculateOTokenRewards(oTokenType: OTokenType = getOTokenTypeFrom
     networkId,
     accountToDolomiteBalanceMap,
     oTokenRewardWeiMap,
-    poolToVirtualLiquidityPositionsAndEvents[networkId],
+    poolToVirtualLiquidityPositionsAndEvents,
     poolToTotalSubLiquidityPoints,
   );
 

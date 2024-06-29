@@ -17,7 +17,7 @@ const PENDLE_TREASURY_MAP: Record<ChainId, string | undefined> = {
 
 export const PENDLE_TREASURY_ADDRESS = PENDLE_TREASURY_MAP[CHAIN];
 
-export const POOL_INFO: Record<ChainId, Record<string, PoolConfiguration>> = {
+export const POOL_INFO: Record<ChainId, Record<number, PoolConfiguration>> = {
   [ChainId.ArbitrumOne]: {
     [USDC_MARKET_ID]: {
       SY: '0x84e0efc0633041aac9d0196b7ac8af3505e8cc32'.toLowerCase(),
