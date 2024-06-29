@@ -3,28 +3,58 @@ import { isScript } from '../src/lib/env';
 import Logger from '../src/lib/logger';
 import {
   getMineralConfigFileNameWithPath,
+  getMineralYtConfigFileNameWithPath,
   getNextConfigIfNeeded,
   MINERAL_SEASON,
-  MineralConfigEpoch,
-  MineralConfigFile,
   writeMineralConfigToGitHub,
+  writeMineralYtConfigToGitHub,
 } from './lib/config-helper';
 import { readFileFromGitHub, writeOutputFile } from './lib/file-helpers';
+import { MineralConfigEpoch, MineralConfigFile, MineralYtConfigEpoch, MineralYtConfigFile } from './lib/data-types';
 
-export const MAX_MINERALS_KEY_BEFORE_MIGRATIONS = 900
+export const MIN_MINERALS_KEY_BEFORE_MIGRATIONS = 900
+export const MAX_MINERALS_KEY_BEFORE_MIGRATIONS = 10_000;
 
-export async function calculateMineralSeasonConfig(
-  skipConfigUpdate: boolean = false,
+export enum MineralConfigType {
+  RegularConfig = 0,
+  YtConfig = 1,
+}
+
+type ConfigType<T extends MineralConfigType> =
+  T extends MineralConfigType.RegularConfig ? MineralConfigFile
+    : T extends MineralConfigType.YtConfig ? MineralYtConfigFile
+      : never;
+
+type EpochConfigType<T extends MineralConfigType> =
+  T extends MineralConfigType.RegularConfig ? MineralConfigEpoch
+    : T extends MineralConfigType.YtConfig ? MineralYtConfigEpoch
+      : never;
+
+export async function calculateMineralSeasonConfig<T extends MineralConfigType>(
+  configType: T,
+  options: { skipConfigUpdate: boolean } = { skipConfigUpdate: false },
 ): Promise<{ epochNumber: number; endTimestamp: number; isEpochElapsed: boolean }> {
   const networkId = await dolomite.web3.eth.net.getId();
 
-  const configFile = await readFileFromGitHub<MineralConfigFile>(getMineralConfigFileNameWithPath(networkId));
+  const mineralConfigPath = configType === MineralConfigType.RegularConfig
+    ? getMineralConfigFileNameWithPath(networkId)
+    : configType === MineralConfigType.YtConfig
+      ? getMineralYtConfigFileNameWithPath(networkId)
+      : undefined;
+  if (!mineralConfigPath) {
+    return Promise.reject(new Error(`Invalid config type, found ${configType}`));
+  }
+
+  const configFile = await readFileFromGitHub<ConfigType<T>>(mineralConfigPath);
   const epochNumber: number = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   let maxKey = epochNumber
   if (Number.isNaN(epochNumber)) {
     maxKey = Object.keys(configFile.epochs).reduce((max, key) => {
       const value = parseInt(key, 10);
-      if (Number.isNaN(value) || value >= MAX_MINERALS_KEY_BEFORE_MIGRATIONS) {
+      if (
+        Number.isNaN(value)
+        || (value >= MIN_MINERALS_KEY_BEFORE_MIGRATIONS && value <= MAX_MINERALS_KEY_BEFORE_MIGRATIONS)
+      ) {
         return max
       }
       if (configFile.epochs[value].isTimeElapsed && configFile.epochs[value].isMerkleRootGenerated) {
@@ -36,7 +66,7 @@ export async function calculateMineralSeasonConfig(
     }, 0);
   }
 
-  if (skipConfigUpdate) {
+  if (options.skipConfigUpdate) {
     Logger.info({
       at: 'calculateMineralSeasonConfig',
       message: 'Skipping config update...',
@@ -52,21 +82,52 @@ export async function calculateMineralSeasonConfig(
   const oldEpoch = configFile.epochs[maxKey];
   const nextEpochData = await getNextConfigIfNeeded(oldEpoch);
 
-  const epochData: MineralConfigEpoch = {
-    epoch: nextEpochData.isReadyForNext ? maxKey + 1 : maxKey,
-    startBlockNumber: nextEpochData.newStartBlockNumber,
-    startTimestamp: nextEpochData.newStartTimestamp,
-    endBlockNumber: nextEpochData.actualEndBlockNumber,
-    endTimestamp: nextEpochData.actualEndTimestamp,
-    isTimeElapsed: nextEpochData.isTimeElapsed,
-    isMerkleRootGenerated: false,
-    isMerkleRootWrittenOnChain: false,
-    boostedMultiplier: (configFile.epochs[maxKey + 1] ?? oldEpoch).boostedMultiplier,
-    marketIdToRewardMap: (configFile.epochs[maxKey + 1] ?? oldEpoch).marketIdToRewardMap,
-  };
+  let epochData: EpochConfigType<T>;
+  if (configType === MineralConfigType.RegularConfig) {
+    const typedConfigFile = configFile as MineralConfigFile;
+    epochData = (
+      {
+        epoch: nextEpochData.isReadyForNext ? maxKey + 1 : maxKey,
+        startBlockNumber: nextEpochData.newStartBlockNumber,
+        startTimestamp: nextEpochData.newStartTimestamp,
+        endBlockNumber: nextEpochData.actualEndBlockNumber,
+        endTimestamp: nextEpochData.actualEndTimestamp,
+        isTimeElapsed: nextEpochData.isTimeElapsed,
+        isMerkleRootGenerated: false,
+        isMerkleRootWrittenOnChain: false,
+        boostedMultiplier: (typedConfigFile.epochs[maxKey + 1] ?? oldEpoch).boostedMultiplier,
+        marketIdToRewardMap: (typedConfigFile.epochs[maxKey + 1] ?? oldEpoch).marketIdToRewardMap,
+      } as MineralConfigEpoch
+    ) as EpochConfigType<T>;
+  } else if (configType === MineralConfigType.YtConfig) {
+    const typedConfigFile = configFile as MineralYtConfigFile;
+    epochData = (
+      {
+        epoch: nextEpochData.isReadyForNext ? maxKey + 1 : maxKey,
+        startBlockNumber: nextEpochData.newStartBlockNumber,
+        startTimestamp: nextEpochData.newStartTimestamp,
+        endBlockNumber: nextEpochData.actualEndBlockNumber,
+        endTimestamp: nextEpochData.actualEndTimestamp,
+        isTimeElapsed: nextEpochData.isTimeElapsed,
+        isMerkleRootGenerated: false,
+        isMerkleRootWrittenOnChain: false,
+        boostedMultiplier: (typedConfigFile.epochs[maxKey + 1] ?? oldEpoch).boostedMultiplier,
+        marketId: (typedConfigFile.epochs[maxKey + 1] ?? oldEpoch).marketId,
+        marketIdReward: (typedConfigFile.epochs[maxKey + 1] ?? oldEpoch).marketIdReward,
+      } as MineralYtConfigEpoch
+    ) as EpochConfigType<T>;
+  } else {
+    return Promise.reject(new Error(`Invalid config type, found ${configType}`));
+  }
 
   if (!isScript()) {
-    await writeMineralConfigToGitHub(configFile, epochData);
+    if (configType === MineralConfigType.RegularConfig) {
+      await writeMineralConfigToGitHub(configFile as MineralConfigFile, epochData as MineralConfigEpoch);
+    } else if (configType === MineralConfigType.YtConfig) {
+      await writeMineralYtConfigToGitHub(configFile as MineralYtConfigFile, epochData as MineralYtConfigEpoch);
+    } else {
+      return Promise.reject(new Error(`Invalid config type, found ${configType}`));
+    }
   } else {
     const data = {
       ...configFile,
@@ -75,7 +136,20 @@ export async function calculateMineralSeasonConfig(
         [epochData.epoch]: epochData,
       },
     }
-    writeOutputFile(`mineral-season-${MINERAL_SEASON}-epoch-${epochData.epoch}-config.json`, data, 2);
+    const extraData = configType === MineralConfigType.RegularConfig
+      ? ''
+      : configType === MineralConfigType.YtConfig
+        ? '-yt'
+        : undefined;
+    if (extraData === undefined) {
+      return Promise.reject(new Error(`Invalid config type, found ${configType}`));
+    }
+
+    writeOutputFile(
+      `mineral-${networkId}-season-${MINERAL_SEASON}-epoch-${epochData.epoch}${extraData}-config.json`,
+      data,
+      2,
+    );
   }
 
   Logger.info({
@@ -93,7 +167,7 @@ export async function calculateMineralSeasonConfig(
 }
 
 if (isScript()) {
-  calculateMineralSeasonConfig()
+  calculateMineralSeasonConfig(MineralConfigType.YtConfig)
     .then(() => {
       console.log('Finished executing script!');
     })

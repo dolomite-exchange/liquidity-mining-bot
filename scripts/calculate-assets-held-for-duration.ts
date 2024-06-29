@@ -1,30 +1,31 @@
-import { BigNumber, INTEGERS } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
+import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import fs from 'fs';
 import v8 from 'v8';
-import { getAllDolomiteAccountsWithSupplyValue } from '../src/clients/dolomite';
+import { getAllDolomiteAccountsWithToken, getTimestampToBlockNumberMap } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
 import BlockStore from '../src/lib/block-store';
+import { ChainId } from '../src/lib/chain-id';
+import { ONE_ETH_WEI } from '../src/lib/constants';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
 import '../src/lib/env'
-import { getMineralConfigFileNameWithPath, MineralConfigFile } from './lib/config-helper';
+import { getMineralConfigFileNameWithPath } from './lib/config-helper';
+import { MineralConfigFile } from './lib/data-types';
 import {
   getAccountBalancesByMarket,
-  getAmmLiquidityPositionAndEvents,
-  getArbVestingLiquidityPositionAndEvents,
   getBalanceChangingEvents,
+  getPoolAddressToVirtualLiquidityPositionsAndEvents,
 } from './lib/event-parser';
 import { readFileFromGitHub } from './lib/file-helpers';
 import { setupRemapping } from './lib/remapper';
 import {
-  ARB_VESTER_PROXY,
+  addToBlacklist,
   calculateFinalPoints,
   calculateVirtualLiquidityPoints,
-  ETH_USDC_POOL,
   InterestOperation,
-  LiquidityPositionsAndEvents,
   processEventsUntilEndTimestamp,
 } from './lib/rewards';
 
@@ -45,6 +46,22 @@ interface OutputFile {
   };
 }
 
+const ONE_WEEK_SECONDS = 86_400 * 7;
+
+const GRAI_MARKET_ID = 46;
+const USDM_MARKET_ID = 48;
+
+const CHAIN_TO_MARKET_ID_REWARDS_MAP: Record<ChainId, Record<string, Integer | undefined>> = {
+  [ChainId.ArbitrumOne]: {
+    [GRAI_MARKET_ID]: new BigNumber('5000').times(ONE_ETH_WEI), // TODO: update to 9000
+    [USDM_MARKET_ID]: new BigNumber('1000').times(ONE_ETH_WEI),
+  },
+  [ChainId.Base]: {},
+  [ChainId.Mantle]: {},
+  [ChainId.PolygonZkEvm]: {},
+  [ChainId.XLayer]: {},
+};
+
 const FOLDER_NAME = `${__dirname}/output`;
 
 async function start() {
@@ -55,9 +72,31 @@ async function start() {
   );
 
   const epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
-  if (Number.isNaN(epoch) || !liquidityMiningConfig.epochs[epoch]) {
+  let startTimestamp = parseInt(process.env.START_TIMESTAMP ?? 'NaN', 10);
+  let endTimestamp = parseInt(process.env.END_TIMESTAMP ?? 'NaN', 10);
+  if (Number.isNaN(epoch) && Number.isNaN(startTimestamp) && Number.isNaN(endTimestamp)) {
+    return Promise.reject(new Error('Invalid EPOCH_NUMBER, START_TIMESTAMP, or END_TIMESTAMP'));
+  } else if (!Number.isNaN(epoch) && !liquidityMiningConfig.epochs[epoch]) {
     return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
+  } else if (!Number.isNaN(startTimestamp) && !Number.isNaN(endTimestamp)) {
+    if (startTimestamp % ONE_WEEK_SECONDS !== 0 || endTimestamp % ONE_WEEK_SECONDS !== 0) {
+      return Promise.reject(new Error('Invalid START_TIMESTAMP or END_TIMESTAMP modularity'));
+    }
   }
+
+  let startBlockNumber: number;
+  let endBlockNumber: number;
+  if (!Number.isNaN(epoch)) {
+    startTimestamp = liquidityMiningConfig.epochs[epoch].startTimestamp;
+    endTimestamp = liquidityMiningConfig.epochs[epoch].endTimestamp;
+    startBlockNumber = liquidityMiningConfig.epochs[epoch].startBlockNumber;
+    endBlockNumber = liquidityMiningConfig.epochs[epoch].endBlockNumber;
+  } else {
+    const timestampToBlockMap = await getTimestampToBlockNumberMap([startTimestamp, endTimestamp]);
+    startBlockNumber = timestampToBlockMap[startTimestamp];
+    endBlockNumber = timestampToBlockMap[endTimestamp];
+  }
+
   const maxMarketId = (await dolomite.getters.getNumMarkets()).toNumber();
   const validMarketId = parseInt(process.env.MARKET_ID ?? 'NaN', 10);
   if (Number.isNaN(validMarketId)) {
@@ -66,16 +105,13 @@ async function start() {
     return Promise.reject(new Error(`MARKET_ID contains an element that is too large, found: ${validMarketId}`));
   }
 
-  const validMarketIdsMap = {
-    [validMarketId]: INTEGERS.ONE,
-  }
+  const validMarketIdMap = { [validMarketId]: INTEGERS.ONE };
 
   const blockStore = new BlockStore();
   await blockStore._update();
   const marketStore = new MarketStore(blockStore, true);
 
-  const { startBlockNumber, startTimestamp, endBlockNumber, endTimestamp } = liquidityMiningConfig.epochs[epoch];
-
+  // 4999999999999999971963.0
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address;
   if (networkId !== Number(process.env.NETWORK_ID)) {
     const message = `Invalid network ID found!\n
@@ -106,8 +142,17 @@ async function start() {
   const endMarketMap = marketStore.getMarketMap();
   const endMarketIndexMap = await marketStore.getMarketIndexMap(endMarketMap, { blockNumber: endBlockNumber });
 
+  const tokenAddress = await dolomite.getters.getMarketTokenAddress(new BigNumber(validMarketId));
+  const token = new dolomite.web3.eth.Contract(TokenAbi, tokenAddress);
+  const tokenName = await dolomite.contracts.callConstantContractFunction(token.methods.name());
+
+  const goArbVesterProxy = ModuleDeployments.GravitaExternalVesterProxy[networkId];
+  if (goArbVesterProxy) {
+    addToBlacklist(goArbVesterProxy.address);
+  }
+
   const apiAccounts = await Pageable.getPageableValues(async (lastId) => {
-    const result = await getAllDolomiteAccountsWithSupplyValue(startMarketIndexMap, startBlockNumber, lastId);
+    const result = await getAllDolomiteAccountsWithToken(tokenAddress, startMarketIndexMap, startBlockNumber, lastId);
     return result.accounts;
   });
 
@@ -116,36 +161,27 @@ async function start() {
   const accountToDolomiteBalanceMap = getAccountBalancesByMarket(
     apiAccounts,
     startTimestamp,
-    validMarketIdsMap,
+    validMarketIdMap,
   );
 
-  const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber);
+  const accountToAssetToEventsMap = await getBalanceChangingEvents(startBlockNumber, endBlockNumber, tokenAddress);
 
   processEventsUntilEndTimestamp(
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
     endMarketIndexMap,
-    validMarketIdsMap,
+    validMarketIdMap,
     endTimestamp,
     InterestOperation.NOTHING,
   );
 
-  const ammLiquidityBalancesAndEvents = await getAmmLiquidityPositionAndEvents(
+  const poolToVirtualLiquidityPositionsAndEvents = await getPoolAddressToVirtualLiquidityPositionsAndEvents(
+    networkId,
     startBlockNumber,
     startTimestamp,
     endTimestamp,
+    false,
   );
-
-  const vestingPositionsAndEvents = await getArbVestingLiquidityPositionAndEvents(
-    startBlockNumber,
-    startTimestamp,
-    endTimestamp,
-  );
-
-  const poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents> = {
-    [ETH_USDC_POOL]: ammLiquidityBalancesAndEvents,
-    [ARB_VESTER_PROXY]: vestingPositionsAndEvents,
-  };
 
   const poolToTotalSubLiquidityPoints = calculateVirtualLiquidityPoints(
     poolToVirtualLiquidityPositionsAndEvents,
@@ -156,7 +192,7 @@ async function start() {
   const { userToPointsMap, marketToPointsMap } = calculateFinalPoints(
     networkId,
     accountToDolomiteBalanceMap,
-    validMarketIdsMap,
+    validMarketIdMap,
     poolToVirtualLiquidityPositionsAndEvents,
     poolToTotalSubLiquidityPoints,
   );
@@ -168,21 +204,22 @@ async function start() {
     }
   });
 
-  const tokenAddress = await dolomite.getters.getMarketTokenAddress(new BigNumber(validMarketId));
-  const token = new dolomite.web3.eth.Contract(TokenAbi, tokenAddress);
-  const tokenName = await dolomite.contracts.callConstantContractFunction(token.methods.name());
-
-  // eslint-disable-next-line max-len
+  const rewardToSplit = CHAIN_TO_MARKET_ID_REWARDS_MAP[networkId as ChainId][validMarketId];
   const fileName = `${FOLDER_NAME}/asset-held-${startTimestamp}-${endTimestamp}-${validMarketId}-output.json`;
   const dataToWrite = readOutputFile(fileName);
   dataToWrite.users = Object.keys(userToPointsMap).reduce((memo, user) => {
-    memo[user] = userToPointsMap[user].toFixed(0);
+    const points = userToPointsMap[user];
+    if (rewardToSplit) {
+      memo[user] = rewardToSplit.times(points).dividedToIntegerBy(marketToPointsMap[validMarketId]).toFixed(0);
+    } else {
+      memo[user] = points.toFixed(0);
+    }
     return memo;
   }, {});
   dataToWrite.metadata = {
     marketId: validMarketId,
     marketName: tokenName,
-    totalPointsForMarket: marketToPointsMap[validMarketId].toFixed(0),
+    totalPointsForMarket: (rewardToSplit ?? marketToPointsMap[validMarketId]).toFixed(0),
     startBlock: startBlockNumber,
     endBlock: endBlockNumber,
     startTimestamp,
@@ -223,6 +260,16 @@ function writeOutputFile(
   fs.writeFileSync(
     fileName,
     JSON.stringify(fileContent),
+    { encoding: 'utf8', flag: 'w' },
+  );
+
+  const amountsAsCsv = Object.keys(fileContent.users).map(user => {
+    const userAmount = new BigNumber(fileContent.users[user]).div(ONE_ETH_WEI).toFixed(18);
+    return `${user.toLowerCase()},${userAmount}`;
+  });
+  fs.writeFileSync(
+    fileName.replace('.json', '.csv'),
+    amountsAsCsv.join('\n'),
     { encoding: 'utf8', flag: 'w' },
   );
 }

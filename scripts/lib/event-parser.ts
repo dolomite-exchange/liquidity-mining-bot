@@ -23,12 +23,19 @@ import {
   ApiTransfer,
   ApiWithdrawal,
 } from '../../src/lib/api-types';
+import { ChainId } from '../../src/lib/chain-id';
+import { ONE_ETH_WEI } from '../../src/lib/constants';
 import Pageable from '../../src/lib/pageable';
+import { POOL_INFO } from '../../src/lib/pendle/configuration';
+import { getMineralFinalizedFileNameWithPath, getMineralYtConfigFileNameWithPath } from './config-helper';
+import { MineralYtConfigFile, MineralYtOutputFile } from './data-types';
+import { readFileFromGitHub } from './file-helpers';
 import {
   AccountToSubAccountToMarketToBalanceChangeMap,
   AccountToSubAccountToMarketToBalanceMap,
   AccountToVirtualLiquidityBalanceMap,
   AccountToVirtualLiquiditySnapshotsMap,
+  ARB_VESTER_PROXY,
   BalanceAndRewardPoints,
   BalanceChangeEvent,
   LiquidityPositionsAndEvents,
@@ -144,43 +151,113 @@ export async function getBalanceChangingEvents(
 
 type VirtualLiquiditySnapshotInternal = VirtualLiquiditySnapshotBalance | VirtualLiquiditySnapshotDeltaPar;
 
-export async function getAmmLiquidityPositionAndEvents(
+export async function getPoolAddressToVirtualLiquidityPositionsAndEvents(
+  networkId: number,
   startBlockNumber: number,
   startTimestamp: number,
   endTimestamp: number,
-): Promise<LiquidityPositionsAndEvents> {
-  const virtualLiquidityBalances: AccountToVirtualLiquidityBalanceMap = {};
-  const userToLiquiditySnapshots: AccountToVirtualLiquiditySnapshotsMap = {};
-  const virtualLiquidityPositions = await Pageable.getPageableValues<VirtualLiquidityPosition>((async (lastId) => {
-    const results = await getLiquidityPositions(startBlockNumber - 1, lastId);
-    return results.ammLiquidityPositions.map<VirtualLiquidityPosition>(position => ({
-      id: position.id,
-      effectiveUser: position.effectiveUser,
-      marketId: -1,
-      balancePar: position.balance,
-    }));
-  }));
-  parseVirtualLiquidityPositions(
-    virtualLiquidityBalances,
-    virtualLiquidityPositions,
+  ignorePendle: boolean,
+): Promise<Record<string, LiquidityPositionsAndEvents>> {
+  const pairToAmmPositionsAndEventsMap = await getAmmLiquidityPositionAndEvents(
+    startBlockNumber,
     startTimestamp,
+    endTimestamp,
   );
 
-  const ammLiquiditySnapshots = await Pageable.getPageableValues<VirtualLiquiditySnapshotInternal>((async (lastId) => {
-    const { snapshots } = await getLiquiditySnapshots(startTimestamp, endTimestamp, lastId);
-    return snapshots.map<VirtualLiquiditySnapshotInternal>(snapshot => ({
-      id: snapshot.id,
-      effectiveUser: snapshot.effectiveUser,
-      timestamp: parseInt(snapshot.timestamp, 10),
-      balancePar: new BigNumber(snapshot.liquidityTokenBalance),
-    }));
-  }));
-  parseVirtualLiquiditySnapshots(userToLiquiditySnapshots, ammLiquiditySnapshots, virtualLiquidityBalances);
+  const oTokenVestingPositionsAndEventsMap = await getOTokenVestingLiquidityPositionAndEvents(
+    startBlockNumber,
+    startTimestamp,
+    endTimestamp,
+  );
 
-  return { virtualLiquidityBalances, userToLiquiditySnapshots };
+  let syAddressToPendlePositionsAndEventsMap: Record<string, LiquidityPositionsAndEvents>;
+  if (ignorePendle) {
+    syAddressToPendlePositionsAndEventsMap = {};
+  } else {
+    syAddressToPendlePositionsAndEventsMap = await getPendleSyAddressToLiquidityPositionAndEvents(
+      networkId,
+      startTimestamp,
+      endTimestamp,
+    );
+  }
+
+  return {
+    ...syAddressToPendlePositionsAndEventsMap,
+    ...pairToAmmPositionsAndEventsMap,
+    [ARB_VESTER_PROXY]: oTokenVestingPositionsAndEventsMap,
+  };
 }
 
-export async function getArbVestingLiquidityPositionAndEvents(
+async function getAmmLiquidityPositionAndEvents(
+  startBlockNumber: number,
+  startTimestamp: number,
+  endTimestamp: number,
+): Promise<Record<string, LiquidityPositionsAndEvents>> {
+  const pairToFinalPositionsAndEventsMap: Record<string, LiquidityPositionsAndEvents> = {};
+  const pairToVirtualPositions: Record<string, VirtualLiquidityPosition[]> = {};
+  const pairToSnapshots: Record<string, VirtualLiquiditySnapshotInternal[]> = {};
+  await Pageable.getPageableValues((async (lastId) => {
+    const results = await getLiquidityPositions(startBlockNumber - 1, lastId);
+    return results.ammLiquidityPositions.map(position => {
+      if (!pairToVirtualPositions[position.pairAddress]) {
+        pairToVirtualPositions[position.pairAddress] = [];
+      }
+      if (!pairToFinalPositionsAndEventsMap[position.pairAddress]) {
+        pairToFinalPositionsAndEventsMap[position.pairAddress] = {
+          userToLiquiditySnapshots: {},
+          virtualLiquidityBalances: {},
+        };
+      }
+
+      const virtualPosition = {
+        id: position.id,
+        effectiveUser: position.effectiveUser,
+        marketId: -1,
+        balancePar: position.balance,
+      };
+      pairToVirtualPositions[position.pairAddress].push(virtualPosition);
+      return virtualPosition;
+    });
+  }));
+
+  Object.keys(pairToVirtualPositions).forEach(pairAddress => {
+    parseVirtualLiquidityPositions(
+      pairToFinalPositionsAndEventsMap[pairAddress].virtualLiquidityBalances,
+      pairToVirtualPositions[pairAddress],
+      startTimestamp,
+    );
+  });
+
+  await Pageable.getPageableValues<VirtualLiquiditySnapshotInternal>((async (lastId) => {
+    const { snapshots } = await getLiquiditySnapshots(startTimestamp, endTimestamp, lastId);
+    return snapshots.map<VirtualLiquiditySnapshotInternal>(snapshot => {
+      if (!pairToSnapshots[snapshot.pairAddress]) {
+        pairToSnapshots[snapshot.pairAddress] = [];
+      }
+
+      const virtualSnapshot: VirtualLiquiditySnapshotInternal = {
+        id: snapshot.id,
+        effectiveUser: snapshot.effectiveUser,
+        timestamp: parseInt(snapshot.timestamp, 10),
+        balancePar: new BigNumber(snapshot.liquidityTokenBalance),
+      };
+      pairToSnapshots[snapshot.pairAddress].push(virtualSnapshot);
+      return virtualSnapshot;
+    });
+  }));
+
+  Object.keys(pairToSnapshots).forEach(pairAddress => {
+    parseVirtualLiquiditySnapshots(
+      pairToFinalPositionsAndEventsMap[pairAddress].userToLiquiditySnapshots,
+      pairToSnapshots[pairAddress],
+      pairToFinalPositionsAndEventsMap[pairAddress].virtualLiquidityBalances,
+    );
+  });
+
+  return pairToFinalPositionsAndEventsMap;
+}
+
+async function getOTokenVestingLiquidityPositionAndEvents(
   startBlockNumber: number,
   startTimestamp: number,
   endTimestamp: number,
@@ -234,6 +311,47 @@ export async function getArbVestingLiquidityPositionAndEvents(
   parseVirtualLiquiditySnapshots(userToLiquiditySnapshots, vestingPositionSnapshots, virtualLiquidityBalances);
 
   return { virtualLiquidityBalances, userToLiquiditySnapshots };
+}
+
+async function getPendleSyAddressToLiquidityPositionAndEvents(
+  networkId: number,
+  startTimestamp: number,
+  endTimestamp: number,
+): Promise<Record<string, LiquidityPositionsAndEvents>> {
+  const virtualLiquidityBalances: AccountToVirtualLiquidityBalanceMap = {};
+  const ytConfig = await readFileFromGitHub<MineralYtConfigFile>(getMineralYtConfigFileNameWithPath(networkId));
+  const epochs = Object.values(ytConfig.epochs).filter(e => {
+    return e.startTimestamp === startTimestamp && e.endTimestamp === endTimestamp;
+  });
+  if (epochs.length === 0) {
+    console.warn(`Invalid epoch, could not find for [${startTimestamp}, ${endTimestamp}]`)
+    return Promise.resolve({});
+  }
+
+  const syAddressToVirtualLiquidityPositions = {};
+  for (const epoch of epochs) {
+    const outputFile = await readFileFromGitHub<MineralYtOutputFile>(
+      getMineralFinalizedFileNameWithPath(networkId, epoch.epoch),
+    );
+    const positions = Object.keys(outputFile.users).map<VirtualLiquidityPosition>(user => {
+      return {
+        id: user,
+        marketId: outputFile.metadata.marketId,
+        effectiveUser: user,
+        balancePar: new BigNumber(outputFile.users[user].amount).div(ONE_ETH_WEI),
+      }
+    });
+    parseVirtualLiquidityPositions(
+      virtualLiquidityBalances,
+      positions,
+      startTimestamp,
+    );
+
+    const syAddress = POOL_INFO[networkId as ChainId][outputFile.metadata.marketId].SY;
+    syAddressToVirtualLiquidityPositions[syAddress] = { virtualLiquidityBalances, userToLiquiditySnapshots: {} };
+  }
+
+  return syAddressToVirtualLiquidityPositions;
 }
 
 export function parseDeposits(
@@ -516,8 +634,7 @@ function addEventToUser(
   marketId: number,
   event: BalanceChangeEvent,
 ): void {
-  const user = marginAccount.user;
-  const accountNumber = marginAccount.accountNumber;
+  const { user, accountNumber } = marginAccount;
   accountToAssetToEventsMap[user] = accountToAssetToEventsMap[user] ?? {};
   accountToAssetToEventsMap[user]![accountNumber] = accountToAssetToEventsMap[user]![accountNumber] ?? {};
   if (accountToAssetToEventsMap[user]![accountNumber]![marketId]) {

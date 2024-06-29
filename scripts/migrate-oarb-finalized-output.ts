@@ -2,15 +2,14 @@ import '../src/lib/env'
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { dolomite } from '../src/helpers/web3';
 import TokenAbi from './abis/isolation-mode-factory.json';
-import { OTokenEpochMetadata } from './calculate-otoken-rewards';
-import { MAX_OARB_KEY_BEFORE_MIGRATIONS, OTokenConfigFile } from './calculate-otoken-season-config';
+import { MAX_OARB_KEY_BEFORE_MIGRATIONS } from './calculate-otoken-season-config';
 import {
   getOTokenConfigFileNameWithPath,
   getOTokenFinalizedFileNameWithPath,
   getOTokenMetadataFileNameWithPath,
-  OTokenType,
 } from './lib/config-helper';
 import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
+import { OTokenConfigFile, OTokenEpochMetadata, OTokenType } from './lib/data-types';
 
 interface OldFinalizedOutputFile {
   users: {

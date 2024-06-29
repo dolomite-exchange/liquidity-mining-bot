@@ -9,37 +9,38 @@ import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
 import {
-  EpochMetadata,
   getMineralConfigFileNameWithPath,
   getMineralFinalizedFileNameWithPath,
   getMineralMetadataFileNameWithPath,
   MINERAL_SEASON,
-  MineralConfigFile,
-  MineralOutputFile,
-  UserMineralAllocationForFile,
   writeMineralConfigToGitHub,
 } from './lib/config-helper';
+import { EpochMetadata, MineralConfigFile, MineralOutputFile, UserMineralAllocationForFile } from './lib/data-types';
 import {
   getAccountBalancesByMarket,
-  getAmmLiquidityPositionAndEvents,
-  getArbVestingLiquidityPositionAndEvents,
   getBalanceChangingEvents,
+  getPoolAddressToVirtualLiquidityPositionsAndEvents,
 } from './lib/event-parser';
 import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
 import { setupRemapping } from './lib/remapper';
 import {
-  ARB_VESTER_PROXY,
   BLACKLIST_ADDRESSES,
   calculateFinalPoints,
   calculateMerkleRootAndProofs,
   calculateVirtualLiquidityPoints,
-  ETH_USDC_POOL,
   InterestOperation,
-  LiquidityPositionsAndEvents,
   processEventsUntilEndTimestamp,
 } from './lib/rewards';
 
 /* eslint-enable */
+
+export interface MineralEpochMetadata extends EpochMetadata {
+  deltas: number[]
+  pendleMetadata: {
+    startEpochNumber: number
+    maxEpochNumber: number
+  }
+}
 
 interface UserMineralAllocation {
   /**
@@ -85,15 +86,15 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
       at: 'calculateMineralRewards',
       message: `Epoch ${epoch} has passed and merkle root was generated, skipping...`,
     });
-    return;
+    return Promise.resolve();
   }
 
-  if (!Object.keys(marketIdToRewardMap).every(m => !Number.isNaN(parseInt(m)))) {
-    return Promise.reject('Invalid market ID in map');
+  if (!Object.keys(marketIdToRewardMap).every(m => !Number.isNaN(parseInt(m, 10)))) {
+    return Promise.reject(new Error('Invalid market ID in map'));
   } else if (!Object.values(marketIdToRewardMap).every(m => !new BigNumber(m).isNaN())) {
-    return Promise.reject('Reward amounts are invalid');
+    return Promise.reject(new Error('Reward amounts are invalid'));
   } else if (!Object.values(marketIdToRewardMap).every(m => new BigNumber(m).lt(1_000_000))) {
-    return Promise.reject('Reward amounts are too large. Is this a bug?');
+    return Promise.reject(new Error('Reward amounts are too large. Is this a bug?'));
   }
 
   const validRewardMultipliersMap = Object.keys(marketIdToRewardMap).reduce((memo, marketId) => {
@@ -158,22 +159,13 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     InterestOperation.ADD_POSITIVE,
   );
 
-  const ammLiquidityBalancesAndEvents = await getAmmLiquidityPositionAndEvents(
+  const poolToVirtualLiquidityPositionsAndEvents = await getPoolAddressToVirtualLiquidityPositionsAndEvents(
+    networkId,
     startBlockNumber,
     startTimestamp,
     endTimestamp,
+    true,
   );
-
-  const vestingPositionsAndEvents = await getArbVestingLiquidityPositionAndEvents(
-    startBlockNumber,
-    startTimestamp,
-    endTimestamp,
-  );
-
-  const poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents> = {
-    [ETH_USDC_POOL]: ammLiquidityBalancesAndEvents,
-    [ARB_VESTER_PROXY]: vestingPositionsAndEvents,
-  };
 
   const poolToTotalSubLiquidityPoints = calculateVirtualLiquidityPoints(
     poolToVirtualLiquidityPositionsAndEvents,

@@ -1,26 +1,20 @@
-import { isScript } from '../src/lib/env'
+import { isScript, shouldForceUpload } from '../src/lib/env'
 import { dolomite } from '../src/helpers/web3';
 import Logger from '../src/lib/logger';
 import {
-  ConfigFile,
-  EpochConfig,
   getNextConfigIfNeeded,
   getOTokenConfigFileNameWithPath,
-  OTokenType,
+  getOTokenTypeFromEnvironment,
+  getSeasonForOTokenType,
+  writeOTokenConfigToGitHub,
 } from './lib/config-helper';
-import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
+import { readFileFromGitHub, writeOutputFile } from './lib/file-helpers';
+import { OTokenConfigEpoch, OTokenConfigFile, OTokenType } from './lib/data-types';
 
 export const MAX_OARB_KEY_BEFORE_MIGRATIONS = 701;
 
-interface OTokenConfigEpoch extends EpochConfig {
-  oTokenAmount: string;
-  rewardWeights: Record<string, string>;
-}
-
-export interface OTokenConfigFile extends ConfigFile<OTokenConfigEpoch> {
-}
-
 async function calculateOTokenSeasonConfig(
+  oTokenType: OTokenType = getOTokenTypeFromEnvironment(),
   skipConfigUpdate: boolean = false,
 ): Promise<number> {
   const { networkId } = dolomite;
@@ -30,7 +24,7 @@ async function calculateOTokenSeasonConfig(
 
   const oTokenConfigFile = await readFileFromGitHub<OTokenConfigFile>(getOTokenConfigFileNameWithPath(
     networkId,
-    OTokenType.oARB,
+    oTokenType,
   ));
   const selectedEpoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   let maxKey = selectedEpoch
@@ -68,28 +62,22 @@ async function calculateOTokenSeasonConfig(
     isMerkleRootWrittenOnChain: false,
   };
 
-  await writeOTokenConfigToGitHub(oTokenConfigFile, epochData);
+  if (!isScript() || shouldForceUpload()) {
+    await writeOTokenConfigToGitHub(oTokenConfigFile, epochData);
+  } else {
+    Logger.info({
+      message: 'Skipping config file upload due to script execution',
+    });
+    oTokenConfigFile.epochs[epochData.epoch] = epochData;
+    const season = getSeasonForOTokenType(oTokenType);
+    writeOutputFile(`${oTokenType}-${networkId}-season-${season}-output.json`, oTokenConfigFile);
+  }
 
   return epochData.epoch;
 }
 
-export async function writeOTokenConfigToGitHub(
-  configFile: OTokenConfigFile,
-  epochData: OTokenConfigEpoch,
-): Promise<void> {
-  configFile.epochs[epochData.epoch] = epochData;
-  await writeFileToGitHub(
-    getOTokenConfigFileNameWithPath(
-      configFile.metadata.networkId,
-      OTokenType.oARB,
-    ),
-    configFile,
-    true,
-  );
-}
-
 if (isScript()) {
-  calculateOTokenSeasonConfig()
+  calculateOTokenSeasonConfig(OTokenType.oARB)
     .then(() => {
       console.log('Finished executing script!');
       process.exit(0);

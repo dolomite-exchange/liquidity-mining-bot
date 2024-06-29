@@ -4,63 +4,36 @@ import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
 import BlockStore from '../src/lib/block-store';
-import { isScript } from '../src/lib/env'
+import { isScript, shouldForceUpload } from '../src/lib/env'
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
-import { OTokenConfigFile, writeOTokenConfigToGitHub } from './calculate-otoken-season-config';
 import {
-  EpochMetadata,
   getOTokenConfigFileNameWithPath,
   getOTokenFinalizedFileNameWithPath,
-  getOTokenMetadataFileNameWithPath,
   getOTokenTypeFromEnvironment,
-  OTokenType,
+  getSeasonForOTokenType,
+  writeOTokenConfigToGitHub,
 } from './lib/config-helper';
+import { OTokenConfigFile, OTokenOutputFile, OTokenType } from './lib/data-types';
 import {
   getAccountBalancesByMarket,
-  getAmmLiquidityPositionAndEvents,
-  getArbVestingLiquidityPositionAndEvents,
   getBalanceChangingEvents,
+  getPoolAddressToVirtualLiquidityPositionsAndEvents,
 } from './lib/event-parser';
-import { readFileFromGitHub, writeFileToGitHub } from './lib/file-helpers';
+import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
 import { setupRemapping } from './lib/remapper';
 import {
-  ARB_VESTER_PROXY,
   calculateFinalPoints,
   calculateMerkleRootAndProofs,
   calculateVirtualLiquidityPoints,
-  ETH_USDC_POOL,
   InterestOperation,
-  LiquidityPositionsAndEvents,
   processEventsUntilEndTimestamp,
 } from './lib/rewards';
 
-export interface OTokenEpochMetadata extends EpochMetadata {
-  deltas: number[]
-}
-
-export interface OTokenOutputFile {
-  users: {
-    [walletAddressLowercase: string]: {
-      amount: string // big int
-      proofs: string[]
-    }
-  };
-  metadata: {
-    epoch: number;
-    merkleRoot: string | null;
-    marketTotalPointsForEpoch: {
-      [market: string]: string // big int
-    }
-  };
-}
-
 const REWARD_MULTIPLIERS_MAP = {};
 
-async function start() {
-  const oTokenType = getOTokenTypeFromEnvironment();
-
+async function calculateOTokenRewards(oTokenType: OTokenType = getOTokenTypeFromEnvironment()) {
   const networkId = await dolomite.web3.eth.net.getId();
   const oTokenConfig = await readFileFromGitHub<OTokenConfigFile>(
     getOTokenConfigFileNameWithPath(networkId, oTokenType as any),
@@ -84,19 +57,22 @@ async function start() {
     oTokenAmount,
   } = oTokenConfig.epochs[epoch];
 
-  const totalOARbAmount = new BigNumber(oTokenConfig.epochs[epoch].oTokenAmount);
+  const totalOTokenAmount = new BigNumber(oTokenConfig.epochs[epoch].oTokenAmount);
   const rewardWeights = oTokenConfig.epochs[epoch].rewardWeights as Record<string, string>;
   const [
     oTokenRewardWeiMap,
     sumOfWeights,
-  ]: [Record<string, Integer>, Decimal] = Object.keys(rewardWeights)
-    .reduce<[Record<string, Integer>, Decimal]>(([acc, sum], key) => {
-      acc[key] = new BigNumber(parseEther(rewardWeights[key]).toString());
-      return [acc, sum.plus(rewardWeights[key])];
-    }, [{}, new BigNumber(0)]);
-  if (!totalOARbAmount.eq(sumOfWeights)) {
+  ]: [Record<string, Integer>, Decimal] = Object.keys(rewardWeights).reduce(([acc, sum], key) => {
+    acc[key] = new BigNumber(parseEther(rewardWeights[key]).toString());
+    return [acc, sum.plus(rewardWeights[key])];
+  }, [{}, new BigNumber(0)] as [Record<string, Integer>, Decimal]);
+  if (!totalOTokenAmount.eq(sumOfWeights)) {
     return Promise.reject(new Error(`Invalid reward weights sum, found: ${sumOfWeights.toString()}`));
   }
+  const defaultEquityPerSecond = Object.keys(rewardWeights).reduce((memo, key) => {
+    memo[key] = INTEGERS.ONE;
+    return memo;
+  }, {} as Record<string, Decimal>);
 
   const { riskParams } = await getDolomiteRiskParams(startBlockNumber);
 
@@ -114,12 +90,13 @@ async function start() {
   }
 
   Logger.info({
-    message: 'DolomiteMargin data',
+    message: `DolomiteMargin data for ${oTokenType} rewards`,
     blockRewardStart: startBlockNumber,
     blockRewardStartTimestamp: startTimestamp,
     blockRewardEnd: endBlockNumber,
     blockRewardEndTimestamp: endTimestamp,
     dolomiteMargin: libraryDolomiteMargin,
+    epochNumber: epoch,
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     networkId,
@@ -151,27 +128,18 @@ async function start() {
     accountToDolomiteBalanceMap,
     accountToAssetToEventsMap,
     endMarketIndexMap,
-    REWARD_MULTIPLIERS_MAP,
+    defaultEquityPerSecond,
     endTimestamp,
     InterestOperation.NOTHING,
   );
 
-  const ammLiquidityBalancesAndEvents = await getAmmLiquidityPositionAndEvents(
+  const poolToVirtualLiquidityPositionsAndEvents = await getPoolAddressToVirtualLiquidityPositionsAndEvents(
+    networkId,
     startBlockNumber,
     startTimestamp,
     endTimestamp,
+    false,
   );
-
-  const vestingPositionsAndEvents = await getArbVestingLiquidityPositionAndEvents(
-    startBlockNumber,
-    startTimestamp,
-    endTimestamp,
-  );
-
-  const poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents> = {
-    [ETH_USDC_POOL]: ammLiquidityBalancesAndEvents,
-    [ARB_VESTER_PROXY]: vestingPositionsAndEvents,
-  };
 
   const poolToTotalSubLiquidityPoints: Record<string, Decimal> = calculateVirtualLiquidityPoints(
     poolToVirtualLiquidityPositionsAndEvents,
@@ -194,6 +162,7 @@ async function start() {
       if (!memo[user]) {
         memo[user] = INTEGERS.ZERO;
       }
+
       memo[user] = memo[user].plus(oTokenRewardWeiMap[market].times(userPoints).div(totalPoints));
     });
     return memo;
@@ -201,8 +170,8 @@ async function start() {
 
   const { merkleRoot, walletAddressToLeavesMap } = calculateMerkleRootAndProofs(userToOTokenRewards);
 
-  const fileName = getOTokenFinalizedFileNameWithPath(networkId, OTokenType.oARB, epoch);
-  const dataToWrite: OTokenOutputFile = {
+  const oTokenFileName = getOTokenFinalizedFileNameWithPath(networkId, OTokenType.oARB, epoch);
+  const oTokenOutputFile: OTokenOutputFile = {
     users: walletAddressToLeavesMap,
     metadata: {
       epoch,
@@ -215,33 +184,54 @@ async function start() {
       },
     },
   };
-  await writeFileToGitHub(fileName, dataToWrite, false);
+
+  if (!isScript() || shouldForceUpload()) {
+    await writeFileToGitHub(oTokenFileName, oTokenOutputFile, false);
+  } else {
+    Logger.info({
+      message: 'Skipping output file upload due to script execution',
+    });
+    const season = getSeasonForOTokenType(oTokenType);
+    writeOutputFile(`${oTokenType}-${networkId}-season-${season}-epoch-${epoch}-output.json`, oTokenOutputFile);
+  }
 
   if (merkleRoot) {
     oTokenConfig.epochs[epoch].isMerkleRootGenerated = true;
-    await writeOTokenConfigToGitHub(oTokenConfig, oTokenConfig.epochs[epoch]);
-  }
-
-  if (merkleRoot) {
-    // TODO: write merkle root to chain
-    // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater` (pings every 15 seconds
-    //  for an update)
-
-    const metadataFilePath = getOTokenMetadataFileNameWithPath(networkId, oTokenType);
-    const metadata = await readFileFromGitHub<OTokenEpochMetadata>(metadataFilePath);
-
-    // Once the merkle root is written, update the metadata to the new highest epoch that is finalized
-    if (metadata.maxEpochNumber === epoch - 1) {
-      metadata.maxEpochNumber = epoch;
+    if (!isScript() || shouldForceUpload()) {
+      await writeOTokenConfigToGitHub(oTokenConfig, oTokenConfig.epochs[epoch]);
+    } else {
+      Logger.info({
+        message: 'Skipping config file upload due to script execution',
+      });
+      const season = getSeasonForOTokenType(oTokenType);
+      writeOutputFile(
+        `${oTokenType}-${networkId}-season-${season}-config.json`,
+        oTokenConfig,
+        2,
+      );
     }
-    await writeFileToGitHub(metadataFilePath, metadata, true)
   }
+
+  // if (merkleRoot) {
+  //   // TODO: write merkle root to chain
+  //   // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater`
+  //   // TODO: (pings every 15 seconds for an update)
+  //
+  //   const metadataFilePath = getOTokenMetadataFileNameWithPath(networkId, oTokenType);
+  //   const metadata = await readFileFromGitHub<OTokenEpochMetadata>(metadataFilePath);
+  //
+  //   // Once the merkle root is written, update the metadata to the new highest epoch that is finalized
+  //   if (metadata.maxEpochNumber === epoch - 1) {
+  //     metadata.maxEpochNumber = epoch;
+  //   }
+  //   await writeFileToGitHub(metadataFilePath, metadata, true)
+  // }
 
   return true;
 }
 
 if (isScript()) {
-  start()
+  calculateOTokenRewards(OTokenType.oARB)
     .then(() => {
       console.log('Finished executing script!');
     })

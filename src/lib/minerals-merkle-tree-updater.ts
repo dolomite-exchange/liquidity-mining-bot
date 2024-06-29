@@ -3,8 +3,6 @@ import { MineralDistributor } from '@dolomite-exchange/modules-deployments/src/d
 import {
   getMineralConfigFileNameWithPath,
   getMineralFinalizedFileNameWithPath,
-  MineralConfigFile,
-  MineralOutputFile,
   writeMineralConfigToGitHub,
 } from '../../scripts/lib/config-helper';
 import { readFileFromGitHub } from '../../scripts/lib/file-helpers';
@@ -13,6 +11,7 @@ import { getGasPriceWei } from '../helpers/gas-price-helpers';
 import { dolomite } from '../helpers/web3';
 import { delay } from './delay';
 import Logger from './logger';
+import { MineralConfigFile, MineralOutputFile } from '../../scripts/lib/data-types';
 
 const SHORT_WAIT_DURATION_MILLIS = 60 * 1_000; // 60 seconds in millis
 const HASH_ZERO = '0x0000000000000000000000000000000000000000000000000000000000000000';

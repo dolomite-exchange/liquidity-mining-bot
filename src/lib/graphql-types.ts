@@ -75,6 +75,9 @@ export interface GraphqlAmmLiquidityPosition {
     id: string
   }
   liquidityTokenBalance: string
+  pair: {
+    id: string;
+  }
 }
 
 export interface GraphqlAmmLiquidityPositionsResult extends GraphqlResult {
@@ -86,6 +89,9 @@ export interface GraphqlAmmLiquidityPositionsResult extends GraphqlResult {
 export interface GraphqlAmmLiquidityPositionSnapshot {
   id: string
   effectiveUser: {
+    id: string
+  }
+  pair: {
     id: string
   }
   liquidityTokenBalance: string

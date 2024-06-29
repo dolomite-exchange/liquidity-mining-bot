@@ -6,7 +6,6 @@ import { MarketIndex } from '../../src/lib/api-types';
 import { ONE_ETH_WEI } from '../../src/lib/constants';
 import { remapAccountToClaimableAccount } from './remapper';
 
-export const ETH_USDC_POOL = '0xb77a493a4950cad1b049e222d62bce14ff423c6f'.toLowerCase();
 export const ARB_VESTER_PROXY = '0x531BC6E97b65adF8B3683240bd594932Cfb63797'.toLowerCase();
 
 export const BLACKLIST_ADDRESSES = process.env.BLACKLIST_ADDRESSES?.split(',') ?? []
@@ -17,7 +16,7 @@ const blacklistMap: Record<string, boolean> = BLACKLIST_ADDRESSES.reduce((map, a
   }
   map[address.toLowerCase()] = true;
   return map;
-}, {})
+}, {});
 
 export interface BalanceChangeEvent {
   amountDeltaPar: Decimal;
@@ -30,7 +29,6 @@ export interface BalanceChangeEvent {
 interface AmountAndProof {
   amount: string;
   proofs: string[];
-
 }
 
 export type VirtualLiquiditySnapshot = VirtualLiquiditySnapshotBalance;
@@ -142,10 +140,8 @@ export class BalanceAndRewardPoints {
       pointsUpdate = pointsUpdate.plus(positiveInterestDelta.minus(negativeInterestDelta)
         .times(timeDelta)
         .times(this.pointsPerSecond));
-    } else {
-      if (operation !== InterestOperation.NOTHING) {
-        throw new Error(`Invalid operation, found: ${operation}`);
-      }
+    } else if (operation !== InterestOperation.NOTHING) {
+      throw new Error(`Invalid operation, found: ${operation}`);
     }
 
     this.rewardPoints = this.rewardPoints.plus(pointsUpdate);
@@ -204,7 +200,6 @@ export function processEventsUntilEndTimestamp(
       }
       const marketToEventsMap = accountToMarketToEventsMap[account]![subAccount]!;
       Object.keys(marketToEventsMap).forEach(market => {
-
         // Sort and process events
         marketToEventsMap[market]!.sort((a, b) => a.serialId - b.serialId);
         marketToEventsMap[market]!.forEach(event => {
@@ -269,6 +264,10 @@ export function processEventsUntilEndTimestamp(
   });
 }
 
+export function addToBlacklist(account: string): void {
+  blacklistMap[account.toLowerCase()] = true;
+}
+
 export function calculateVirtualLiquidityPoints(
   poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
   startTimestamp: number,
@@ -323,7 +322,7 @@ export function calculateVirtualLiquidityPoints(
 export function calculateFinalPoints(
   networkId: number,
   accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceMap,
-  validMarketIdsMap: Record<string, any>,
+  validMarketIdsMap: Record<string, Integer | Decimal>,
   poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
   poolToTotalSubLiquidityPoints: Record<string, Decimal>,
   oldUserToPointsMap: Record<string, string> = {},
@@ -368,10 +367,12 @@ export function calculateFinalPoints(
             userToMarketToPointsMap[remappedAccount][market] = INTEGERS.ZERO;
           }
 
-          const points = balanceStruct.rewardPoints.times(ONE_ETH_WEI).dividedToIntegerBy(INTEGERS.ONE);
+          const points = balanceStruct.rewardPoints.times(ONE_ETH_WEI).integerValue();
           userToPointsMap[remappedAccount] = userToPointsMap[remappedAccount].plus(points);
           marketToPointsMap[market] = marketToPointsMap[market].plus(points);
-          userToMarketToPointsMap[remappedAccount][market] = userToMarketToPointsMap[remappedAccount][market].plus(points);
+          userToMarketToPointsMap[remappedAccount][market] = userToMarketToPointsMap[remappedAccount][market].plus(
+            points,
+          );
         }
       });
     });
@@ -380,9 +381,10 @@ export function calculateFinalPoints(
   // Distribute liquidity pool rewards
   Object.keys(poolToVirtualLiquidityPositionsAndEvents).forEach(pool => {
     const totalLiquidityPoolPoints = userToPointsMap[pool];
+    const totalMarketToLiquidityPoolPointsMap = userToMarketToPointsMap[pool];
     const totalPoolEquityPoints = poolToTotalSubLiquidityPoints[pool];
     let totalWhitelistPoints = INTEGERS.ZERO;
-    if (totalLiquidityPoolPoints && totalPoolEquityPoints) {
+    if (totalLiquidityPoolPoints && totalPoolEquityPoints && totalMarketToLiquidityPoolPointsMap) {
       const events = poolToVirtualLiquidityPositionsAndEvents[pool];
       Object.keys(events.virtualLiquidityBalances).forEach(account => {
         if (!blacklistMap[account]) {
@@ -397,6 +399,18 @@ export function calculateFinalPoints(
           }
           userToPointsMap[remappedAccount] = userToPointsMap[remappedAccount].plus(points);
           totalWhitelistPoints = totalWhitelistPoints.plus(points);
+
+          Object.keys(totalMarketToLiquidityPoolPointsMap).forEach(market => {
+            if (!userToMarketToPointsMap[remappedAccount]) {
+              userToMarketToPointsMap[remappedAccount] = {};
+            }
+            if (!userToMarketToPointsMap[remappedAccount][market]) {
+              userToMarketToPointsMap[remappedAccount][market] = INTEGERS.ZERO;
+            }
+
+            userToMarketToPointsMap[remappedAccount][market] = userToMarketToPointsMap[remappedAccount][market]
+              .plus(points);
+          });
         }
       });
     }
@@ -408,9 +422,14 @@ export function calculateFinalPoints(
         .dividedToIntegerBy(totalLiquidityPoolPoints);
       const blacklistPoints = pointsFromMarket.minus(whitelistPointsFromMarket);
       marketToPointsMap[market] = marketToPointsMap[market].minus(blacklistPoints);
-    })
+    });
+
     delete userToPointsMap[pool];
-  });1
+
+    if (userToMarketToPointsMap[pool] && Object.keys(userToMarketToPointsMap[pool]).length === 0) {
+      delete userToMarketToPointsMap[pool];
+    }
+  });
 
   // Remove all users with 0 points
   Object.keys(userToPointsMap).forEach(user => {

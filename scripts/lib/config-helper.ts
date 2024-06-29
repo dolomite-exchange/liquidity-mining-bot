@@ -1,101 +1,17 @@
 import '../../src/lib/env';
 import { getBlockDataByBlockNumber, getLatestBlockDataByTimestamp } from '../../src/clients/blocks';
 import { writeFileToGitHub } from './file-helpers';
-
-export interface UserMineralAllocationForFile {
-  amount: string; // big int
-  multiplier: string; // decimal
-  proofs: string[];
-}
-
-export interface MineralOutputFile {
-  users: {
-    [walletAddressLowercase: string]: UserMineralAllocationForFile;
-  };
-  metadata: {
-    epoch: number;
-    merkleRoot: string | null;
-    marketIds: number[];
-    marketNames: string[];
-    totalAmount: string; // big int
-    totalUsers: number; // big int
-    startBlockNumber: number;
-    endBlockNumber: number;
-    startTimestamp: number;
-    endTimestamp: number;
-    boostedMultiplier: string | null | undefined;
-  };
-}
-
-export interface MineralConfigEpoch extends EpochConfig {
-  marketIdToRewardMap: {
-    [marketId: string]: string;
-  };
-  boostedMultiplier: string | undefined | null;
-}
-
-export interface MineralConfigFile extends ConfigFile<MineralConfigEpoch> {
-}
-
-export enum OTokenType {
-  oARB = 'oarb',
-  oMATIC = 'omatic',
-}
-
-export interface EpochConfig {
-  epoch: number;
-  startTimestamp: number;
-  endTimestamp: number;
-  startBlockNumber: number;
-  endBlockNumber: number;
-  isTimeElapsed: boolean;
-  isMerkleRootGenerated: boolean;
-  isMerkleRootWrittenOnChain: boolean;
-}
-
-export interface ConfigFile<T> {
-  epochs: {
-    [epoch: string]: T
-  };
-  metadata: {
-    networkId: number;
-  };
-}
-
-export interface EpochMetadata {
-  maxEpochNumber: number;
-}
-
-interface NextConfig {
-  /**
-   * True if the old epoch has elapsed and the merkle root was generated
-   */
-  isReadyForNext: boolean;
-  /**
-   * The block number that marks the start of the epoch
-   */
-  newStartBlockNumber: number;
-  /**
-   * Timestamp that marks the start of the epoch
-   */
-  newStartTimestamp: number;
-  /**
-   * Always one week after the start timestamp
-   */
-  newEndTimestamp: number;
-  /**
-   * The latest seen block number. Not necessarily be ONE WEEK after the start block
-   */
-  actualEndBlockNumber: number;
-  /**
-   * The latest seen block timestamp. Not necessarily be ONE WEEK after the start timestamp
-   */
-  actualEndTimestamp: number;
-  /**
-   * True if the week is over and the next block occurs in the next week
-   */
-  isTimeElapsed: boolean;
-}
+import {
+  EpochConfig,
+  MineralConfigEpoch,
+  MineralConfigFile,
+  MineralYtConfigEpoch,
+  MineralYtConfigFile,
+  NextConfig,
+  OTokenConfigEpoch,
+  OTokenConfigFile,
+  OTokenType,
+} from './data-types';
 
 const ONE_WEEK_SECONDS = 86_400 * 7;
 
@@ -133,6 +49,10 @@ export const OMATIC_SEASON = 0;
  */
 export function getMineralConfigFileNameWithPath(networkId: number): string {
   return getConfigFilePath(networkId, 'mineral', MINERAL_SEASON);
+}
+
+export function getMineralYtConfigFileNameWithPath(networkId: number): string {
+  return getConfigFilePath(networkId, 'mineral', MINERAL_SEASON, '-yt');
 }
 
 /**
@@ -180,7 +100,7 @@ export function getOTokenTypeFromEnvironment(): OTokenType {
   return oTokenType as OTokenType;
 }
 
-function getSeasonForOTokenType(oTokenType: OTokenType): number {
+export function getSeasonForOTokenType(oTokenType: OTokenType): number {
   if (oTokenType === OTokenType.oARB) {
     return OARB_SEASON;
   } else if (oTokenType === OTokenType.oMATIC) {
@@ -190,8 +110,13 @@ function getSeasonForOTokenType(oTokenType: OTokenType): number {
   throw new Error(`Invalid oTokenType, found ${oTokenType}`);
 }
 
-function getConfigFilePath(networkId: number, type: OTokenType | 'mineral', season: number): string {
-  return `config/${networkId}/${type}-season-${season}.json`
+function getConfigFilePath(
+  networkId: number,
+  type: OTokenType | 'mineral',
+  season: number,
+  extra: string = '',
+): string {
+  return `config/${networkId}/${type}-season-${season}${extra}.json`
 }
 
 function getMetadataFilePath(networkId: number, type: OTokenType | 'mineral'): string {
@@ -209,6 +134,33 @@ export async function writeMineralConfigToGitHub(
   configFile.epochs[epochData.epoch] = epochData;
   await writeFileToGitHub(
     getMineralConfigFileNameWithPath(configFile.metadata.networkId),
+    configFile,
+    true,
+  );
+}
+
+export async function writeMineralYtConfigToGitHub(
+  configFile: MineralYtConfigFile,
+  epochData: MineralYtConfigEpoch,
+): Promise<void> {
+  configFile.epochs[epochData.epoch] = epochData;
+  await writeFileToGitHub(
+    getMineralYtConfigFileNameWithPath(configFile.metadata.networkId),
+    configFile,
+    true,
+  );
+}
+
+export async function writeOTokenConfigToGitHub(
+  configFile: OTokenConfigFile,
+  epochData: OTokenConfigEpoch,
+): Promise<void> {
+  configFile.epochs[epochData.epoch] = epochData;
+  await writeFileToGitHub(
+    getOTokenConfigFileNameWithPath(
+      configFile.metadata.networkId,
+      OTokenType.oARB,
+    ),
     configFile,
     true,
   );

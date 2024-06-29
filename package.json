@@ -16,13 +16,14 @@
     "seed": "echo 'Nothing to seed'",
     "execute:add-mineral-deltas": "SCRIPT=true npx ts-node scripts/add-mineral-deltas.ts",
     "execute:calculate-assets-held-for-duration": "SCRIPT=true npx ts-node scripts/calculate-assets-held-for-duration.ts",
-    "execute:calculate-ez-eth-points": "SCRIPT=true npx ts-node scripts/calculate-ez-eth-points.ts",
     "execute:calculate-mineral-rewards": "SCRIPT=true npx ts-node scripts/calculate-mineral-rewards.ts",
+    "execute:calculate-mineral-rewards-for-yt": "SCRIPT=true npx ts-node scripts/calculate-mineral-rewards-for-yt.ts",
     "execute:calculate-mineral-season-config": "SCRIPT=true npx ts-node scripts/calculate-mineral-season-config.ts",
     "execute:calculate-otoken-rewards": "SCRIPT=true npx ts-node scripts/calculate-otoken-rewards.ts",
     "execute:calculate-otoken-season-config": "SCRIPT=true npx ts-node scripts/calculate-otoken-season-config.ts",
     "execute:get-global-otoken-data": "SCRIPT=true npx ts-node scripts/get-global-otoken-vesting-data.ts",
     "execute:migrate-oarb-finalized-outputs": "SCRIPT=true npx ts-node scripts/migrate-oarb-finalized-output.ts",
+    "execute:pendle-balance-fetcher": "SCRIPT=true npx ts-node src/lib/pendle/main.ts",
     "execute:rectify-oarb-rewards-for-arb": "SCRIPT=true npx ts-node scripts/rectify-oarb-rewards-for-arb.ts",
     "execute:rectify-oarb-rewards-for-deltas": "SCRIPT=true npx ts-node scripts/rectify-oarb-rewards-for-deltas.ts"
   },
@@ -38,7 +39,7 @@
   "homepage": "https://github.com/dolomite-exchange/liquidity-mining-bot#readme",
   "dependencies": {
     "@dolomite-exchange/dolomite-margin": "^0.12.3",
-    "@dolomite-exchange/zap-sdk": "^0.3.6",
+    "@dolomite-exchange/zap-sdk": "^0.3.10",
     "axios": "^1.1.3",
     "dotenv-flow": "^0.4.0",
     "ethers": "^5.5.3",
@@ -51,7 +52,7 @@
   },
   "devDependencies": {
     "@types/jest": "^24.9.1",
-    "@types/node": "^14.0.14",
+    "@types/node": "^16.11.68",
     "@types/node-fetch": "^2.5.12",
     "@typescript-eslint/eslint-plugin": "^3.10.1",
     "@typescript-eslint/parser": "^3.10.1",
@@ -72,6 +73,6 @@
     "supertest": "^4.0.2",
     "ts-jest": "^26.3.0",
     "ts-node": "^10.9.1",
-    "typescript": "^4.7.4"
+    "typescript": "^5.4.5"
   }
 }

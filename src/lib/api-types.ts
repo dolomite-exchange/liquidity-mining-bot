@@ -43,11 +43,13 @@ export interface ApiAmmLiquidityPosition {
   id: string;
   effectiveUser: string;
   balance: Decimal;
+  pairAddress: string;
 }
 
 export interface ApiAmmLiquiditySnapshot {
   id: string;
   effectiveUser: string;
+  pairAddress: string;
   liquidityTokenBalance: string;
   block: string;
   timestamp: string;

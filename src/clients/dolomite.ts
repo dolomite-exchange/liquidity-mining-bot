@@ -596,6 +596,9 @@ export async function getLiquidityPositions(
         effectiveUser {
           id
         }
+        pair {
+          id
+        }
         liquidityTokenBalance
       }
     }
@@ -623,6 +626,7 @@ export async function getLiquidityPositions(
       id: ammLiquidityPosition.id,
       effectiveUser: ammLiquidityPosition.effectiveUser.id.toLowerCase(),
       balance: new BigNumber(ammLiquidityPosition.liquidityTokenBalance),
+      pairAddress: ammLiquidityPosition.pair.id.toLowerCase(),
     }
   });
 
@@ -648,6 +652,9 @@ export async function getLiquiditySnapshots(
         liquidityTokenBalance
         block
         timestamp
+        pair {
+          id
+        }
       }
     }
   `;
@@ -675,6 +682,7 @@ export async function getLiquiditySnapshots(
     return {
       id: snapshot.id,
       effectiveUser: snapshot.effectiveUser.id.toLowerCase(),
+      pairAddress: snapshot.pair.id.toLowerCase(),
       block: snapshot.block,
       timestamp: snapshot.timestamp,
       liquidityTokenBalance: snapshot.liquidityTokenBalance,
