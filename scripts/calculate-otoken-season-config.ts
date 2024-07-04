@@ -70,7 +70,7 @@ async function calculateOTokenSeasonConfig(
     });
     oTokenConfigFile.epochs[epochData.epoch] = epochData;
     const season = getSeasonForOTokenType(oTokenType);
-    writeOutputFile(`${oTokenType}-${networkId}-season-${season}-output.json`, oTokenConfigFile);
+    writeOutputFile(`${oTokenType}-${networkId}-season-${season}-config.json`, oTokenConfigFile, 2);
   }
 
   return epochData.epoch;

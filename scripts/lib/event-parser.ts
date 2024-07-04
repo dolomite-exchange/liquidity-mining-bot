@@ -319,6 +319,7 @@ async function getPendleSyAddressToLiquidityPositionAndEvents(
   endTimestamp: number,
 ): Promise<Record<string, LiquidityPositionsAndEvents>> {
   const virtualLiquidityBalances: AccountToVirtualLiquidityBalanceMap = {};
+  // TODO: handle file not found on a specific network
   const ytConfig = await readFileFromGitHub<MineralYtConfigFile>(getMineralYtConfigFileNameWithPath(networkId));
   const epochs = Object.values(ytConfig.epochs).filter(e => {
     return e.startTimestamp === startTimestamp && e.endTimestamp === endTimestamp;

@@ -136,17 +136,9 @@ export async function calculateMineralSeasonConfig<T extends MineralConfigType>(
         [epochData.epoch]: epochData,
       },
     }
-    const extraData = configType === MineralConfigType.RegularConfig
-      ? ''
-      : configType === MineralConfigType.YtConfig
-        ? '-yt'
-        : undefined;
-    if (extraData === undefined) {
-      return Promise.reject(new Error(`Invalid config type, found ${configType}`));
-    }
 
     writeOutputFile(
-      `mineral-${networkId}-season-${MINERAL_SEASON}-epoch-${epochData.epoch}${extraData}-config.json`,
+      `mineral-${networkId}-season-${MINERAL_SEASON}-epoch-${epochData.epoch}-config.json`,
       data,
       2,
     );

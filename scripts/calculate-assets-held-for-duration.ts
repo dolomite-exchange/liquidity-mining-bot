@@ -53,7 +53,7 @@ const USDM_MARKET_ID = 48;
 
 const CHAIN_TO_MARKET_ID_REWARDS_MAP: Record<ChainId, Record<string, Integer | undefined>> = {
   [ChainId.ArbitrumOne]: {
-    [GRAI_MARKET_ID]: new BigNumber('5000').times(ONE_ETH_WEI), // TODO: update to 9000
+    [GRAI_MARKET_ID]: new BigNumber('9000').times(ONE_ETH_WEI),
     [USDM_MARKET_ID]: new BigNumber('1000').times(ONE_ETH_WEI),
   },
   [ChainId.Base]: {},
@@ -111,7 +111,6 @@ async function start() {
   await blockStore._update();
   const marketStore = new MarketStore(blockStore, true);
 
-  // 4999999999999999971963.0
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address;
   if (networkId !== Number(process.env.NETWORK_ID)) {
     const message = `Invalid network ID found!\n
@@ -149,6 +148,9 @@ async function start() {
   const goArbVesterProxy = ModuleDeployments.GravitaExternalVesterProxy[networkId];
   if (goArbVesterProxy) {
     addToBlacklist(goArbVesterProxy.address);
+  }
+  if (validMarketId === GRAI_MARKET_ID) {
+    addToBlacklist('0xfB0214D7Ac08ed0D2D9cA920EA6D4f4be2654EA5'); // Gravita multisig
   }
 
   const apiAccounts = await Pageable.getPageableValues(async (lastId) => {
