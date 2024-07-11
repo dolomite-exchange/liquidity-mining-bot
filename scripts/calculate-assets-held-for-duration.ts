@@ -50,11 +50,19 @@ const ONE_WEEK_SECONDS = 86_400 * 7;
 
 const GRAI_MARKET_ID = 46;
 const USDM_MARKET_ID = 48;
+const RS_ETH_MARKET_ID = 49;
+const PT_E_ETH_SEP_2024_MARKET_ID = 50;
+const PT_EZ_ETH_SEP_2024_MARKET_ID = 51;
+const PT_RS_ETH_SEP_2024_MARKET_ID = 52;
 
 const CHAIN_TO_MARKET_ID_REWARDS_MAP: Record<ChainId, Record<string, Integer | undefined>> = {
   [ChainId.ArbitrumOne]: {
     [GRAI_MARKET_ID]: new BigNumber('9000').times(ONE_ETH_WEI),
     [USDM_MARKET_ID]: new BigNumber('1000').times(ONE_ETH_WEI),
+    [RS_ETH_MARKET_ID]: new BigNumber('1000').times(ONE_ETH_WEI),
+    [PT_E_ETH_SEP_2024_MARKET_ID]: new BigNumber('1500').times(ONE_ETH_WEI), // for 3 weeks
+    [PT_EZ_ETH_SEP_2024_MARKET_ID]: new BigNumber('1500').times(ONE_ETH_WEI), // for 3 weeks
+    [PT_RS_ETH_SEP_2024_MARKET_ID]: new BigNumber('1500').times(ONE_ETH_WEI), // for 3 weeks
   },
   [ChainId.Base]: {},
   [ChainId.Mantle]: {},

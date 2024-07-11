@@ -1,5 +1,5 @@
 import { dolomite } from '../src/helpers/web3';
-import { isScript } from '../src/lib/env';
+import { isScript, shouldForceUpload } from '../src/lib/env';
 import Logger from '../src/lib/logger';
 import {
   getMineralConfigFileNameWithPath,
@@ -120,7 +120,7 @@ export async function calculateMineralSeasonConfig<T extends MineralConfigType>(
     return Promise.reject(new Error(`Invalid config type, found ${configType}`));
   }
 
-  if (!isScript()) {
+  if (!isScript() || shouldForceUpload()) {
     if (configType === MineralConfigType.RegularConfig) {
       await writeMineralConfigToGitHub(configFile as MineralConfigFile, epochData as MineralConfigEpoch);
     } else if (configType === MineralConfigType.YtConfig) {

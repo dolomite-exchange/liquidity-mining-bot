@@ -44,6 +44,7 @@ import {
   VirtualLiquiditySnapshotBalance,
   VirtualLiquiditySnapshotDeltaPar,
 } from './rewards';
+import Logger from '../../src/lib/logger';
 
 const TEN = new BigNumber(10);
 
@@ -325,7 +326,9 @@ async function getPendleSyAddressToLiquidityPositionAndEvents(
     return e.startTimestamp === startTimestamp && e.endTimestamp === endTimestamp;
   });
   if (epochs.length === 0) {
-    console.warn(`Invalid epoch, could not find for [${startTimestamp}, ${endTimestamp}]`)
+    Logger.warn({
+      message: `Invalid epoch, could not find for start_timestamp, end_timestamp: [${startTimestamp}, ${endTimestamp}]`,
+    });
     return Promise.resolve({});
   }
 

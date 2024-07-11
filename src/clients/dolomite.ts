@@ -1309,7 +1309,7 @@ export async function getTimestampToBlockNumberMap(timestamps: number[]): Promis
     .then(json => json as GraphqlTimestampToBlockResult);
 
   return timestamps.reduce((memo, timestamp) => {
-    memo[timestamp.toString()] = result.data[`_${timestamp}`]?.[0]?.number;
+    memo[timestamp.toString()] = parseInt(result.data[`_${timestamp}`]?.[0]?.number, 10);
     return memo;
   }, {});
 }
