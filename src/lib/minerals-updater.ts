@@ -1,5 +1,5 @@
 import { calculateMineralRewards } from '../../scripts/calculate-mineral-rewards';
-import { calculateMineralSeasonConfig } from '../../scripts/calculate-mineral-season-config';
+import { calculateMineralSeasonConfig, MineralConfigType } from '../../scripts/calculate-mineral-season-config';
 import { delay } from './delay';
 import Logger from './logger';
 
@@ -40,7 +40,7 @@ export default class MineralsUpdater {
         Logger.error({
           at: 'MineralsUpdater#_poll',
           message: `Could not update minerals due to error: ${e.message}`,
-          remediation: `Waiting for ${SHORT_WAIT_DURATION_MILLIS} before trying again...`
+          remediation: `Waiting for ${SHORT_WAIT_DURATION_MILLIS} before trying again...`,
         })
         await delay(SHORT_WAIT_DURATION_MILLIS);
       }
@@ -53,7 +53,14 @@ export default class MineralsUpdater {
       message: 'Starting update...',
     });
 
-    const { epochNumber, endTimestamp, isEpochElapsed } = await calculateMineralSeasonConfig(this.skipConfigUpdate);
+    const {
+      epochNumber,
+      endTimestamp,
+      isEpochElapsed,
+    } = await calculateMineralSeasonConfig(
+      MineralConfigType.RegularConfig,
+      { skipConfigUpdate: this.skipConfigUpdate },
+    );
     Logger.info({
       at: 'MineralsUpdater#_update',
       message: `Finished updating season config for epoch ${epochNumber}`,

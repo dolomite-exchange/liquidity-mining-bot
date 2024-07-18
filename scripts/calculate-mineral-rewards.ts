@@ -309,11 +309,12 @@ async function calculateFinalMinerals(
   return Object.keys(userToPointsMap).reduce((memo, user) => {
     const userCurrent = userToPointsMap[user];
     const userPrevious = new BigNumber(previousMinerals.users[user]?.amount ?? '0');
-    const userPreviousMultiplier = new BigNumber(previousMinerals.users[user]?.multiplier ?? '1').times(previousBoost);
+    const userPreviousMultiplierPreBoost = new BigNumber(previousMinerals.users[user]?.multiplier ?? '1').times(previousBoost);
+    const userPreviousMultiplier = userPreviousMultiplierPreBoost.times(previousBoost);
     const userPreviousNormalized = userPrevious.dividedToIntegerBy(userPreviousMultiplier);
     let newMultiplier = INTEGERS.ONE;
     if (isTimeElapsed && userCurrent.gt(userPreviousNormalized) && userPreviousNormalized.gt(INTEGERS.ZERO)) {
-      newMultiplier = userPreviousMultiplier.plus(0.5);
+      newMultiplier = userPreviousMultiplierPreBoost.plus(0.5);
       if (newMultiplier.gt(MAX_MULTIPLIER)) {
         newMultiplier = MAX_MULTIPLIER
       }

@@ -7,6 +7,7 @@ import { dolomite } from '../src/helpers/web3';
 import BlockStore from '../src/lib/block-store';
 import { ChainId } from '../src/lib/chain-id';
 import { ONE_ETH_WEI } from '../src/lib/constants';
+import { isScript } from '../src/lib/env';
 import Logger from '../src/lib/logger';
 import MarketStore from '../src/lib/market-store';
 import Pageable from '../src/lib/pageable';
@@ -72,10 +73,13 @@ const CHAIN_TO_MARKET_ID_REWARDS_MAP: Record<ChainId, Record<string, Integer | u
 
 const FOLDER_NAME = `${__dirname}/output`;
 
-async function start() {
+export async function calculateAssetHeldForDuration(validMarketId: number = parseInt(
+  process.env.MARKET_ID ?? 'NaN',
+  10,
+)) {
   const networkId = await dolomite.web3.eth.net.getId();
 
-  const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>(
+  const mineralConfig = await readFileFromGitHub<MineralConfigFile>(
     getMineralConfigFileNameWithPath(networkId),
   );
 
@@ -84,7 +88,7 @@ async function start() {
   let endTimestamp = parseInt(process.env.END_TIMESTAMP ?? 'NaN', 10);
   if (Number.isNaN(epoch) && Number.isNaN(startTimestamp) && Number.isNaN(endTimestamp)) {
     return Promise.reject(new Error('Invalid EPOCH_NUMBER, START_TIMESTAMP, or END_TIMESTAMP'));
-  } else if (!Number.isNaN(epoch) && !liquidityMiningConfig.epochs[epoch]) {
+  } else if (!Number.isNaN(epoch) && !mineralConfig.epochs[epoch]) {
     return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
   } else if (!Number.isNaN(startTimestamp) && !Number.isNaN(endTimestamp)) {
     if (startTimestamp % ONE_WEEK_SECONDS !== 0 || endTimestamp % ONE_WEEK_SECONDS !== 0) {
@@ -95,10 +99,10 @@ async function start() {
   let startBlockNumber: number;
   let endBlockNumber: number;
   if (!Number.isNaN(epoch)) {
-    startTimestamp = liquidityMiningConfig.epochs[epoch].startTimestamp;
-    endTimestamp = liquidityMiningConfig.epochs[epoch].endTimestamp;
-    startBlockNumber = liquidityMiningConfig.epochs[epoch].startBlockNumber;
-    endBlockNumber = liquidityMiningConfig.epochs[epoch].endBlockNumber;
+    startTimestamp = mineralConfig.epochs[epoch].startTimestamp;
+    endTimestamp = mineralConfig.epochs[epoch].endTimestamp;
+    startBlockNumber = mineralConfig.epochs[epoch].startBlockNumber;
+    endBlockNumber = mineralConfig.epochs[epoch].endBlockNumber;
   } else {
     const timestampToBlockMap = await getTimestampToBlockNumberMap([startTimestamp, endTimestamp]);
     startBlockNumber = timestampToBlockMap[startTimestamp];
@@ -106,7 +110,6 @@ async function start() {
   }
 
   const maxMarketId = (await dolomite.getters.getNumMarkets()).toNumber();
-  const validMarketId = parseInt(process.env.MARKET_ID ?? 'NaN', 10);
   if (Number.isNaN(validMarketId)) {
     return Promise.reject(new Error(`Invalid MARKET_ID, found: ${process.env.MARKET_ID}`));
   } else if (validMarketId >= maxMarketId) {
@@ -284,11 +287,13 @@ function writeOutputFile(
   );
 }
 
-start()
-  .then(() => {
-    console.log('Finished executing script!');
-  })
-  .catch(error => {
-    console.error('Caught error while starting:', error);
-    process.exit(1);
-  });
+if (isScript()) {
+  calculateAssetHeldForDuration()
+    .then(() => {
+      console.log('Finished executing script!');
+    })
+    .catch(error => {
+      console.error('Caught error while starting:', error);
+      process.exit(1);
+    });
+}

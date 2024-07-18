@@ -1,7 +1,9 @@
 import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
+import { OARBRewardsDistributor } from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import { parseEther } from 'ethers/lib/utils';
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
+import { writeMerkleRootOnChain } from '../src/helpers/dolomite-helpers';
 import { dolomite } from '../src/helpers/web3';
 import BlockStore from '../src/lib/block-store';
 import { isScript, shouldForceUpload } from '../src/lib/env'
@@ -11,11 +13,12 @@ import Pageable from '../src/lib/pageable';
 import {
   getOTokenConfigFileNameWithPath,
   getOTokenFinalizedFileNameWithPath,
+  getOTokenMetadataFileNameWithPath,
   getOTokenTypeFromEnvironment,
   getSeasonForOTokenType,
   writeOTokenConfigToGitHub,
 } from './lib/config-helper';
-import { OTokenConfigFile, OTokenOutputFile, OTokenType } from './lib/data-types';
+import { OTokenConfigFile, OTokenEpochMetadata, OTokenOutputFile, OTokenType } from './lib/data-types';
 import {
   getAccountBalancesByMarket,
   getBalanceChangingEvents,
@@ -212,20 +215,45 @@ async function calculateOTokenRewards(oTokenType: OTokenType = getOTokenTypeFrom
     }
   }
 
-  // if (merkleRoot) {
-  //   // TODO: write merkle root to chain
-  //   // TODO: move this to another file that can be invoked via script or `MineralsMerkleUpdater`
-  //   // TODO: (pings every 15 seconds for an update)
-  //
-  //   const metadataFilePath = getOTokenMetadataFileNameWithPath(networkId, oTokenType);
-  //   const metadata = await readFileFromGitHub<OTokenEpochMetadata>(metadataFilePath);
-  //
-  //   // Once the merkle root is written, update the metadata to the new highest epoch that is finalized
-  //   if (metadata.maxEpochNumber === epoch - 1) {
-  //     metadata.maxEpochNumber = epoch;
-  //   }
-  //   await writeFileToGitHub(metadataFilePath, metadata, true)
-  // }
+  if (merkleRoot) {
+    await writeMerkleRootOnChain(epoch, merkleRoot, OARBRewardsDistributor[networkId].address);
+
+    oTokenConfig.epochs[epoch].isMerkleRootWrittenOnChain = true;
+    if (!isScript() || shouldForceUpload()) {
+      await writeOTokenConfigToGitHub(oTokenConfig, oTokenConfig.epochs[epoch]);
+    } else {
+      Logger.info({
+        message: 'Skipping config file upload due to script execution',
+      });
+      const season = getSeasonForOTokenType(oTokenType);
+      writeOutputFile(
+        `${oTokenType}-${networkId}-season-${season}-config.json`,
+        oTokenConfig,
+        2,
+      );
+    }
+
+    // Once the merkle root is written, update the metadata to the new highest epoch that is finalized
+
+    const metadataFilePath = getOTokenMetadataFileNameWithPath(networkId, OTokenType.oARB);
+    const metadata = await readFileFromGitHub<OTokenEpochMetadata>(metadataFilePath)
+    if (metadata.maxEpochNumber === epoch - 1) {
+      metadata.maxEpochNumber = epoch;
+    }
+
+    if (!isScript() || shouldForceUpload()) {
+      await writeFileToGitHub(metadataFilePath, metadata, true);
+    } else {
+      Logger.info({
+        message: 'Skipping config file upload due to script execution',
+      });
+      writeOutputFile(
+        `${oTokenType}-${networkId}-metadata.json`,
+        oTokenConfig,
+        2,
+      );
+    }
+  }
 
   return true;
 }

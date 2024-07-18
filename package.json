@@ -25,7 +25,8 @@
     "execute:migrate-oarb-finalized-outputs": "SCRIPT=true npx ts-node scripts/migrate-oarb-finalized-output.ts",
     "execute:pendle-balance-fetcher": "SCRIPT=true npx ts-node src/lib/pendle/main.ts",
     "execute:rectify-oarb-rewards-for-arb": "SCRIPT=true npx ts-node scripts/rectify-oarb-rewards-for-arb.ts",
-    "execute:rectify-oarb-rewards-for-deltas": "SCRIPT=true npx ts-node scripts/rectify-oarb-rewards-for-deltas.ts"
+    "execute:rectify-oarb-rewards-for-deltas": "SCRIPT=true npx ts-node scripts/rectify-oarb-rewards-for-deltas.ts",
+    "flow:arb-stip": "npx ts-node scripts/flow/execute-arb-stip-flow.ts"
   },
   "repository": {
     "type": "git",
@@ -39,7 +40,7 @@
   "homepage": "https://github.com/dolomite-exchange/liquidity-mining-bot#readme",
   "dependencies": {
     "@dolomite-exchange/dolomite-margin": "^0.12.3",
-    "@dolomite-exchange/zap-sdk": "^0.3.10",
+    "@dolomite-exchange/zap-sdk": "^0.3.12",
     "axios": "^1.1.3",
     "dotenv-flow": "^0.4.0",
     "ethers": "^5.5.3",

@@ -34,7 +34,7 @@ const ONE_MINERAL_IN_WEI = new BigNumber('1000000000000000000');
 
 export async function calculateMineralYtRewards(
   epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10),
-): Promise<void> {
+): Promise<{ epoch: number, merkleRoot: string | null }> {
   const networkId = await dolomite.web3.eth.net.getId();
   const mineralYtConfigFile = await readFileFromGitHub<MineralYtConfigFile>(
     getMineralYtConfigFileNameWithPath(networkId),
@@ -59,7 +59,7 @@ export async function calculateMineralYtRewards(
       at: 'calculateMineralRewards',
       message: `Epoch ${epoch} has passed and merkle root was generated, skipping...`,
     });
-    return Promise.resolve();
+    return Promise.resolve({ epoch, merkleRoot: null });
   }
 
   if (new BigNumber(marketId).isNaN()) {
@@ -220,7 +220,7 @@ export async function calculateMineralYtRewards(
     writeOutputFile(`mineral-${networkId}-season-${MINERAL_SEASON}-metadata.json`, metadata, 2);
   }
 
-  return undefined;
+  return { epoch, merkleRoot: mineralOutputFile.metadata.merkleRoot };
 }
 
 async function getOrCreateMineralOutputFile(

@@ -1,11 +1,13 @@
 /* eslint-disable import/no-extraneous-dependencies */
-import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
+import { BigNumber, ConfirmationType, Decimal, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import { TxResult } from '@dolomite-exchange/dolomite-margin/dist/src/types';
-import { BigNumber, Decimal, INTEGERS } from '@dolomite-exchange/dolomite-margin';
+import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import axios from 'axios';
 import { DateTime } from 'luxon';
+import OARBRewardsDistributorAbi from '../abi/reward-distributor.json';
 import VesterExploderAbi from '../abi/vester-exploder.json';
 import VesterProxyAbi from '../abi/vester-proxy.json';
+import { getAllDolomiteAccountsByWalletAddress } from '../clients/dolomite';
 import {
   ApiLiquidityMiningLevelUpdateRequest,
   ApiLiquidityMiningVestingPosition,
@@ -13,9 +15,10 @@ import {
   MarketIndex,
 } from '../lib/api-types';
 import Logger from '../lib/logger';
-import { dolomite } from './web3';
-import { getAllDolomiteAccountsByWalletAddress } from '../clients/dolomite';
+import { getGasPriceWei, updateGasPrice } from './gas-price-helpers';
+import { dolomite, loadAccounts } from './web3';
 
+const HASH_ZERO = '0x0000000000000000000000000000000000000000000000000000000000000000';
 const network = process.env.NETWORK_ID as string;
 
 export async function detonateAccount(
@@ -116,4 +119,47 @@ export async function fulfillLevelUpdateRequest(
 export async function fetchLevelByUser(user: string): Promise<number> {
   return axios.get(`https://verification.dolomite.io/level/${user}`)
     .then(response => response.data.level as number);
+}
+
+export async function writeMerkleRootOnChain(
+  epoch: number,
+  merkleRoot: string,
+  distributorAddress: string,
+) {
+  Logger.info({
+    at: 'dolomite-helpers#detonateAccount',
+    message: `Writing merkle root for epoch ${epoch} on chain`,
+    merkleRoot: merkleRoot,
+    distributorAddress: distributorAddress,
+  });
+
+  const distributor = new dolomite.web3.eth.Contract(
+    OARBRewardsDistributorAbi,
+    distributorAddress,
+  );
+  const foundMerkleRoot = await dolomite.contracts.callConstantContractFunction<string>(
+    distributor.methods.getMerkleRootByEpoch(epoch),
+  );
+
+  if (foundMerkleRoot !== HASH_ZERO) {
+    Logger.warn({
+      at: 'MineralsMerkleTreeUpdater#_update',
+      message: 'Merkle root was already set on chain!',
+    });
+  } else {
+    await loadAccounts();
+    await updateGasPrice(dolomite);
+    const result = await dolomite.contracts.callContractFunction(
+      distributor.methods.handlerSetMerkleRoot(epoch, merkleRoot),
+      {
+        gasPrice: getGasPriceWei().toFixed(),
+        confirmationType: ConfirmationType.Hash,
+      },
+    );
+    Logger.info({
+      at: 'MineralsMerkleTreeUpdater#_update',
+      message: 'Merkle root transaction has been sent!',
+      hash: result.transactionHash,
+    })
+  }
 }
