@@ -13,10 +13,10 @@ import { OTokenConfigEpoch, OTokenConfigFile, OTokenType } from './lib/data-type
 
 export const MAX_OARB_KEY_BEFORE_MIGRATIONS = 701;
 
-async function calculateOTokenSeasonConfig(
+export async function calculateOTokenSeasonConfig(
   oTokenType: OTokenType = getOTokenTypeFromEnvironment(),
-  skipConfigUpdate: boolean = false,
-): Promise<number> {
+  options: { skipConfigUpdate: boolean } = { skipConfigUpdate: false },
+): Promise<{ epochNumber: number; endTimestamp: number; isEpochElapsed: boolean }> {
   const { networkId } = dolomite;
   if (Number.isNaN(networkId)) {
     return Promise.reject(new Error('Invalid network ID'));
@@ -38,13 +38,19 @@ async function calculateOTokenSeasonConfig(
     }, 0);
   }
 
-  if (skipConfigUpdate) {
+  if (options.skipConfigUpdate) {
     Logger.info({
-      message: 'calculateOTokenSeasonConfig: Skipping config update...',
-      epochNumber: maxKey,
+      at: 'calculateOTokenSeasonConfig',
+      message: 'Skipping config update...',
+      maxFinalizedEpochNumber: maxKey,
     });
-    return maxKey;
+    return {
+      epochNumber: maxKey,
+      endTimestamp: oTokenConfigFile.epochs[maxKey].endTimestamp,
+      isEpochElapsed: oTokenConfigFile.epochs[maxKey].isTimeElapsed,
+    };
   }
+
 
   const oldEpoch = oTokenConfigFile.epochs[maxKey];
   const nextEpochData = await getNextConfigIfNeeded(oldEpoch);
@@ -73,7 +79,11 @@ async function calculateOTokenSeasonConfig(
     writeOutputFile(`${oTokenType}-${networkId}-season-${season}-config.json`, oTokenConfigFile, 2);
   }
 
-  return epochData.epoch;
+  return {
+    epochNumber: epochData.epoch,
+    endTimestamp: epochData.endTimestamp,
+    isEpochElapsed: epochData.isTimeElapsed,
+  };
 }
 
 if (isScript()) {

@@ -57,7 +57,7 @@ const SECONDS_PER_WEEK = 86_400 * 7;
 const MAX_MULTIPLIER = new BigNumber('5');
 
 export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)): Promise<void> {
-  const networkId = await dolomite.web3.eth.net.getId();
+  const networkId = dolomite.networkId;
   const liquidityMiningConfig = await readFileFromGitHub<MineralConfigFile>(
     getMineralConfigFileNameWithPath(networkId),
   );

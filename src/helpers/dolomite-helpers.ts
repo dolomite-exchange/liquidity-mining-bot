@@ -129,6 +129,7 @@ export async function writeMerkleRootOnChain(
   Logger.info({
     at: 'dolomite-helpers#detonateAccount',
     message: `Writing merkle root for epoch ${epoch} on chain`,
+    epoch: epoch,
     merkleRoot: merkleRoot,
     distributorAddress: distributorAddress,
   });
@@ -143,7 +144,7 @@ export async function writeMerkleRootOnChain(
 
   if (foundMerkleRoot !== HASH_ZERO) {
     Logger.warn({
-      at: 'MineralsMerkleTreeUpdater#_update',
+      at: 'dolomite-helpers#_update',
       message: 'Merkle root was already set on chain!',
     });
   } else {
@@ -157,7 +158,7 @@ export async function writeMerkleRootOnChain(
       },
     );
     Logger.info({
-      at: 'MineralsMerkleTreeUpdater#_update',
+      at: 'dolomite-helpers#_update',
       message: 'Merkle root transaction has been sent!',
       hash: result.transactionHash,
     })

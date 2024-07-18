@@ -44,7 +44,6 @@ import {
   VirtualLiquiditySnapshotBalance,
   VirtualLiquiditySnapshotDeltaPar,
 } from './rewards';
-import Logger from '../../src/lib/logger';
 
 const TEN = new BigNumber(10);
 
@@ -320,16 +319,13 @@ async function getPendleSyAddressToLiquidityPositionAndEvents(
   endTimestamp: number,
 ): Promise<Record<string, LiquidityPositionsAndEvents>> {
   const virtualLiquidityBalances: AccountToVirtualLiquidityBalanceMap = {};
-  // TODO: handle file not found on a specific network
   const ytConfig = await readFileFromGitHub<MineralYtConfigFile>(getMineralYtConfigFileNameWithPath(networkId));
   const epochs = Object.values(ytConfig.epochs).filter(e => {
     return e.startTimestamp === startTimestamp && e.endTimestamp === endTimestamp;
   });
   if (epochs.length === 0) {
-    Logger.warn({
-      message: `Invalid epoch, could not find for start_timestamp, end_timestamp: [${startTimestamp}, ${endTimestamp}]`,
-    });
-    return Promise.resolve({});
+    const message = `Could not find epoch for start_timestamp, end_timestamp: [${startTimestamp}, ${endTimestamp}]`;
+    return Promise.reject(new Error(`${message}. Did you mean to ignore this function call?`));
   }
 
   const syAddressToVirtualLiquidityPositions = {};

@@ -35,7 +35,7 @@ const ONE_MINERAL_IN_WEI = new BigNumber('1000000000000000000');
 export async function calculateMineralYtRewards(
   epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10),
 ): Promise<{ epoch: number, merkleRoot: string | null }> {
-  const networkId = await dolomite.web3.eth.net.getId();
+  const networkId = dolomite.networkId;
   const mineralYtConfigFile = await readFileFromGitHub<MineralYtConfigFile>(
     getMineralYtConfigFileNameWithPath(networkId),
   );

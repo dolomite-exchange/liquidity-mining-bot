@@ -24,7 +24,7 @@ async function start() {
   await blockStore._update();
   const marketStore = new MarketStore(blockStore, true);
 
-  const networkId = await dolomite.web3.eth.net.getId();
+  const networkId = dolomite.networkId;
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address;
   if (networkId !== Number(process.env.NETWORK_ID)) {

@@ -1,9 +1,7 @@
 import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
-import { OARBRewardsDistributor } from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import { parseEther } from 'ethers/lib/utils';
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
-import { writeMerkleRootOnChain } from '../src/helpers/dolomite-helpers';
 import { dolomite } from '../src/helpers/web3';
 import BlockStore from '../src/lib/block-store';
 import { isScript, shouldForceUpload } from '../src/lib/env'
@@ -13,12 +11,11 @@ import Pageable from '../src/lib/pageable';
 import {
   getOTokenConfigFileNameWithPath,
   getOTokenFinalizedFileNameWithPath,
-  getOTokenMetadataFileNameWithPath,
   getOTokenTypeFromEnvironment,
   getSeasonForOTokenType,
   writeOTokenConfigToGitHub,
 } from './lib/config-helper';
-import { OTokenConfigFile, OTokenEpochMetadata, OTokenOutputFile, OTokenType } from './lib/data-types';
+import { OTokenConfigFile, OTokenOutputFile, OTokenType } from './lib/data-types';
 import {
   getAccountBalancesByMarket,
   getBalanceChangingEvents,
@@ -36,13 +33,18 @@ import {
 
 const REWARD_MULTIPLIERS_MAP = {};
 
-async function calculateOTokenRewards(oTokenType: OTokenType = getOTokenTypeFromEnvironment()) {
-  const networkId = await dolomite.web3.eth.net.getId();
+export async function calculateOTokenRewards(
+  oTokenType: OTokenType = getOTokenTypeFromEnvironment(),
+  epoch: number = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10),
+): Promise<{
+  epoch: number;
+  merkleRoot: string | null
+}> {
+  const networkId = dolomite.networkId;
   const oTokenConfig = await readFileFromGitHub<OTokenConfigFile>(
-    getOTokenConfigFileNameWithPath(networkId, oTokenType as any),
+    getOTokenConfigFileNameWithPath(networkId, oTokenType),
   );
 
-  const epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   if (Number.isNaN(epoch) || !oTokenConfig.epochs[epoch]) {
     return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
   }
@@ -173,7 +175,7 @@ async function calculateOTokenRewards(oTokenType: OTokenType = getOTokenTypeFrom
 
   const { merkleRoot, walletAddressToLeavesMap } = calculateMerkleRootAndProofs(userToOTokenRewards);
 
-  const oTokenFileName = getOTokenFinalizedFileNameWithPath(networkId, OTokenType.oARB, epoch);
+  const oTokenFileName = getOTokenFinalizedFileNameWithPath(networkId, oTokenType, epoch);
   const oTokenOutputFile: OTokenOutputFile = {
     users: walletAddressToLeavesMap,
     metadata: {
@@ -215,47 +217,8 @@ async function calculateOTokenRewards(oTokenType: OTokenType = getOTokenTypeFrom
     }
   }
 
-  if (merkleRoot) {
-    await writeMerkleRootOnChain(epoch, merkleRoot, OARBRewardsDistributor[networkId].address);
 
-    oTokenConfig.epochs[epoch].isMerkleRootWrittenOnChain = true;
-    if (!isScript() || shouldForceUpload()) {
-      await writeOTokenConfigToGitHub(oTokenConfig, oTokenConfig.epochs[epoch]);
-    } else {
-      Logger.info({
-        message: 'Skipping config file upload due to script execution',
-      });
-      const season = getSeasonForOTokenType(oTokenType);
-      writeOutputFile(
-        `${oTokenType}-${networkId}-season-${season}-config.json`,
-        oTokenConfig,
-        2,
-      );
-    }
-
-    // Once the merkle root is written, update the metadata to the new highest epoch that is finalized
-
-    const metadataFilePath = getOTokenMetadataFileNameWithPath(networkId, OTokenType.oARB);
-    const metadata = await readFileFromGitHub<OTokenEpochMetadata>(metadataFilePath)
-    if (metadata.maxEpochNumber === epoch - 1) {
-      metadata.maxEpochNumber = epoch;
-    }
-
-    if (!isScript() || shouldForceUpload()) {
-      await writeFileToGitHub(metadataFilePath, metadata, true);
-    } else {
-      Logger.info({
-        message: 'Skipping config file upload due to script execution',
-      });
-      writeOutputFile(
-        `${oTokenType}-${networkId}-metadata.json`,
-        oTokenConfig,
-        2,
-      );
-    }
-  }
-
-  return true;
+  return { epoch, merkleRoot };
 }
 
 if (isScript()) {

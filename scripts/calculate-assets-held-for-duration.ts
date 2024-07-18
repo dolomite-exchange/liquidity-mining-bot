@@ -77,7 +77,7 @@ export async function calculateAssetHeldForDuration(validMarketId: number = pars
   process.env.MARKET_ID ?? 'NaN',
   10,
 )) {
-  const networkId = await dolomite.web3.eth.net.getId();
+  const networkId = dolomite.networkId;
 
   const mineralConfig = await readFileFromGitHub<MineralConfigFile>(
     getMineralConfigFileNameWithPath(networkId),

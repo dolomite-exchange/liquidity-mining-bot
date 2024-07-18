@@ -34,7 +34,7 @@ export async function calculateMineralSeasonConfig<T extends MineralConfigType>(
   configType: T,
   options: { skipConfigUpdate: boolean } = { skipConfigUpdate: false },
 ): Promise<{ epochNumber: number; endTimestamp: number; isEpochElapsed: boolean }> {
-  const networkId = await dolomite.web3.eth.net.getId();
+  const networkId = dolomite.networkId;
 
   const mineralConfigPath = configType === MineralConfigType.RegularConfig
     ? getMineralConfigFileNameWithPath(networkId)
