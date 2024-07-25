@@ -26,9 +26,9 @@
     "execute:pendle-balance-fetcher": "SCRIPT=true npx ts-node src/lib/pendle/main.ts",
     "execute:rectify-oarb-rewards-for-arb": "SCRIPT=true npx ts-node scripts/rectify-oarb-rewards-for-arb.ts",
     "execute:rectify-oarb-rewards-for-deltas": "SCRIPT=true npx ts-node scripts/rectify-oarb-rewards-for-deltas.ts",
-    "flow:arb-stip": "ENV_FILENAME=local.arbitrum.production.env npx ts-node scripts/flow/execute-arb-stip-flow.ts",
-    "flow:oarb-stip": "ENV_FILENAME=local.arbitrum.production.env npx ts-node scripts/flow/execute-oarb-stip-flow.ts",
-    "flow:pendle-mineral": "ENV_FILENAME=local.arbitrum.production.env npx ts-node scripts/flow/execute-pendle-mineral-flow.ts"
+    "flow:arb-stip:arbitrum": "ENV_FILENAME=local.arbitrum.production.env npx ts-node scripts/flow/execute-arb-stip-flow.ts",
+    "flow:oarb-stip:arbitrum": "ENV_FILENAME=local.arbitrum.production.env npx ts-node scripts/flow/execute-oarb-stip-flow.ts",
+    "flow:pendle-mineral:arbitrum": "ENV_FILENAME=local.arbitrum.production.env npx ts-node scripts/flow/execute-pendle-mineral-flow.ts"
   },
   "repository": {
     "type": "git",

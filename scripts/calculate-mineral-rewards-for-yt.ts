@@ -49,11 +49,12 @@ export async function calculateMineralYtRewards(
     endTimestamp,
     endBlockNumber,
     isTimeElapsed,
+    isMerkleRootGenerated,
     boostedMultiplier,
     marketId,
   } = mineralYtConfigFile.epochs[epoch];
 
-  if (isTimeElapsed && !isScript()) {
+  if (isTimeElapsed && isMerkleRootGenerated && !isScript()) {
     // If this epoch is finalized, and we're not in a script, return.
     Logger.info({
       at: 'calculateMineralRewards',

@@ -414,11 +414,13 @@ export async function getLiquidityMiningVestingPositions(
         owner {
           id
         }
-        pairToken {
-          marketId
+        vester {
+          pairToken {
+            marketId
+          }
         }
         pairAmountPar
-        tokenSpent
+        paymentAmountWei
         oTokenAmount
         status
         startTimestamp
@@ -445,19 +447,19 @@ export async function getLiquidityMiningVestingPositions(
     return Promise.reject(result.errors[0]);
   }
 
-  const liquidityMiningVestingPositions = (result.data.liquidityMiningVestingPositions as any[]).map<ApiLiquidityMiningVestingPosition>(
+  const liquidityMiningVestingPositions = result.data.liquidityMiningVestingPositions.map<ApiLiquidityMiningVestingPosition>(
     position => {
       return {
         id: position.id,
         effectiveUser: position.owner.id.toLowerCase(),
         amountPar: new BigNumber(position.pairAmountPar),
-        marketId: new BigNumber(position.pairToken.marketId).toNumber(),
+        marketId: new BigNumber(position.vester.pairToken.marketId).toNumber(),
         oTokenAmount: new BigNumber(position.oTokenAmount),
-        otherTokenSpent: new BigNumber(position.tokenSpent),
-        startTimestamp: position.startTimestamp,
-        endTimestamp: position.endTimestamp,
+        otherTokenSpent: new BigNumber(position.paymentAmountWei),
+        startTimestamp: parseInt(position.startTimestamp, 10),
+        endTimestamp: parseInt(position.endTimestamp, 10),
         duration: parseInt(position.duration, 10),
-        status: position.status,
+        status: position.status as ApiLiquidityMiningVestingPositionStatus,
       };
     },
   );

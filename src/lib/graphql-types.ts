@@ -208,7 +208,18 @@ export interface GraphqlLiquidityMiningVestingPosition {
   owner: {
     id: string
   }
+  vester: {
+    pairToken: {
+      marketId: string
+    }
+  }
+  pairAmountPar: string
+  paymentAmountWei: string
   oTokenAmount: string
+  status: string
+  startTimestamp: string
+  endTimestamp: string
+  duration: string
 }
 
 export interface GraphqlLiquidityMiningLevelUpdateRequests {
@@ -331,12 +342,7 @@ export interface GraphqlVestingPositionTransfer {
   toEffectiveUser: {
     id: string
   }
-  vestingPosition: {
-    pairToken: {
-      marketId: string
-    }
-    pairAmountPar: string
-  }
+  vestingPosition: GraphqlLiquidityMiningVestingPosition
 }
 
 export interface GraphqlVestingPositionTransfersResult extends GraphqlResult {
