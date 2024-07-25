@@ -55,6 +55,7 @@ const RS_ETH_MARKET_ID = 49;
 const PT_E_ETH_SEP_2024_MARKET_ID = 50;
 const PT_EZ_ETH_SEP_2024_MARKET_ID = 51;
 const PT_RS_ETH_SEP_2024_MARKET_ID = 52;
+const WO_ETH_MARKET_ID = 53;
 
 const CHAIN_TO_MARKET_ID_REWARDS_MAP: Record<ChainId, Record<string, Integer | undefined>> = {
   [ChainId.ArbitrumOne]: {
@@ -64,6 +65,7 @@ const CHAIN_TO_MARKET_ID_REWARDS_MAP: Record<ChainId, Record<string, Integer | u
     [PT_E_ETH_SEP_2024_MARKET_ID]: new BigNumber('1500').times(ONE_ETH_WEI), // for 3 weeks
     [PT_EZ_ETH_SEP_2024_MARKET_ID]: new BigNumber('1500').times(ONE_ETH_WEI), // for 3 weeks
     [PT_RS_ETH_SEP_2024_MARKET_ID]: new BigNumber('1500').times(ONE_ETH_WEI), // for 3 weeks
+    [WO_ETH_MARKET_ID]: new BigNumber('4000').times(ONE_ETH_WEI), // for 3 weeks
   },
   [ChainId.Base]: {},
   [ChainId.Mantle]: {},
@@ -130,6 +132,11 @@ export async function calculateAssetHeldForDuration(validMarketId: number = pars
     return Promise.reject(new Error(message));
   }
 
+  const rewardToSplit = CHAIN_TO_MARKET_ID_REWARDS_MAP[networkId as ChainId][validMarketId];
+  if (!rewardToSplit) {
+    return Promise.reject(new Error(`Invalid reward to split for market ID [${validMarketId}]`));
+  }
+
   Logger.info({
     message: 'DolomiteMargin data',
     blockRewardStart: startBlockNumber,
@@ -141,6 +148,7 @@ export async function calculateAssetHeldForDuration(validMarketId: number = pars
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
     networkId,
     marketId: validMarketId,
+    rewardToSplit: rewardToSplit.toFixed(),
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
 
@@ -217,7 +225,6 @@ export async function calculateAssetHeldForDuration(validMarketId: number = pars
     }
   });
 
-  const rewardToSplit = CHAIN_TO_MARKET_ID_REWARDS_MAP[networkId as ChainId][validMarketId];
   const fileName = `${FOLDER_NAME}/asset-held-${startTimestamp}-${endTimestamp}-${validMarketId}-output.json`;
   const dataToWrite = readOutputFile(fileName);
   dataToWrite.users = Object.keys(userToPointsMap).reduce((memo, user) => {
