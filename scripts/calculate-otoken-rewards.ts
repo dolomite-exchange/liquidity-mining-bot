@@ -72,7 +72,7 @@ export async function calculateOTokenRewards(
     return [acc, sum.plus(rewardWeights[key])];
   }, [{}, new BigNumber(0)] as [Record<string, Integer>, Decimal]);
   if (!totalOTokenAmount.eq(sumOfWeights)) {
-    return Promise.reject(new Error(`Invalid reward weights sum, found: ${sumOfWeights.toString()}`));
+    return Promise.reject(new Error(`Invalid reward weights sum, found: ${sumOfWeights.toFixed()} but expected ${totalOTokenAmount.toFixed()}`));
   }
   const defaultEquityPerSecond = Object.keys(rewardWeights).reduce((memo, key) => {
     memo[key] = INTEGERS.ONE;

@@ -64,7 +64,7 @@ const CHAIN_TO_MARKET_ID_REWARDS_MAP: Record<ChainId, Record<string, Integer | u
     [RS_ETH_MARKET_ID]: new BigNumber('1000').times(ONE_ETH_WEI),
     [PT_E_ETH_SEP_2024_MARKET_ID]: new BigNumber('1500').times(ONE_ETH_WEI), // for 3 weeks
     [PT_EZ_ETH_SEP_2024_MARKET_ID]: new BigNumber('1500').times(ONE_ETH_WEI), // for 3 weeks
-    [PT_RS_ETH_SEP_2024_MARKET_ID]: new BigNumber('1500').times(ONE_ETH_WEI), // for 3 weeks
+    [PT_RS_ETH_SEP_2024_MARKET_ID]: new BigNumber('3000').times(ONE_ETH_WEI), // for 3 weeks
     [WO_ETH_MARKET_ID]: new BigNumber('4000').times(ONE_ETH_WEI), // for 3 weeks
   },
   [ChainId.Base]: {},
@@ -88,6 +88,7 @@ export async function calculateAssetHeldForDuration(validMarketId: number = pars
   const epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
   let startTimestamp = parseInt(process.env.START_TIMESTAMP ?? 'NaN', 10);
   let endTimestamp = parseInt(process.env.END_TIMESTAMP ?? 'NaN', 10);
+  let ignorePendle = process.env.IGNORE_PENDLE === 'true';
   if (Number.isNaN(epoch) && Number.isNaN(startTimestamp) && Number.isNaN(endTimestamp)) {
     return Promise.reject(new Error('Invalid EPOCH_NUMBER, START_TIMESTAMP, or END_TIMESTAMP'));
   } else if (!Number.isNaN(epoch) && !mineralConfig.epochs[epoch]) {
@@ -96,6 +97,8 @@ export async function calculateAssetHeldForDuration(validMarketId: number = pars
     if (startTimestamp % ONE_WEEK_SECONDS !== 0 || endTimestamp % ONE_WEEK_SECONDS !== 0) {
       return Promise.reject(new Error('Invalid START_TIMESTAMP or END_TIMESTAMP modularity'));
     }
+  } else if (process.env.IGNORE_PENDLE !== 'true' && process.env.IGNORE_PENDLE !== 'false') {
+    return Promise.reject(new Error('Invalid IGNORE_PENDLE value, expected `true` or `false`'));
   }
 
   let startBlockNumber: number;
@@ -146,6 +149,7 @@ export async function calculateAssetHeldForDuration(validMarketId: number = pars
     dolomiteMargin: libraryDolomiteMargin,
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
+    ignorePendle,
     networkId,
     marketId: validMarketId,
     rewardToSplit: rewardToSplit.toFixed(),
@@ -201,7 +205,7 @@ export async function calculateAssetHeldForDuration(validMarketId: number = pars
     startBlockNumber,
     startTimestamp,
     endTimestamp,
-    false,
+    ignorePendle,
   );
 
   const poolToTotalSubLiquidityPoints = calculateVirtualLiquidityPoints(
