@@ -4,7 +4,8 @@ import { getTimestampToBlockNumberMap } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
 import { isScript, shouldForceUpload } from '../src/lib/env';
 import Logger from '../src/lib/logger';
-import { PENDLE_TREASURY_ADDRESS } from '../src/lib/pendle/configuration';
+import { fetchPendleYtUserBalanceSnapshotBatch } from '../src/lib/pendle/fetcher';
+import { MineralEpochMetadata } from './calculate-mineral-rewards';
 import {
   getMineralFinalizedFileNameWithPath,
   getMineralMetadataFileNameWithPath,
@@ -12,11 +13,9 @@ import {
   MINERAL_SEASON,
   writeMineralYtConfigToGitHub,
 } from './lib/config-helper';
+import { MineralYtConfigFile, MineralYtOutputFile } from './lib/data-types';
 import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
 import { BLACKLIST_ADDRESSES, calculateMerkleRootAndProofs } from './lib/rewards';
-import { fetchPendleYtUserBalanceSnapshotBatch } from '../src/lib/pendle/fetcher';
-import { MineralEpochMetadata } from './calculate-mineral-rewards';
-import { MineralYtConfigFile, MineralYtOutputFile } from './lib/data-types';
 
 /* eslint-enable */
 
@@ -105,8 +104,9 @@ export async function calculateMineralYtRewards(
   );
 
   const maxTimestamp = Math.min(startTimestamp + WEEK_DURATION_FOR_FETCHES, Math.floor(Date.now() / 1000));
+  const syncTimestamp = mineralOutputFile.metadata.syncTimestamp;
   const numberOfTimestampsToFetch = Math.floor(
-    (maxTimestamp - mineralOutputFile.metadata.syncTimestamp) / FETCH_FREQUENCY,
+    (maxTimestamp - syncTimestamp) / FETCH_FREQUENCY,
   );
   if (numberOfTimestampsToFetch <= 0) {
     Logger.warn({
@@ -115,7 +115,7 @@ export async function calculateMineralYtRewards(
   }
   const timestamps = Array.from(
     { length: numberOfTimestampsToFetch },
-    (_, i) => mineralOutputFile.metadata.syncTimestamp + (FETCH_FREQUENCY * i),
+    (_, i) => syncTimestamp + (FETCH_FREQUENCY * i),
   );
   const blockNumbers = Object.values(await getTimestampToBlockNumberMap(timestamps));
 
@@ -131,15 +131,8 @@ export async function calculateMineralYtRewards(
 
   userToMineralsMaps.forEach(userToMineralsMap => {
     Object.keys(userToMineralsMap).forEach(user => {
-      const pendleTreasuryAmount = userToMineralsMap[PENDLE_TREASURY_ADDRESS!] ?? { amount: INTEGERS.ZERO };
       const mineralsAmount = userToMineralsMap[user].amount;
-      const timeWeightedBalance = mineralsAmount.times(FETCH_FREQUENCY).dividedToIntegerBy(ONE_WEEK_SECONDS);
-
-      const mineralsForUser = timeWeightedBalance.times(97).dividedToIntegerBy(100);
-      const mineralsForPendle = timeWeightedBalance.times(3).dividedToIntegerBy(100);
-
-      userToMineralsMap[PENDLE_TREASURY_ADDRESS!] = { amount: pendleTreasuryAmount.amount.plus(mineralsForPendle) };
-      userToMineralsMap[user].amount = mineralsForUser;
+      userToMineralsMap[user].amount = mineralsAmount.times(FETCH_FREQUENCY).dividedToIntegerBy(ONE_WEEK_SECONDS);
     });
   });
 
