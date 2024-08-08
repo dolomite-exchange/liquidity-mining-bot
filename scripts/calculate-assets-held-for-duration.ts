@@ -85,7 +85,7 @@ export async function calculateAssetHeldForDuration(validMarketId: number = pars
     getMineralConfigFileNameWithPath(networkId),
   );
 
-  const epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10);
+  const epoch = parseInt(process.env.MINERAL_EPOCH_NUMBER ?? 'NaN', 10);
   let startTimestamp = parseInt(process.env.START_TIMESTAMP ?? 'NaN', 10);
   let endTimestamp = parseInt(process.env.END_TIMESTAMP ?? 'NaN', 10);
   let ignorePendle = process.env.IGNORE_PENDLE === 'true';

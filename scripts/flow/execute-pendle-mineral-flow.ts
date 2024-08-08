@@ -24,6 +24,7 @@ async function executePendleMineralFlow() {
       getMineralYtConfigFileNameWithPath(networkId),
     );
     mineralYtConfigFile.epochs[epoch].isMerkleRootGenerated = true;
+    mineralYtConfigFile.epochs[epoch].isMerkleRootWrittenOnChain = true;
     await writeMineralYtConfigToGitHub(mineralYtConfigFile, mineralYtConfigFile.epochs[epoch]);
   }
 }
