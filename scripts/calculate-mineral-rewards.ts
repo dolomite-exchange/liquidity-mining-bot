@@ -196,7 +196,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     networkId,
     epoch,
     isTimeElapsed,
-    boostedMultiplier,
+    isTimeElapsed ? boostedMultiplier : null, // only pass through the boost when the epoch is done
   );
 
   let merkleRoot: string | null;
