@@ -196,7 +196,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     networkId,
     epoch,
     isTimeElapsed,
-    isTimeElapsed ? boostedMultiplier : null, // only pass through the boost when the epoch is done
+    boostedMultiplier, // The boosted multiplier is only used if `isTimeElapsed` is set to `true`
   );
 
   let merkleRoot: string | null;
@@ -310,8 +310,8 @@ async function calculateFinalMinerals(
     const userCurrent = userToPointsMap[user];
     const userPrevious = new BigNumber(previousMinerals.users[user]?.amount ?? '0');
     const userPreviousMultiplierPreBoost = new BigNumber(previousMinerals.users[user]?.multiplier ?? '1').times(previousBoost);
-    const userPreviousMultiplier = userPreviousMultiplierPreBoost.times(previousBoost);
-    const userPreviousNormalized = userPrevious.dividedToIntegerBy(userPreviousMultiplier);
+    const userPreviousMultiplierWithBoost = userPreviousMultiplierPreBoost.times(previousBoost);
+    const userPreviousNormalized = userPrevious.dividedToIntegerBy(userPreviousMultiplierWithBoost);
     let newMultiplier = INTEGERS.ONE;
     if (isTimeElapsed && userCurrent.gt(userPreviousNormalized) && userPreviousNormalized.gt(INTEGERS.ZERO)) {
       newMultiplier = userPreviousMultiplierPreBoost.plus(0.5);
@@ -319,7 +319,7 @@ async function calculateFinalMinerals(
         newMultiplier = MAX_MULTIPLIER
       }
     }
-    const multiplierWithBoost = newMultiplier.times(boostedMultiplier ?? '1');
+    const multiplierWithBoost = newMultiplier.times(isTimeElapsed && boostedMultiplier ? boostedMultiplier : '1');
 
     memo[user] = {
       amount: userCurrent.times(multiplierWithBoost),

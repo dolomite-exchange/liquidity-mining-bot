@@ -61,7 +61,7 @@ const CHAIN_TO_MARKET_ID_REWARDS_MAP: Record<ChainId, Record<string, Integer | u
   [ChainId.ArbitrumOne]: {
     [GRAI_MARKET_ID]: new BigNumber('9000').times(ONE_ETH_WEI),
     [USDM_MARKET_ID]: new BigNumber('1000').times(ONE_ETH_WEI),
-    [RS_ETH_MARKET_ID]: new BigNumber('1000').times(ONE_ETH_WEI),
+    [RS_ETH_MARKET_ID]: new BigNumber('500').times(ONE_ETH_WEI),
     [PT_E_ETH_SEP_2024_MARKET_ID]: new BigNumber('1500').times(ONE_ETH_WEI), // for 3 weeks
     [PT_EZ_ETH_SEP_2024_MARKET_ID]: new BigNumber('1500').times(ONE_ETH_WEI), // for 3 weeks
     [PT_RS_ETH_SEP_2024_MARKET_ID]: new BigNumber('3000').times(ONE_ETH_WEI), // for 3 weeks
@@ -90,9 +90,9 @@ export async function calculateAssetHeldForDuration(validMarketId: number = pars
   let endTimestamp = parseInt(process.env.END_TIMESTAMP ?? 'NaN', 10);
   let ignorePendle = process.env.IGNORE_PENDLE === 'true';
   if (Number.isNaN(epoch) && Number.isNaN(startTimestamp) && Number.isNaN(endTimestamp)) {
-    return Promise.reject(new Error('Invalid EPOCH_NUMBER, START_TIMESTAMP, or END_TIMESTAMP'));
+    return Promise.reject(new Error('Invalid MINERAL_EPOCH_NUMBER, START_TIMESTAMP, or END_TIMESTAMP'));
   } else if (!Number.isNaN(epoch) && !mineralConfig.epochs[epoch]) {
-    return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
+    return Promise.reject(new Error(`Invalid MINERAL_EPOCH_NUMBER, found: ${epoch}`));
   } else if (!Number.isNaN(startTimestamp) && !Number.isNaN(endTimestamp)) {
     if (startTimestamp % ONE_WEEK_SECONDS !== 0 || endTimestamp % ONE_WEEK_SECONDS !== 0) {
       return Promise.reject(new Error('Invalid START_TIMESTAMP or END_TIMESTAMP modularity'));
