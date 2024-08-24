@@ -79,16 +79,17 @@ export async function calculateAssetHeldForDuration(validMarketId: number = pars
   process.env.MARKET_ID ?? 'NaN',
   10,
 )) {
-  const networkId = dolomite.networkId;
+  const { networkId } = dolomite;
 
   const mineralConfig = await readFileFromGitHub<MineralConfigFile>(
     getMineralConfigFileNameWithPath(networkId),
   );
 
   const epoch = parseInt(process.env.MINERAL_EPOCH_NUMBER ?? 'NaN', 10);
+  const ignorePendle = process.env.IGNORE_PENDLE === 'true';
+  console.log('process.env.IGNORE_PENDLE', process.env.IGNORE_PENDLE, ignorePendle);
   let startTimestamp = parseInt(process.env.START_TIMESTAMP ?? 'NaN', 10);
   let endTimestamp = parseInt(process.env.END_TIMESTAMP ?? 'NaN', 10);
-  let ignorePendle = process.env.IGNORE_PENDLE === 'true';
   if (Number.isNaN(epoch) && Number.isNaN(startTimestamp) && Number.isNaN(endTimestamp)) {
     return Promise.reject(new Error('Invalid MINERAL_EPOCH_NUMBER, START_TIMESTAMP, or END_TIMESTAMP'));
   } else if (!Number.isNaN(epoch) && !mineralConfig.epochs[epoch]) {
