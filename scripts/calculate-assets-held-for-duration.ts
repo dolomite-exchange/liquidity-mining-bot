@@ -62,9 +62,9 @@ const CHAIN_TO_MARKET_ID_REWARDS_MAP: Record<ChainId, Record<string, Integer | u
     [GRAI_MARKET_ID]: new BigNumber('9000').times(ONE_ETH_WEI),
     [USDM_MARKET_ID]: new BigNumber('1000').times(ONE_ETH_WEI),
     [RS_ETH_MARKET_ID]: new BigNumber('500').times(ONE_ETH_WEI),
-    [PT_E_ETH_SEP_2024_MARKET_ID]: new BigNumber('1500').times(ONE_ETH_WEI), // for 3 weeks
-    [PT_EZ_ETH_SEP_2024_MARKET_ID]: new BigNumber('1500').times(ONE_ETH_WEI), // for 3 weeks
-    [PT_RS_ETH_SEP_2024_MARKET_ID]: new BigNumber('3000').times(ONE_ETH_WEI), // for 3 weeks
+    [PT_E_ETH_SEP_2024_MARKET_ID]: new BigNumber('2000').times(ONE_ETH_WEI), // for 4 weeks
+    [PT_EZ_ETH_SEP_2024_MARKET_ID]: new BigNumber('2000').times(ONE_ETH_WEI), // for 4 weeks
+    [PT_RS_ETH_SEP_2024_MARKET_ID]: new BigNumber('8000').times(ONE_ETH_WEI), // for 4 weeks
     [WO_ETH_MARKET_ID]: new BigNumber('4000').times(ONE_ETH_WEI), // for 3 weeks
   },
   [ChainId.Base]: {},
