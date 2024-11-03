@@ -24,6 +24,7 @@ export interface BalanceChangeEvent {
   timestamp: number;
   serialId: number;
   effectiveUser: string;
+  marketId: number;
 }
 
 interface AmountAndProof {
@@ -255,6 +256,7 @@ export function processEventsUntilEndTimestamp(
               serialId: 0,
               effectiveUser: userBalanceStruct.effectiveUser,
               interestIndex: endInterestIndex,
+              marketId: parseInt(market, 10),
             },
             operation,
           );

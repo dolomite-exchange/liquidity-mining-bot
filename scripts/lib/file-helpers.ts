@@ -73,6 +73,16 @@ export async function writeFileToGitHub(
   return Promise.resolve();
 }
 
+export function readOutputFile(fileName: string): string | undefined {
+  const directory = `${process.cwd()}/scripts/output`;
+  const fullPath = `${directory}/${fileName}`;
+  if (!fs.existsSync(fullPath)) {
+    return undefined;
+  }
+
+  return fs.readFileSync(`${directory}/${fileName}`).toString();
+}
+
 export function writeOutputFile(
   fileName: string,
   fileContent: object,

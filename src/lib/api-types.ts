@@ -75,6 +75,25 @@ export interface ApiLiquidation {
   borrowedInterestIndex: MarketIndex;
 }
 
+export interface ApiVaporization {
+  id: string;
+  serialId: number;
+  timestamp: number;
+  solidEffectiveUser: string;
+  vaporEffectiveUser: string;
+  solidMarginAccount: ApiMarginAccount;
+  vaporMarginAccount: ApiMarginAccount;
+  heldMarketId: number;
+  borrowedMarketId: number;
+  heldTokenAmountDeltaWei: Decimal;
+  borrowedTokenAmountDeltaWei: Decimal;
+  solidHeldTokenAmountDeltaPar: Decimal;
+  solidBorrowedTokenAmountDeltaPar: Decimal;
+  vaporBorrowedTokenAmountDeltaPar: Decimal;
+  heldInterestIndex: MarketIndex;
+  borrowedInterestIndex: MarketIndex;
+}
+
 export interface ApiMarket {
   marketId: number
   symbol: string

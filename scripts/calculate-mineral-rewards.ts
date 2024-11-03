@@ -57,23 +57,21 @@ interface UserMineralAllocation {
 const SECONDS_PER_WEEK = 86_400 * 7;
 const MAX_MULTIPLIER = new BigNumber('5');
 const HARVEST_MULTIPLIER = new BigNumber(3);
-const HARVEST_REWARDS_POOL: Record<ChainId, Record<string, boolean | undefined>> = {
+const BOOSTED_POOLS: Record<ChainId, Record<string, BigNumber | undefined>> = {
   [ChainId.ArbitrumOne]: {
-    ['0xA95E010aF63196747F459176A1B85d250E8211b4'.toLowerCase()]: true, // DAI
-    ['0xD174dd89af9F58804B47A67435317bc31f971cee'.toLowerCase()]: true, // USDC
-    ['0x257b80afB7143D8877D16Aae58ffCa4C0b1D3F13'.toLowerCase()]: true, // USDT
-    ['0xFDF482245b68CfEB89b3873Af9f0Bb210d815A7C'.toLowerCase()]: true, // WBTC
-    ['0x6C7d2382Ec65582c839BC4f55B55922Be69f8764'.toLowerCase()]: true, // USDC.e
-    ['0x2E53f490FB438c9d2d0d7D7Ab17153A2f4a20870'.toLowerCase()]: true, // GMX
-    ['0x905Fea083FbbcaCf1cF1c7Bb15f6504A458cCACb'.toLowerCase()]: true, // ETH
+    ['0xA95E010aF63196747F459176A1B85d250E8211b4'.toLowerCase()]: HARVEST_MULTIPLIER, // Harvest Finance DAI
+    ['0xD174dd89af9F58804B47A67435317bc31f971cee'.toLowerCase()]: HARVEST_MULTIPLIER, // Harvest Finance USDC
+    ['0x257b80afB7143D8877D16Aae58ffCa4C0b1D3F13'.toLowerCase()]: HARVEST_MULTIPLIER, // Harvest Finance USDT
+    ['0xFDF482245b68CfEB89b3873Af9f0Bb210d815A7C'.toLowerCase()]: HARVEST_MULTIPLIER, // Harvest Finance WBTC
+    ['0x6C7d2382Ec65582c839BC4f55B55922Be69f8764'.toLowerCase()]: HARVEST_MULTIPLIER, // Harvest Finance USDC.e
+    ['0x2E53f490FB438c9d2d0d7D7Ab17153A2f4a20870'.toLowerCase()]: HARVEST_MULTIPLIER, // Harvest Finance GMX
+    ['0x905Fea083FbbcaCf1cF1c7Bb15f6504A458cCACb'.toLowerCase()]: HARVEST_MULTIPLIER, // Harvest Finance ETH
   },
   [ChainId.Base]: {},
   [ChainId.Mantle]: {},
   [ChainId.PolygonZkEvm]: {},
   [ChainId.XLayer]: {},
 };
-
-const rectifyAddress = '0xa3271e0ea07475c722474faaa5738a219e3aca96'.toLowerCase();
 
 export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)): Promise<void> {
   const networkId = dolomite.networkId;
@@ -306,7 +304,7 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
 
 async function calculateFinalMinerals(
   userToPointsMap: Record<string, Integer>,
-  networkId: number,
+  networkId: ChainId,
   epoch: number,
   isTimeElapsed: boolean,
   boostedMultiplier: string | undefined | null,
@@ -333,10 +331,10 @@ async function calculateFinalMinerals(
     const userPreviousNormalized = userPrevious.dividedToIntegerBy(userPreviousMultiplierWithBoost);
     const userPreviousNormalizedWithSlippage = userPreviousNormalized.times(99).dividedToIntegerBy(100);
     let newMultiplier = INTEGERS.ONE;
-    if (isTimeElapsed && networkId === ChainId.ArbitrumOne && epoch === 26 && user === rectifyAddress) {
+    if (isTimeElapsed && networkId === ChainId.ArbitrumOne) {
       newMultiplier = MAX_MULTIPLIER
-    } else if (isTimeElapsed && HARVEST_REWARDS_POOL[networkId][user]) {
-      newMultiplier = HARVEST_MULTIPLIER; // Harvest gets an automatic 3x reward
+    } else if (isTimeElapsed && BOOSTED_POOLS[networkId][user]) {
+      newMultiplier = BOOSTED_POOLS[networkId][user]!;
     } else if (
       isTimeElapsed
       && userCurrent.gt(userPreviousNormalizedWithSlippage)

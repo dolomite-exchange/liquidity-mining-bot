@@ -17,6 +17,7 @@ import {
   ApiRiskParam,
   ApiTrade,
   ApiTransfer,
+  ApiVaporization,
   ApiVestingPositionTransfer,
   ApiWithdrawal,
   MarketIndex,
@@ -35,6 +36,7 @@ import {
   GraphqlTimestampToBlockResult,
   GraphqlTradesResult,
   GraphqlTransfersResult,
+  GraphqlVaporizationsResult,
   GraphqlVestingPositionTransfersResult,
   GraphqlWithdrawalsResult,
 } from '../lib/graphql-types';
@@ -80,6 +82,49 @@ const LIQUIDATION_FIELDS_GQL = `     id
         liquidHeldTokenAmountDeltaPar
         solidBorrowedTokenAmountDeltaPar
         liquidBorrowedTokenAmountDeltaPar
+        heldInterestIndex {
+          supplyIndex
+          borrowIndex
+        }
+        borrowedInterestIndex {
+          supplyIndex
+          borrowIndex
+        }`
+
+const VAPORIZATION_FIELDS_GQL = `     id
+        serialId
+        transaction {
+          timestamp
+        }
+        solidEffectiveUser {
+          id
+        }
+        vaporEffectiveUser {
+          id
+        }
+        solidMarginAccount {
+          user {
+            id
+          }
+          accountNumber
+        }
+        vaporMarginAccount {
+          user {
+            id
+          }
+          accountNumber
+        }
+        heldToken {
+          marketId
+        }
+        heldTokenAmountDeltaWei
+        borrowedToken {
+          marketId
+        }
+        borrowedTokenAmountDeltaWei
+        solidHeldTokenAmountDeltaPar
+        solidBorrowedTokenAmountDeltaPar
+        vaporBorrowedTokenAmountDeltaPar
         heldInterestIndex {
           supplyIndex
           borrowIndex
@@ -396,6 +441,141 @@ export async function getLiquidationsByBorrowedToken(
 
   const liquidations = result.data.liquidations.map(liquidation => _mapLiquidationGqlToApiLiquidation(liquidation));
   return { liquidations };
+}
+
+export async function getVaporizations(
+  startBlock: number,
+  endBlock: number,
+  lastId: string,
+): Promise<{ vaporizations: ApiVaporization[] }> {
+  const query = `
+    query getVaporizations($startBlock: Int, $endBlock: Int, $lastId: ID) {
+      vaporizations(
+        first: ${Pageable.MAX_PAGE_SIZE},
+        orderBy: id
+        where: {
+            transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }
+            id_gt: $lastId
+        }
+      ) {
+        ${VAPORIZATION_FIELDS_GQL}
+      }
+    }
+  `;
+  const result = await axios.post(
+    subgraphUrl,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlVaporizationsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const vaporizations = result.data.vaporizations.map(vaporization => _mapVaporizationsGqlToApiVaporizations(
+    vaporization));
+  return { vaporizations };
+}
+
+export async function getVaporizationsByHeldToken(
+  startBlock: number,
+  endBlock: number,
+  lastId: string,
+  heldTokenAddress: string,
+): Promise<{ vaporizations: ApiVaporization[] }> {
+  const query = `
+    query getVaporizations($startBlock: Int, $endBlock: Int, $lastId: ID, $heldToken: String) {
+      vaporizations(
+        first: ${Pageable.MAX_PAGE_SIZE},
+        orderBy: id
+        where: {
+            transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }
+            id_gt: $lastId
+            heldToken: $heldToken
+        }
+      ) {
+        ${LIQUIDATION_FIELDS_GQL}
+      }
+    }
+  `;
+  const result = await axios.post(
+    subgraphUrl,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+        heldToken: heldTokenAddress.toLowerCase(),
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlVaporizationsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const vaporizations = result.data.vaporizations.map(vaporization => _mapVaporizationsGqlToApiVaporizations(
+    vaporization));
+  return { vaporizations };
+}
+
+export async function getVaporizationsByBorrowedToken(
+  startBlock: number,
+  endBlock: number,
+  lastId: string,
+  borrowedTokenAddress: string,
+): Promise<{ vaporizations: ApiVaporization[] }> {
+  const query = `
+    query getVaporizations($startBlock: Int, $endBlock: Int, $lastId: ID, $borrowedToken: String) {
+      vaporizations(
+        first: ${Pageable.MAX_PAGE_SIZE},
+        orderBy: id
+        where: {
+            transaction_: { blockNumber_gte: $startBlock blockNumber_lt: $endBlock }
+            id_gt: $lastId
+            borrowedToken: $borrowedToken
+        }
+      ) {
+        ${LIQUIDATION_FIELDS_GQL}
+      }
+    }
+  `;
+  const result = await axios.post(
+    subgraphUrl,
+    {
+      query,
+      variables: {
+        startBlock,
+        endBlock,
+        lastId,
+        borrowedToken: borrowedTokenAddress.toLowerCase(),
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data)
+    .then(json => json as GraphqlVaporizationsResult);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const vaporizations = result.data.vaporizations.map(vaporization => _mapVaporizationsGqlToApiVaporizations(
+    vaporization));
+  return { vaporizations };
 }
 
 export async function getLiquidityMiningVestingPositions(
@@ -1295,8 +1475,8 @@ export async function getDolomiteRiskParams(blockNumber: number): Promise<{ risk
 export async function getTimestampToBlockNumberMap(timestamps: number[]): Promise<Record<string, number>> {
   let queries = '';
   timestamps.forEach(timestamp => {
-    queries += `_${timestamp}:blocks(where: { timestamp_gt: ${timestamp - 30}, timestamp_lt: ${timestamp
-    + 30} } first: 1) { number }`
+    queries += `_${timestamp}:blocks(where: { timestamp_gt: ${timestamp
+    - 30}, timestamp_lte: ${timestamp} } first: 1 orderBy: timestamp orderDirection: desc) { number }`
   });
   const result = await axios.post(
     `${process.env.SUBGRAPH_BLOCKS_URL}`,
@@ -1390,6 +1570,41 @@ function _mapLiquidationGqlToApiLiquidation(liquidation: any): ApiLiquidation {
       marketId: new BigNumber(liquidation.borrowedToken.marketId).toNumber(),
       borrow: new BigNumber(liquidation.borrowedInterestIndex.borrowIndex),
       supply: new BigNumber(liquidation.borrowedInterestIndex.supplyIndex),
+    },
+  };
+}
+
+function _mapVaporizationsGqlToApiVaporizations(vaporization: any): ApiVaporization {
+  return {
+    id: vaporization.id,
+    serialId: parseInt(vaporization.serialId, 10),
+    timestamp: parseInt(vaporization.transaction.timestamp, 10),
+    solidEffectiveUser: vaporization.solidEffectiveUser.id.toLowerCase(),
+    solidMarginAccount: {
+      user: vaporization.solidMarginAccount.user.id.toLowerCase(),
+      accountNumber: vaporization.solidMarginAccount.accountNumber,
+    },
+    vaporEffectiveUser: vaporization.vaporEffectiveUser.id.toLowerCase(),
+    vaporMarginAccount: {
+      user: vaporization.vaporMarginAccount.user.id.toLowerCase(),
+      accountNumber: vaporization.vaporMarginAccount.accountNumber,
+    },
+    heldMarketId: new BigNumber(vaporization.heldToken.marketId).toNumber(),
+    borrowedMarketId: new BigNumber(vaporization.borrowedToken.marketId).toNumber(),
+    heldTokenAmountDeltaWei: new BigNumber(vaporization.heldTokenAmountDeltaWei),
+    borrowedTokenAmountDeltaWei: new BigNumber(vaporization.borrowedTokenAmountDeltaWei),
+    solidHeldTokenAmountDeltaPar: new BigNumber(vaporization.solidHeldTokenAmountDeltaPar),
+    solidBorrowedTokenAmountDeltaPar: new BigNumber(vaporization.solidBorrowedTokenAmountDeltaPar),
+    vaporBorrowedTokenAmountDeltaPar: new BigNumber(vaporization.vaporBorrowedTokenAmountDeltaPar),
+    heldInterestIndex: {
+      marketId: new BigNumber(vaporization.heldToken.marketId).toNumber(),
+      borrow: new BigNumber(vaporization.heldInterestIndex.borrowIndex),
+      supply: new BigNumber(vaporization.heldInterestIndex.supplyIndex),
+    },
+    borrowedInterestIndex: {
+      marketId: new BigNumber(vaporization.borrowedToken.marketId).toNumber(),
+      borrow: new BigNumber(vaporization.borrowedInterestIndex.borrowIndex),
+      supply: new BigNumber(vaporization.borrowedInterestIndex.supplyIndex),
     },
   };
 }

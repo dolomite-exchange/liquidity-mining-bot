@@ -142,6 +142,42 @@ export interface GraphqlLiquidationsResult extends GraphqlResult {
   }
 }
 
+export interface GraphqlVaporization {
+  id: string
+  serialId: string
+  transaction: {
+    timestamp: string
+  }
+  solidEffectiveUser: {
+    id: string
+  }
+  vaporEffectiveUser: {
+    id: string
+  }
+  solidMarginAccount: GraphqlMarginAccount
+  vaporMarginAccount: GraphqlMarginAccount
+  heldToken: {
+    marketId: string
+  }
+  heldTokenAmountDeltaWei: string
+  heldTokenLiquidationRewardWei: string
+  borrowedToken: {
+    marketId: string
+  }
+  borrowedTokenAmountDeltaWei
+  solidHeldTokenAmountDeltaPar: string
+  solidBorrowedTokenAmountDeltaPar: string
+  vaporBorrowedTokenAmountDeltaPar: string
+  heldInterestIndex: InterestIndexSnapshot
+  borrowedInterestIndex: InterestIndexSnapshot
+}
+
+export interface GraphqlVaporizationsResult extends GraphqlResult {
+  data: {
+    vaporizations: GraphqlVaporization[]
+  }
+}
+
 export interface GraphqlTrade {
   id: string
   serialId: string
