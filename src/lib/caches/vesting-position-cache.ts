@@ -1,5 +1,5 @@
 import LRU from 'lru-cache';
-import { ApiLiquidityMiningVestingPosition } from './api-types';
+import { ApiLiquidityMiningVestingPosition } from '../api-types';
 
 export default class VestingPositionCache {
   public store: LRU;

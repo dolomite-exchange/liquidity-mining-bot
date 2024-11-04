@@ -5,8 +5,8 @@ import {
   EpochConfig,
   MineralConfigEpoch,
   MineralConfigFile,
-  MineralYtConfigEpoch,
-  MineralYtConfigFile,
+  MineralPendleConfigEpoch,
+  MineralPendleConfigFile,
   NextConfig,
   OTokenConfigEpoch,
   OTokenConfigFile,
@@ -51,8 +51,8 @@ export function getMineralConfigFileNameWithPath(networkId: number): string {
   return getConfigFilePath(networkId, 'mineral', MINERAL_SEASON);
 }
 
-export function getMineralYtConfigFileNameWithPath(networkId: number): string {
-  return getConfigFilePath(networkId, 'mineral', MINERAL_SEASON, '-yt');
+export function getMineralPendleConfigFileNameWithPath(networkId: number): string {
+  return getConfigFilePath(networkId, 'mineral', MINERAL_SEASON, '-pendle');
 }
 
 /**
@@ -139,13 +139,13 @@ export async function writeMineralConfigToGitHub(
   );
 }
 
-export async function writeMineralYtConfigToGitHub(
-  configFile: MineralYtConfigFile,
-  epochData: MineralYtConfigEpoch,
+export async function writeMineralPendleConfigToGitHub(
+  configFile: MineralPendleConfigFile,
+  epochData: MineralPendleConfigEpoch,
 ): Promise<void> {
   configFile.epochs[epochData.epoch] = epochData;
   await writeFileToGitHub(
-    getMineralYtConfigFileNameWithPath(configFile.metadata.networkId),
+    getMineralPendleConfigFileNameWithPath(configFile.metadata.networkId),
     configFile,
     true,
   );

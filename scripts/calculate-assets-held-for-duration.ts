@@ -4,12 +4,12 @@ import fs from 'fs';
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithToken, getTimestampToBlockNumberMap } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
-import BlockStore from '../src/lib/block-store';
+import BlockStore from '../src/lib/stores/block-store';
 import { ChainId } from '../src/lib/chain-id';
 import { ONE_ETH_WEI } from '../src/lib/constants';
 import { isScript } from '../src/lib/env';
 import Logger from '../src/lib/logger';
-import MarketStore from '../src/lib/market-store';
+import MarketStore from '../src/lib/stores/market-store';
 import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
 import '../src/lib/env'

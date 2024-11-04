@@ -1,7 +1,7 @@
-import { calculateMineralRewards } from '../../scripts/calculate-mineral-rewards';
-import { calculateMineralSeasonConfig, MineralConfigType } from '../../scripts/calculate-mineral-season-config';
-import { delay } from './delay';
-import Logger from './logger';
+import { calculateMineralRewards } from '../../../scripts/calculate-mineral-rewards';
+import { calculateMineralSeasonConfig, MineralConfigType } from '../../../scripts/calculate-mineral-season-config';
+import { delay } from '../delay';
+import Logger from '../logger';
 
 const SHORT_WAIT_DURATION_MILLIS = 60 * 1_000; // 60 seconds in millis
 const LONG_WAIT_DURATION_MILLIS = 3_540 * 1_000; // 59 minutes in millis

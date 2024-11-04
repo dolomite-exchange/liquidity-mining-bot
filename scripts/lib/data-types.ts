@@ -4,19 +4,21 @@ export interface UserMineralAllocationForFile {
   proofs: string[];
 }
 
-export interface UserYtMineralAllocationForFile {
+export interface UserPendleMineralAllocationForFile {
   amount: string; // big int
   proofs: string[];
 }
 
-export interface MineralYtOutputFile {
+export interface MineralPendleOutputFile {
   users: {
-    [walletAddressLowercase: string]: UserYtMineralAllocationForFile;
+    [walletAddressLowercase: string]: UserPendleMineralAllocationForFile;
   };
   metadata: {
     epoch: number;
     merkleRoot: string | null;
-    marketId: number;
+    marketIdToRewardMap: {
+      [marketId: string]: number;
+    };
     totalAmount: string; // big int
     totalUsers: number;
     startBlockNumber: number;
@@ -25,7 +27,7 @@ export interface MineralYtOutputFile {
     startTimestamp: number;
     syncTimestamp: number;
     endTimestamp: number;
-    boostedMultiplier: string; // decimal
+    boostedMultiplier: number; // decimal
   };
 }
 
@@ -50,21 +52,22 @@ export interface MineralOutputFile {
 
 export interface MineralConfigEpoch extends EpochConfig {
   marketIdToRewardMap: {
-    [marketId: string]: string;
+    [marketId: string]: number;
   };
   boostedMultiplier: string | undefined | null; // decimal
 }
 
-export interface MineralYtConfigEpoch extends EpochConfig {
-  boostedMultiplier: string; // decimal
-  marketId: number;
-  marketIdReward: string; // decimal
+export interface MineralPendleConfigEpoch extends EpochConfig {
+  boostedMultiplier: number; // decimal
+  marketIdToRewardMap: {
+    [marketId: string]: number; // Represents the amount of minerals earned per unit of marketId
+  };
 }
 
 export interface MineralConfigFile extends ConfigFile<MineralConfigEpoch> {
 }
 
-export interface MineralYtConfigFile extends ConfigFile<MineralYtConfigEpoch> {
+export interface MineralPendleConfigFile extends ConfigFile<MineralPendleConfigEpoch> {
 }
 
 export enum OTokenType {

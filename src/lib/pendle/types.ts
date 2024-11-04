@@ -23,6 +23,7 @@ export interface PoolConfiguration {
   YT: string;
   LPs: Market[];
   decimals: number;
+  deployedBlock: number;
   liquidLockers: LiquidLocker[];
 }
 

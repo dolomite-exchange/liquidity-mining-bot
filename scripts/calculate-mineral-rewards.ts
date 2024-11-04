@@ -2,11 +2,11 @@ import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomi
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
-import BlockStore from '../src/lib/block-store';
+import BlockStore from '../src/lib/stores/block-store';
 import { ChainId } from '../src/lib/chain-id';
 import { isScript, shouldForceUpload } from '../src/lib/env';
 import Logger from '../src/lib/logger';
-import MarketStore from '../src/lib/market-store';
+import MarketStore from '../src/lib/stores/market-store';
 import Pageable from '../src/lib/pageable';
 import TokenAbi from './abis/isolation-mode-factory.json';
 import {

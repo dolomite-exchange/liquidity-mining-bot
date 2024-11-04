@@ -3,9 +3,9 @@ import v8 from 'v8';
 import { getLiquidityMiningVestingPositions } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
 import { ApiLiquidityMiningVestingPosition, ApiLiquidityMiningVestingPositionStatus } from '../src/lib/api-types';
-import BlockStore from '../src/lib/block-store';
+import BlockStore from '../src/lib/stores/block-store';
 import Logger from '../src/lib/logger';
-import MarketStore from '../src/lib/market-store';
+import MarketStore from '../src/lib/stores/market-store';
 import Pageable from '../src/lib/pageable';
 import '../src/lib/env'
 

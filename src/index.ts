@@ -4,10 +4,10 @@ import '../src/lib/env';
 
 import { getDolomiteRiskParams } from './clients/dolomite';
 import { dolomite, loadAccounts } from './helpers/web3';
-import BlockStore from './lib/block-store';
-import DolomiteDetonator from './lib/dolomite-detonator';
-import DolomiteLevelRequestUpdater from './lib/dolomite-level-request-updater';
-import GasPriceUpdater from './lib/gas-price-updater';
+import BlockStore from './lib/stores/block-store';
+import DolomiteDetonatorUpdater from './lib/updaters/dolomite-detonator-updater';
+import DolomiteLevelRequestUpdater from './lib/updaters/dolomite-level-request-updater';
+import GasPriceUpdater from './lib/updaters/gas-price-updater';
 import {
   checkBigNumber,
   checkBooleanValue,
@@ -19,14 +19,15 @@ import {
   checkMarketIdList,
   checkPrivateKey,
 } from './lib/invariants';
-import LevelUpdateRequestCache from './lib/level-update-request-cache';
-import LevelUpdateRequestStore from './lib/level-update-request-store';
+import LevelUpdateRequestCache from './lib/caches/level-update-request-cache';
+import LevelUpdateRequestStore from './lib/stores/level-update-request-store';
 import Logger from './lib/logger';
-import MarketStore from './lib/market-store';
-import MineralsMerkleTreeUpdater from './lib/minerals-merkle-tree-updater';
-import MineralsUpdater from './lib/minerals-updater';
-import VestingPositionCache from './lib/vesting-position-cache';
-import VestingPositionStore from './lib/vesting-position-store';
+import MarketStore from './lib/stores/market-store';
+import MineralsMerkleTreeUpdater from './lib/updaters/minerals-merkle-tree-updater';
+import MineralsUpdater from './lib/updaters/minerals-updater';
+import VestingPositionCache from './lib/caches/vesting-position-cache';
+import VestingPositionStore from './lib/stores/vesting-position-store';
+import PendleMineralsUpdater from './lib/updaters/pendle-minerals-updater';
 
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
@@ -48,6 +49,7 @@ checkDuration('LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS', 1, false);
 checkDuration('LEVEL_REQUESTS_POLL_INTERVAL_MS', 1000, true);
 checkBooleanValue('MINERALS_ENABLED');
 checkJsNumber('NETWORK_ID');
+checkBooleanValue('PENDLE_MINERALS_ENABLED');
 checkDuration('SEQUENTIAL_TRANSACTION_DELAY_MS', 100);
 checkExists('SUBGRAPH_URL');
 
@@ -64,7 +66,7 @@ async function start() {
   const marketStore = new MarketStore(blockStore, false);
   const vestingPositionStore = new VestingPositionStore(blockStore);
   const vestingPositionCache = new VestingPositionCache();
-  const dolomiteDetonator = new DolomiteDetonator(vestingPositionStore, vestingPositionCache, blockStore);
+  const dolomiteDetonator = new DolomiteDetonatorUpdater(vestingPositionStore, vestingPositionCache, blockStore);
   const requestUpdaterStore = new LevelUpdateRequestStore(blockStore);
   const requestUpdaterCache = new LevelUpdateRequestCache();
   const dolomiteRequestUpdater = new DolomiteLevelRequestUpdater(
@@ -82,6 +84,7 @@ async function start() {
   const { riskParams } = await getDolomiteRiskParams(subgraphBlockNumber);
   const networkId = await dolomite.web3.eth.net.getId();
   const mineralsUpdater = new MineralsUpdater();
+  const pendleMineralsUpdater = new PendleMineralsUpdater();
   const mineralsMerkleTreeUpdater = new MineralsMerkleTreeUpdater(networkId);
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address
@@ -120,6 +123,7 @@ async function start() {
     levelRequestsPollIntervalMillis: process.env.LEVEL_REQUESTS_POLL_INTERVAL_MS,
     mineralsEnabled: process.env.MINERALS_ENABLED,
     networkId,
+    pendleMineralsEnabled: process.env.PENDLE_MINERALS_ENABLED,
     sequentialTransactionDelayMillis: process.env.SEQUENTIAL_TRANSACTION_DELAY_MS,
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
@@ -142,6 +146,9 @@ async function start() {
   if (process.env.MINERALS_ENABLED === 'true') {
     mineralsUpdater.start();
     mineralsMerkleTreeUpdater.start();
+  }
+  if (process.env.PENDLE_MINERALS_ENABLED === 'true') {
+    pendleMineralsUpdater.start();
   }
   return true
 }

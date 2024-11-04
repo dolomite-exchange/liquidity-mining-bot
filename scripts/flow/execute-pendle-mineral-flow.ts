@@ -1,18 +1,18 @@
 import { MineralDistributor } from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import { writeMerkleRootOnChain } from '../../src/helpers/dolomite-helpers';
 import { dolomite } from '../../src/helpers/web3';
-import { calculateMineralYtRewards } from '../calculate-mineral-rewards-for-yt';
+import { calculateMineralPendleRewards } from '../calculate-mineral-rewards-for-pendle';
 import { calculateMineralSeasonConfig, MineralConfigType } from '../calculate-mineral-season-config';
-import { getMineralYtConfigFileNameWithPath, writeMineralYtConfigToGitHub } from '../lib/config-helper';
-import { MineralYtConfigFile } from '../lib/data-types';
+import { getMineralPendleConfigFileNameWithPath, writeMineralPendleConfigToGitHub } from '../lib/config-helper';
+import { MineralPendleConfigFile } from '../lib/data-types';
 import { readFileFromGitHub } from '../lib/file-helpers';
 
 async function executePendleMineralFlow() {
-  const { epochNumber: epoch, isEpochElapsed } = await calculateMineralSeasonConfig(MineralConfigType.YtConfig);
+  const { epochNumber: epoch, isEpochElapsed } = await calculateMineralSeasonConfig(MineralConfigType.PendleConfig);
 
   let merkleRoot: string | null = null;
   if (isEpochElapsed) {
-    const result = await calculateMineralYtRewards(epoch);
+    const result = await calculateMineralPendleRewards(epoch);
     merkleRoot = result.merkleRoot;
   }
 
@@ -20,12 +20,12 @@ async function executePendleMineralFlow() {
     const networkId = dolomite.networkId;
     await writeMerkleRootOnChain(epoch, merkleRoot, MineralDistributor[networkId].address);
 
-    const mineralYtConfigFile = await readFileFromGitHub<MineralYtConfigFile>(
-      getMineralYtConfigFileNameWithPath(networkId),
+    const mineralPendleConfigFile = await readFileFromGitHub<MineralPendleConfigFile>(
+      getMineralPendleConfigFileNameWithPath(networkId),
     );
-    mineralYtConfigFile.epochs[epoch].isMerkleRootGenerated = true;
-    mineralYtConfigFile.epochs[epoch].isMerkleRootWrittenOnChain = true;
-    await writeMineralYtConfigToGitHub(mineralYtConfigFile, mineralYtConfigFile.epochs[epoch]);
+    mineralPendleConfigFile.epochs[epoch].isMerkleRootGenerated = true;
+    mineralPendleConfigFile.epochs[epoch].isMerkleRootWrittenOnChain = true;
+    await writeMineralPendleConfigToGitHub(mineralPendleConfigFile, mineralPendleConfigFile.epochs[epoch]);
   }
 }
 

@@ -1,6 +1,6 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { delay } from '../../src/lib/delay';
-import LevelUpdateRequestCache from '../../src/lib/level-update-request-cache';
+import LevelUpdateRequestCache from '../../src/lib/caches/level-update-request-cache';
 
 describe('LevelUpdateRequestCache', () => {
   const expirationSeconds = 2;

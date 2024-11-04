@@ -1,6 +1,6 @@
 import v8 from 'v8';
 import { dolomite } from '../src/helpers/web3';
-import BlockStore from '../src/lib/block-store';
+import BlockStore from '../src/lib/stores/block-store';
 import { ChainId } from '../src/lib/chain-id';
 import Logger from '../src/lib/logger';
 import { getBalanceChangingEvents } from './lib/event-parser';

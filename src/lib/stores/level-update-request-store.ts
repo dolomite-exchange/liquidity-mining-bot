@@ -1,8 +1,8 @@
-import { getUnfulfilledLevelUpdateRequests } from '../clients/dolomite';
-import { ApiLiquidityMiningLevelUpdateRequest } from './api-types';
+import { getUnfulfilledLevelUpdateRequests } from '../../clients/dolomite';
+import { ApiLiquidityMiningLevelUpdateRequest } from '../api-types';
 import BlockStore from './block-store';
-import { delay } from './delay';
-import Logger from './logger';
+import { delay } from '../delay';
+import Logger from '../logger';
 
 export default class LevelUpdateRequestStore {
   public levelUpdateRequests: ApiLiquidityMiningLevelUpdateRequest[];

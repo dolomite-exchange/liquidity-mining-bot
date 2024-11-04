@@ -1,15 +1,15 @@
-import { detonateAccount } from '../helpers/dolomite-helpers';
-import BlockStore from './block-store';
-import { delay } from './delay';
-import Logger from './logger';
-import VestingPositionCache from './vesting-position-cache';
-import VestingPositionStore from './vesting-position-store';
+import { detonateAccount } from '../../helpers/dolomite-helpers';
+import BlockStore from '../stores/block-store';
+import { delay } from '../delay';
+import Logger from '../logger';
+import VestingPositionCache from '../caches/vesting-position-cache';
+import VestingPositionStore from '../stores/vesting-position-store';
 
 const WAIT_DURATION = 5_000;
 
 export const DETONATION_WINDOW_SECONDS = 86_400 * 7 * 4; // 4 weeks
 
-export default class DolomiteDetonator {
+export default class DolomiteDetonatorUpdater {
   public vestingPositionStore: VestingPositionStore;
   public vestingPositionCache: VestingPositionCache;
   public blockStore: BlockStore;

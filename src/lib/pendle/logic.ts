@@ -1,8 +1,8 @@
 import { BigNumber, ethers } from 'ethers';
-import { UserRecord } from './types';
-import { getAllERC20Balances, getAllMarketActiveBalances, getAllYTInterestData } from './multicall';
 import { CHAIN, PENDLE_TREASURY_ADDRESS, POOL_INFO } from './configuration';
 import * as constants from './consts';
+import { getAllERC20Balances, getAllMarketActiveBalances, getAllYTInterestData } from './multicall';
+import { UserRecord } from './types';
 
 function increaseUserAmount(
   result: UserRecord,
@@ -22,8 +22,10 @@ export async function applyYtHolderShares(
   marketId: number,
   blockNumber: number,
 ): Promise<void> {
+  const poolConfiguration = POOL_INFO[CHAIN][marketId];
+
   const balances = (
-    await getAllERC20Balances(POOL_INFO[CHAIN][marketId].YT, allUsers, blockNumber)
+    await getAllERC20Balances(poolConfiguration.YT, allUsers, blockNumber, poolConfiguration.deployedBlock)
   ).map((v, i) => {
     return {
       user: allUsers[i],
@@ -32,7 +34,7 @@ export async function applyYtHolderShares(
   });
 
   const allInterests = (
-    await getAllYTInterestData(POOL_INFO[CHAIN][marketId].YT, allUsers, blockNumber)
+    await getAllYTInterestData(poolConfiguration.YT, allUsers, blockNumber, poolConfiguration.deployedBlock)
   ).map((v, i) => {
     return {
       user: allUsers[i],
@@ -59,7 +61,7 @@ export async function applyYtHolderShares(
   }
 
   for (const i of allInterests) {
-    if (i.user === POOL_INFO[CHAIN][marketId].YT) {
+    if (i.user === poolConfiguration.YT) {
       continue;
     }
     if (i.userIndex.eq(0)) {
@@ -83,13 +85,15 @@ export async function applyLpHolderShares(
   marketId: number,
   blockNumber: number,
 ): Promise<void> {
+  const poolConfiguration = POOL_INFO[CHAIN][marketId];
   const totalSy = (
-    await getAllERC20Balances(POOL_INFO[CHAIN][marketId].SY, [lpToken], blockNumber)
+    await getAllERC20Balances(poolConfiguration.SY, [lpToken], blockNumber, poolConfiguration.deployedBlock)
   )[0];
   const allActiveBalances = await getAllMarketActiveBalances(
     lpToken,
     allUsers,
     blockNumber,
+    poolConfiguration.deployedBlock,
   );
   const totalActiveSupply = allActiveBalances.reduce(
     (a, b) => a.add(b),
@@ -100,7 +104,7 @@ export async function applyLpHolderShares(
     liquidLocker: string,
     totalBoostedSy: BigNumber,
   ) {
-    const validLockers = POOL_INFO[CHAIN][marketId].liquidLockers.filter(
+    const validLockers = poolConfiguration.liquidLockers.filter(
       (v) => v.address === liquidLocker && v.lpToken === lpToken,
     );
 
@@ -108,11 +112,12 @@ export async function applyLpHolderShares(
       return;
     }
 
-    const { receiptToken } = validLockers[0];
+    const { receiptToken, deployedBlock } = validLockers[0];
     const allReceiptTokenBalances = await getAllERC20Balances(
       receiptToken,
       allUsers,
       blockNumber,
+      deployedBlock,
     );
     const totalLiquidLockerShares = allReceiptTokenBalances.reduce(
       (a, b) => a.add(b),

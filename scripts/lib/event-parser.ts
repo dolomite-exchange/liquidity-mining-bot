@@ -31,8 +31,8 @@ import { ChainId } from '../../src/lib/chain-id';
 import { ONE_ETH_WEI } from '../../src/lib/constants';
 import Pageable from '../../src/lib/pageable';
 import { POOL_INFO } from '../../src/lib/pendle/configuration';
-import { getMineralFinalizedFileNameWithPath, getMineralYtConfigFileNameWithPath } from './config-helper';
-import { MineralYtConfigFile, MineralYtOutputFile } from './data-types';
+import { getMineralFinalizedFileNameWithPath, getMineralPendleConfigFileNameWithPath } from './config-helper';
+import { MineralPendleConfigFile, MineralPendleOutputFile } from './data-types';
 import { readFileFromGitHub } from './file-helpers';
 import {
   AccountToSubAccountToMarketToBalanceChangeMap,
@@ -355,8 +355,8 @@ async function getPendleSyAddressToLiquidityPositionAndEvents(
   endTimestamp: number,
 ): Promise<Record<string, LiquidityPositionsAndEvents>> {
   const virtualLiquidityBalances: AccountToVirtualLiquidityBalanceMap = {};
-  const ytConfig = await readFileFromGitHub<MineralYtConfigFile>(getMineralYtConfigFileNameWithPath(networkId));
-  const epochs = Object.values(ytConfig.epochs).filter(e => {
+  const pendleConfig = await readFileFromGitHub<MineralPendleConfigFile>(getMineralPendleConfigFileNameWithPath(networkId));
+  const epochs = Object.values(pendleConfig.epochs).filter(e => {
     return e.startTimestamp === startTimestamp && e.endTimestamp === endTimestamp;
   });
   if (epochs.length === 0) {
@@ -366,7 +366,7 @@ async function getPendleSyAddressToLiquidityPositionAndEvents(
 
   const syAddressToVirtualLiquidityPositions = {};
   for (const epoch of epochs) {
-    const outputFile = await readFileFromGitHub<MineralYtOutputFile>(
+    const outputFile = await readFileFromGitHub<MineralPendleOutputFile>(
       getMineralFinalizedFileNameWithPath(networkId, epoch.epoch),
     );
     const positions = Object.keys(outputFile.users).map<VirtualLiquidityPosition>(user => {

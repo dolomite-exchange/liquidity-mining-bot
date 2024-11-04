@@ -3,15 +3,22 @@ import { MineralDistributor } from '@dolomite-exchange/modules-deployments/src/d
 import {
   getMineralConfigFileNameWithPath,
   getMineralFinalizedFileNameWithPath,
+  getMineralPendleConfigFileNameWithPath,
   writeMineralConfigToGitHub,
-} from '../../scripts/lib/config-helper';
-import { readFileFromGitHub } from '../../scripts/lib/file-helpers';
-import MineralDistributorAbi from '../abi/reward-distributor.json';
-import { getGasPriceWei } from '../helpers/gas-price-helpers';
-import { dolomite } from '../helpers/web3';
-import { delay } from './delay';
-import Logger from './logger';
-import { MineralConfigFile, MineralOutputFile } from '../../scripts/lib/data-types';
+  writeMineralPendleConfigToGitHub,
+} from '../../../scripts/lib/config-helper';
+import { MineralConfigFile, MineralOutputFile, MineralPendleConfigFile } from '../../../scripts/lib/data-types';
+import { readFileFromGitHub } from '../../../scripts/lib/file-helpers';
+import MineralDistributorAbi from '../../abi/reward-distributor.json';
+import { getGasPriceWei } from '../../helpers/gas-price-helpers';
+import { dolomite } from '../../helpers/web3';
+import { delay } from '../delay';
+import Logger from '../logger';
+
+enum ConfigFileType {
+  NormalMineral = 'NormalMineral',
+  PendleMineral = 'PendleMineral',
+}
 
 const SHORT_WAIT_DURATION_MILLIS = 60 * 1_000; // 60 seconds in millis
 const HASH_ZERO = '0x0000000000000000000000000000000000000000000000000000000000000000';
@@ -53,6 +60,23 @@ export default class MineralsMerkleTreeUpdater {
     });
 
     const mineralConfigFile = await readFileFromGitHub<MineralConfigFile>(getMineralConfigFileNameWithPath(this.networkId));
+    await this._checkConfigFileAndWriteOnChain(mineralConfigFile, ConfigFileType.NormalMineral);
+
+    const mineralPendleConfigFile = await readFileFromGitHub<MineralPendleConfigFile>(
+      getMineralPendleConfigFileNameWithPath(this.networkId),
+    );
+    await this._checkConfigFileAndWriteOnChain(mineralPendleConfigFile, ConfigFileType.PendleMineral);
+
+    Logger.info({
+      at: 'MineralsMerkleTreeUpdater#_update',
+      message: `Finished checking for merkle tree root updates`,
+    });
+  };
+
+  _checkConfigFileAndWriteOnChain = async (
+    mineralConfigFile: MineralConfigFile | MineralPendleConfigFile,
+    configType: ConfigFileType,
+  ) => {
     const epochs = Object.keys(mineralConfigFile.epochs);
     for (let i = 0; i < epochs.length; i++) {
       const configForEpoch = mineralConfigFile.epochs[epochs[i]];
@@ -89,7 +113,7 @@ export default class MineralsMerkleTreeUpdater {
             {
               gasPrice: getGasPriceWei().toFixed(),
               confirmationType: ConfirmationType.Hash,
-            }
+            },
           );
           Logger.info({
             at: 'MineralsMerkleTreeUpdater#_update',
@@ -98,13 +122,18 @@ export default class MineralsMerkleTreeUpdater {
           })
         }
         configForEpoch.isMerkleRootWrittenOnChain = true;
-        await writeMineralConfigToGitHub(mineralConfigFile, configForEpoch);
+
+        if (configType === ConfigFileType.NormalMineral) {
+          await writeMineralConfigToGitHub(mineralConfigFile as any, configForEpoch as any);
+        } else if (configType === ConfigFileType.PendleMineral) {
+          await writeMineralPendleConfigToGitHub(mineralConfigFile as any, configForEpoch as any);
+        } else {
+          Logger.error({
+            message: `Invalid config type, found: ${configType}`,
+          });
+          process.exit(1);
+        }
       }
     }
-
-    Logger.info({
-      at: 'MineralsMerkleTreeUpdater#_update',
-      message: `Finished checking for merkle tree root updates`,
-    });
-  };
+  }
 }

@@ -1,10 +1,10 @@
-import { fulfillLevelUpdateRequest } from '../helpers/dolomite-helpers';
-import BlockStore from './block-store';
-import { delay } from './delay';
-import LevelUpdateRequestCache from './level-update-request-cache';
-import LevelUpdateRequestStore from './level-update-request-store';
-import Logger from './logger';
-import MarketStore from './market-store';
+import { fulfillLevelUpdateRequest } from '../../helpers/dolomite-helpers';
+import BlockStore from '../stores/block-store';
+import { delay } from '../delay';
+import LevelUpdateRequestCache from '../caches/level-update-request-cache';
+import LevelUpdateRequestStore from '../stores/level-update-request-store';
+import Logger from '../logger';
+import MarketStore from '../stores/market-store';
 
 const WAIT_DURATION = 1_000;
 

@@ -3,10 +3,10 @@ import { parseEther } from 'ethers/lib/utils';
 import v8 from 'v8';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
-import BlockStore from '../src/lib/block-store';
+import BlockStore from '../src/lib/stores/block-store';
 import { isScript, shouldForceUpload } from '../src/lib/env'
 import Logger from '../src/lib/logger';
-import MarketStore from '../src/lib/market-store';
+import MarketStore from '../src/lib/stores/market-store';
 import Pageable from '../src/lib/pageable';
 import {
   getOTokenConfigFileNameWithPath,

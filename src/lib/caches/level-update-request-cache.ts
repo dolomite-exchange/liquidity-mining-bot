@@ -1,5 +1,5 @@
 import LRU from 'lru-cache';
-import { ApiLiquidityMiningLevelUpdateRequest } from './api-types';
+import { ApiLiquidityMiningLevelUpdateRequest } from '../api-types';
 
 export default class LevelUpdateRequestCache {
   public store: LRU;

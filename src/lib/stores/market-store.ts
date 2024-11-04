@@ -1,15 +1,15 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { ContractConstantCallOptions } from '@dolomite-exchange/dolomite-margin/dist/src/types';
-import { getDolomiteMarkets } from '../clients/dolomite';
-import { isMarketIgnored } from '../helpers/market-helpers';
-import { dolomite } from '../helpers/web3';
-import { ApiMarket, MarketIndex } from './api-types';
+import { getDolomiteMarkets } from '../../clients/dolomite';
+import { isMarketIgnored } from '../../helpers/market-helpers';
+import { dolomite } from '../../helpers/web3';
+import { ApiMarket, MarketIndex } from '../api-types';
 import BlockStore from './block-store';
-import { ONE_ETH_WEI } from './constants';
-import { delay } from './delay';
-import Logger from './logger';
-import Pageable from './pageable';
-import { chunkArray } from './utils';
+import { ONE_ETH_WEI } from '../constants';
+import { delay } from '../delay';
+import Logger from '../logger';
+import Pageable from '../pageable';
+import { chunkArray } from '../utils';
 
 export default class MarketStore {
   private marketMap: { [marketId: string]: ApiMarket };

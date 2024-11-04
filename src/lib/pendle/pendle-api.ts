@@ -11,8 +11,7 @@ export class PendleAPI {
         if (token === ADDRESS_ZERO) {
           return Promise.resolve([]);
         } else {
-          const result = this.query(token);
-          return result;
+          return this.query(token);
         }
       }),
     );

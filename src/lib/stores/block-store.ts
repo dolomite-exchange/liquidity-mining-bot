@@ -1,6 +1,6 @@
-import { getSubgraphBlockNumber } from '../helpers/block-helper';
-import { delay } from './delay';
-import Logger from './logger';
+import { getSubgraphBlockNumber } from '../../helpers/block-helper';
+import { delay } from '../delay';
+import Logger from '../logger';
 
 export default class BlockStore {
   private blockNumber: number;

@@ -1,9 +1,9 @@
-import { getExpiredLiquidityMiningVestingPositions } from '../clients/dolomite';
-import { ApiLiquidityMiningVestingPosition } from './api-types';
+import { getExpiredLiquidityMiningVestingPositions } from '../../clients/dolomite';
+import { ApiLiquidityMiningVestingPosition } from '../api-types';
 import BlockStore from './block-store';
-import { delay } from './delay';
-import Logger from './logger';
-import { DETONATION_WINDOW_SECONDS } from './dolomite-detonator';
+import { delay } from '../delay';
+import Logger from '../logger';
+import { DETONATION_WINDOW_SECONDS } from '../updaters/dolomite-detonator-updater';
 
 export default class VestingPositionStore {
   public explodablePositions: ApiLiquidityMiningVestingPosition[];

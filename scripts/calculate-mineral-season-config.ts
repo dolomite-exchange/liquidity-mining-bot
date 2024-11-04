@@ -3,31 +3,31 @@ import { isScript, shouldForceUpload } from '../src/lib/env';
 import Logger from '../src/lib/logger';
 import {
   getMineralConfigFileNameWithPath,
-  getMineralYtConfigFileNameWithPath,
+  getMineralPendleConfigFileNameWithPath,
   getNextConfigIfNeeded,
   MINERAL_SEASON,
   writeMineralConfigToGitHub,
-  writeMineralYtConfigToGitHub,
+  writeMineralPendleConfigToGitHub,
 } from './lib/config-helper';
 import { readFileFromGitHub, writeOutputFile } from './lib/file-helpers';
-import { MineralConfigEpoch, MineralConfigFile, MineralYtConfigEpoch, MineralYtConfigFile } from './lib/data-types';
+import { MineralConfigEpoch, MineralConfigFile, MineralPendleConfigEpoch, MineralPendleConfigFile } from './lib/data-types';
 
 export const MIN_MINERALS_KEY_BEFORE_MIGRATIONS = 900
 export const MAX_MINERALS_KEY_BEFORE_MIGRATIONS = 10_000;
 
 export enum MineralConfigType {
   RegularConfig = 0,
-  YtConfig = 1,
+  PendleConfig = 1,
 }
 
 type ConfigType<T extends MineralConfigType> =
   T extends MineralConfigType.RegularConfig ? MineralConfigFile
-    : T extends MineralConfigType.YtConfig ? MineralYtConfigFile
+    : T extends MineralConfigType.PendleConfig ? MineralPendleConfigFile
       : never;
 
 type EpochConfigType<T extends MineralConfigType> =
   T extends MineralConfigType.RegularConfig ? MineralConfigEpoch
-    : T extends MineralConfigType.YtConfig ? MineralYtConfigEpoch
+    : T extends MineralConfigType.PendleConfig ? MineralPendleConfigEpoch
       : never;
 
 export async function calculateMineralSeasonConfig<T extends MineralConfigType>(
@@ -38,8 +38,8 @@ export async function calculateMineralSeasonConfig<T extends MineralConfigType>(
 
   const mineralConfigPath = configType === MineralConfigType.RegularConfig
     ? getMineralConfigFileNameWithPath(networkId)
-    : configType === MineralConfigType.YtConfig
-      ? getMineralYtConfigFileNameWithPath(networkId)
+    : configType === MineralConfigType.PendleConfig
+      ? getMineralPendleConfigFileNameWithPath(networkId)
       : undefined;
   if (!mineralConfigPath) {
     return Promise.reject(new Error(`Invalid config type, found ${configType}`));
@@ -99,8 +99,8 @@ export async function calculateMineralSeasonConfig<T extends MineralConfigType>(
         marketIdToRewardMap: (typedConfigFile.epochs[maxKey + 1] ?? oldEpoch).marketIdToRewardMap,
       } as MineralConfigEpoch
     ) as EpochConfigType<T>;
-  } else if (configType === MineralConfigType.YtConfig) {
-    const typedConfigFile = configFile as MineralYtConfigFile;
+  } else if (configType === MineralConfigType.PendleConfig) {
+    const typedConfigFile = configFile as MineralPendleConfigFile;
     epochData = (
       {
         epoch: nextEpochData.isReadyForNext ? maxKey + 1 : maxKey,
@@ -112,9 +112,8 @@ export async function calculateMineralSeasonConfig<T extends MineralConfigType>(
         isMerkleRootGenerated: false,
         isMerkleRootWrittenOnChain: false,
         boostedMultiplier: (typedConfigFile.epochs[maxKey + 1] ?? oldEpoch).boostedMultiplier,
-        marketId: (typedConfigFile.epochs[maxKey + 1] ?? oldEpoch).marketId,
-        marketIdReward: (typedConfigFile.epochs[maxKey + 1] ?? oldEpoch).marketIdReward,
-      } as MineralYtConfigEpoch
+        marketIdToRewardMap: (typedConfigFile.epochs[maxKey + 1] ?? oldEpoch).marketIdToRewardMap,
+      } as MineralPendleConfigEpoch
     ) as EpochConfigType<T>;
   } else {
     return Promise.reject(new Error(`Invalid config type, found ${configType}`));
@@ -123,8 +122,8 @@ export async function calculateMineralSeasonConfig<T extends MineralConfigType>(
   if (!isScript() || shouldForceUpload()) {
     if (configType === MineralConfigType.RegularConfig) {
       await writeMineralConfigToGitHub(configFile as MineralConfigFile, epochData as MineralConfigEpoch);
-    } else if (configType === MineralConfigType.YtConfig) {
-      await writeMineralYtConfigToGitHub(configFile as MineralYtConfigFile, epochData as MineralYtConfigEpoch);
+    } else if (configType === MineralConfigType.PendleConfig) {
+      await writeMineralPendleConfigToGitHub(configFile as MineralPendleConfigFile, epochData as MineralPendleConfigEpoch);
     } else {
       return Promise.reject(new Error(`Invalid config type, found ${configType}`));
     }
@@ -159,7 +158,7 @@ export async function calculateMineralSeasonConfig<T extends MineralConfigType>(
 }
 
 if (isScript()) {
-  calculateMineralSeasonConfig(MineralConfigType.YtConfig)
+  calculateMineralSeasonConfig(MineralConfigType.PendleConfig)
     .then(() => {
       console.log('Finished executing script!');
     })

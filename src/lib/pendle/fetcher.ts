@@ -1,10 +1,12 @@
 import { BigNumber } from '@dolomite-exchange/dolomite-margin';
-import { UserRecord, UserRecordWithDecimal } from './types';
-import { applyLpHolderShares, applyYtHolderShares } from './logic';
 import { CHAIN, POOL_INFO } from './configuration';
+import { applyLpHolderShares, applyYtHolderShares } from './logic';
 import { PendleAPI } from './pendle-api';
+import { UserRecord, UserRecordWithDecimal } from './types';
 
-export async function fetchPendleYtUserBalanceSnapshotBatch(
+const TEN = new BigNumber(10);
+
+export async function fetchPendleUserBalanceSnapshotBatch(
   marketId: number,
   blockNumbers: number[],
 ): Promise<UserRecordWithDecimal[]> {
@@ -19,7 +21,7 @@ export async function fetchPendleYtUserBalanceSnapshotBatch(
     ...allLiquidLockerTokens,
   ]);
 
-  return Promise.all(
+  return await Promise.all(
     blockNumbers.map((b) => _fetchUserBalanceSnapshot(marketId, allYTUsers, allLPUsers, b)),
   );
 }
@@ -31,7 +33,7 @@ async function _fetchUserBalanceSnapshot(
   blockNumber: number,
 ): Promise<UserRecordWithDecimal> {
   const result: UserRecord = {};
-  const oneUnit = new BigNumber(10).pow(POOL_INFO[CHAIN][marketId].decimals);
+  const oneUnit = TEN.pow(POOL_INFO[CHAIN][marketId].decimals);
   await applyYtHolderShares(result, allYTUsers, marketId, blockNumber);
   for (const lp of POOL_INFO[CHAIN][marketId].LPs) {
     if (lp.deployedBlock <= blockNumber) {
