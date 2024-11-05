@@ -1,4 +1,4 @@
-import { calculateMineralPendleRewards } from '../../../scripts/calculate-mineral-rewards-for-pendle';
+import { calculateMineralRewardsForPendle } from '../../../scripts/calculate-mineral-rewards-for-pendle';
 import { calculateMineralSeasonConfig, MineralConfigType } from '../../../scripts/calculate-mineral-season-config';
 import { delay } from '../delay';
 import Logger from '../logger';
@@ -33,7 +33,7 @@ export default class PendleMineralsUpdater {
         });
 
         const { epochNumber: epoch } = await calculateMineralSeasonConfig(MineralConfigType.PendleConfig);
-        await calculateMineralPendleRewards(epoch);
+        await calculateMineralRewardsForPendle(epoch);
 
         const { durationSeconds } = getDurationToNextTimestamp();
         Logger.info({

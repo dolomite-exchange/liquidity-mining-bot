@@ -1,7 +1,7 @@
 import { MineralDistributor } from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import { writeMerkleRootOnChain } from '../../src/helpers/dolomite-helpers';
 import { dolomite } from '../../src/helpers/web3';
-import { calculateMineralPendleRewards } from '../calculate-mineral-rewards-for-pendle';
+import { calculateMineralRewardsForPendle } from '../calculate-mineral-rewards-for-pendle';
 import { calculateMineralSeasonConfig, MineralConfigType } from '../calculate-mineral-season-config';
 import { getMineralPendleConfigFileNameWithPath, writeMineralPendleConfigToGitHub } from '../lib/config-helper';
 import { MineralPendleConfigFile } from '../lib/data-types';
@@ -12,7 +12,7 @@ async function executePendleMineralFlow() {
 
   let merkleRoot: string | null = null;
   if (isEpochElapsed) {
-    const result = await calculateMineralPendleRewards(epoch);
+    const result = await calculateMineralRewardsForPendle(epoch);
     merkleRoot = result.merkleRoot;
   }
 

@@ -31,7 +31,7 @@ const FETCH_FREQUENCY = 60 * 60; // one hour in seconds
 const WEEK_DURATION_FOR_FETCHES = ONE_WEEK_SECONDS;
 const ONE_MINERAL_IN_WEI = new BigNumber('1000000000000000000');
 
-export async function calculateMineralPendleRewards(
+export async function calculateMineralRewardsForPendle(
   epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10),
 ): Promise<{ epoch: number, merkleRoot: string | null }> {
   const networkId = dolomite.networkId;
@@ -56,7 +56,7 @@ export async function calculateMineralPendleRewards(
   if (isTimeElapsed && isMerkleRootGenerated && !isScript()) {
     // If this epoch is finalized, and we're not in a script, return.
     Logger.info({
-      at: 'calculateMineralRewards',
+      at: 'calculateMineralRewardsForPendle',
       message: `Epoch ${epoch} has passed and merkle root was generated, skipping...`,
     });
     return Promise.resolve({ epoch, merkleRoot: null });
@@ -71,6 +71,7 @@ export async function calculateMineralPendleRewards(
   }
 
   Logger.info({
+    at: 'calculateMineralRewardsForPendle',
     message: 'Pendle Mineral Rewards Data',
     blacklistAddresses: BLACKLIST_ADDRESSES,
     blockRewardStart: startBlockNumber,
@@ -102,11 +103,10 @@ export async function calculateMineralPendleRewards(
 
   const maxTimestamp = Math.min(startTimestamp + WEEK_DURATION_FOR_FETCHES, Math.floor(Date.now() / 1000));
   const syncTimestamp = mineralOutputFile.metadata.syncTimestamp;
-  const numberOfTimestampsToFetch = Math.floor(
-    (maxTimestamp - syncTimestamp) / FETCH_FREQUENCY,
-  );
+  const numberOfTimestampsToFetch = Math.floor((maxTimestamp - syncTimestamp) / FETCH_FREQUENCY);
   if (numberOfTimestampsToFetch <= 0) {
     Logger.info({
+      at: 'calculateMineralRewardsForPendle',
       message: 'Skipping fetch since the number of required fetches is <= 0',
     });
 
@@ -115,10 +115,28 @@ export async function calculateMineralPendleRewards(
       merkleRoot: mineralOutputFile.metadata.merkleRoot,
     };
   }
+
   const timestamps = Array.from(
     { length: numberOfTimestampsToFetch },
     (_, i) => syncTimestamp + (FETCH_FREQUENCY * i),
   );
+  if (timestamps.length === 1) {
+    Logger.info({
+      at: 'calculateMineralRewardsForPendle',
+      message: `Retrieving Pendle data for the following timestamps: [${timestamps[0]}]`,
+      firstTimestamp: timestamps[0],
+    });
+  } else {
+    const firstTimestamp = timestamps[0];
+    const lastTimestamp = timestamps[timestamps.length - 1];
+    Logger.info({
+      at: 'calculateMineralRewardsForPendle',
+      message: `Retrieving Pendle data for the following timestamps: [${firstTimestamp} ... ${lastTimestamp}]`,
+      firstTimestamp,
+      lastTimestamp,
+    });
+  }
+
   const blockNumbers = Object.values(await getTimestampToBlockNumberMap(timestamps));
 
   mineralOutputFile.metadata.syncTimestamp = timestamps[timestamps.length - 1];
@@ -203,6 +221,7 @@ export async function calculateMineralPendleRewards(
     await writeFileToGitHub(mineralFileName, mineralOutputFile, false);
   } else {
     Logger.info({
+      at: 'calculateMineralRewardsForPendle',
       message: 'Skipping output file upload due to script execution',
     });
     writeOutputFile(`mineral-${networkId}-season-${MINERAL_SEASON}-epoch-${epoch}-output.json`, mineralOutputFile);
@@ -213,6 +232,7 @@ export async function calculateMineralPendleRewards(
     await writeMineralPendleConfigToGitHub(mineralPendleConfigFile, mineralPendleConfigFile.epochs[epoch]);
   } else if (mineralOutputFile.metadata.merkleRoot) {
     Logger.info({
+      at: 'calculateMineralRewardsForPendle',
       message: 'Skipping config file upload due to script execution',
     });
     mineralPendleConfigFile.epochs[epoch].isMerkleRootGenerated = true;
@@ -232,6 +252,7 @@ export async function calculateMineralPendleRewards(
     await writeFileToGitHub(metadataFilePath, metadata, true);
   } else if (metadata.pendleMetadata.maxEpochNumber < epoch) {
     Logger.info({
+      at: 'calculateMineralRewardsForPendle',
       message: 'Skipping config file upload due to script execution',
     });
     metadata.pendleMetadata.maxEpochNumber = epoch;
@@ -295,7 +316,7 @@ function calculateFinalMinerals(
 }
 
 if (isScript()) {
-  calculateMineralPendleRewards()
+  calculateMineralRewardsForPendle()
     .then(() => {
       console.log('Finished executing script!');
     })
