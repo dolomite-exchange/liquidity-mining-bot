@@ -124,46 +124,56 @@ export async function calculateMineralPendleRewards(
   mineralOutputFile.metadata.syncTimestamp = timestamps[timestamps.length - 1];
   mineralOutputFile.metadata.syncBlockNumber = blockNumbers[blockNumbers.length - 1];
 
-  const userToMineralsMaps: Record<string, UserMineralAllocation>[] = [];
+  const marketIdToUserToMineralsMaps: Record<string, Record<string, UserMineralAllocation>[]> = {};
   for (let marketId of Object.keys(marketIdToRewardMap)) {
     const userToBalanceMapsForBlockNumbers = await fetchPendleUserBalanceSnapshotBatch(
       parseInt(marketId),
       blockNumbers,
     );
     const mineralsPerUnit = ONE_MINERAL_IN_WEI.times(marketIdToRewardMap[marketId]).integerValue();
-    userToMineralsMaps.push(
-      ...userToBalanceMapsForBlockNumbers.map(userRecord => {
-        return calculateFinalMinerals(userRecord, boostedMultiplier, mineralsPerUnit);
-      }),
-    );
+    marketIdToUserToMineralsMaps[marketId] = userToBalanceMapsForBlockNumbers.map(userRecord => {
+      return calculateFinalMinerals(userRecord, boostedMultiplier, mineralsPerUnit);
+    });
   }
 
-  userToMineralsMaps.forEach(userToMineralsMap => {
-    Object.keys(userToMineralsMap).forEach(user => {
-      const mineralsAmount = userToMineralsMap[user].amount;
-      userToMineralsMap[user].amount = mineralsAmount.times(FETCH_FREQUENCY).dividedToIntegerBy(ONE_WEEK_SECONDS);
+  Object.keys(marketIdToUserToMineralsMaps).forEach(marketId => {
+    marketIdToUserToMineralsMaps[marketId].forEach(userToMineralsMap => {
+      Object.keys(userToMineralsMap).forEach(user => {
+        const mineralsAmount = userToMineralsMap[user].amount;
+        userToMineralsMap[user].amount = mineralsAmount.times(FETCH_FREQUENCY).dividedToIntegerBy(ONE_WEEK_SECONDS);
+      });
     });
   });
 
-  userToMineralsMaps.forEach(userToMineralsMap => {
-    Object.keys(userToMineralsMap).forEach(user => {
-      if (!mineralOutputFile.users[user]) {
-        mineralOutputFile.users[user] = {
-          amount: '0',
-          proofs: [],
-        };
-      }
+  Object.keys(marketIdToUserToMineralsMaps).forEach(marketId => {
+    marketIdToUserToMineralsMaps[marketId].forEach(userToMineralsMap => {
+      Object.keys(userToMineralsMap).forEach(user => {
+        if (!mineralOutputFile.users[user]) {
+          mineralOutputFile.users[user] = {
+            amount: '0',
+            proofs: [],
+            marketIdToAmountMap: {},
+          };
+        }
 
-      const originalUserAmount = new BigNumber(mineralOutputFile.users[user].amount);
-      const originalTotalAmount = new BigNumber(mineralOutputFile.metadata.totalAmount);
-      const amountToAdd = userToMineralsMap[user].amount;
+        const userObject  = mineralOutputFile.users[user];
+        if (!userObject.marketIdToAmountMap[marketId]) {
+          userObject.marketIdToAmountMap[marketId] = '0';
+        }
 
-      if (amountToAdd.gt(INTEGERS.ZERO)) {
-        mineralOutputFile.users[user].amount = originalUserAmount.plus(amountToAdd).toFixed(0);
-        mineralOutputFile.metadata.totalAmount = originalTotalAmount.plus(amountToAdd).toFixed(0);
-      } else if (originalUserAmount.eq(INTEGERS.ZERO)) {
-        delete mineralOutputFile.users[user];
-      }
+        const originalUserAmount = new BigNumber(userObject.amount);
+        const originalMarketIdAmount = new BigNumber(userObject.marketIdToAmountMap[marketId]);
+        const originalTotalAmount = new BigNumber(mineralOutputFile.metadata.totalAmount);
+        const amountToAdd = userToMineralsMap[user].amount;
+
+        if (amountToAdd.gt(INTEGERS.ZERO)) {
+          userObject.amount = originalUserAmount.plus(amountToAdd).toFixed(0);
+          userObject.marketIdToAmountMap[marketId] = originalMarketIdAmount.plus(amountToAdd).toFixed(0);
+          mineralOutputFile.metadata.totalAmount = originalTotalAmount.plus(amountToAdd).toFixed(0);
+        } else if (originalUserAmount.eq(INTEGERS.ZERO)) {
+          delete mineralOutputFile.users[user];
+        }
+      });
     });
   });
 
@@ -181,9 +191,10 @@ export async function calculateMineralPendleRewards(
 
     Object.keys(mineralOutputFile.users).forEach((user) => {
       mineralOutputFile.users[user] = {
+        ...mineralOutputFile.users[user],
         amount: walletAddressToLeavesMap[user].amount,
         proofs: walletAddressToLeavesMap[user].proofs,
-      }
+      };
     });
     mineralOutputFile.metadata.merkleRoot = calculatedMerkleRoot;
   }

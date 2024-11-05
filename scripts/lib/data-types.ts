@@ -7,6 +7,9 @@ export interface UserMineralAllocationForFile {
 export interface UserPendleMineralAllocationForFile {
   amount: string; // big int
   proofs: string[];
+  marketIdToAmountMap: {
+    [marketId: string]: string; // big int; represents how much of `amount` the user earned for each `marketId`
+  }
 }
 
 export interface MineralPendleOutputFile {

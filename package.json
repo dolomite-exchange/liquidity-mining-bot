@@ -28,6 +28,7 @@
     "execute:pendle-balance-fetcher": "SCRIPT=true npx ts-node src/lib/pendle/main.ts",
     "execute:rectify-oarb-rewards-for-arb": "SCRIPT=true npx ts-node scripts/rectify-oarb-rewards-for-arb.ts",
     "execute:rectify-oarb-rewards-for-deltas": "SCRIPT=true npx ts-node scripts/rectify-oarb-rewards-for-deltas.ts",
+    "execute:rectify-old-pendle-epochs": "SCRIPT=true npx ts-node scripts/rectify-old-pendle-epochs.ts",
     "execute:verify-all-prices": "SCRIPT=true npx ts-node scripts/verify-all-prices.ts",
     "flow:arb-stip:arbitrum": "ENV_FILENAME=local.arbitrum.production.env npx ts-node scripts/flow/execute-arb-stip-flow.ts",
     "flow:pendle-arb-stip:arbitrum": "ENV_FILENAME=local.arbitrum.production.env npx ts-node scripts/flow/execute-pendle-arb-stip-flow.ts",
