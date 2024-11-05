@@ -25,10 +25,10 @@ export interface MineralPendleOutputFile {
     totalAmount: string; // big int
     totalUsers: number;
     startBlockNumber: number;
-    syncBlockNumber: number;
+    syncBlockNumber: number; // The block number at which the latest sync occurred
     endBlockNumber: number;
     startTimestamp: number;
-    syncTimestamp: number;
+    syncTimestamp: number; // The next timestamp to use to fetch data; not to be confused with `syncBlockNumber`
     endTimestamp: number;
     boostedMultiplier: number; // decimal
   };

@@ -28,7 +28,6 @@ interface UserMineralAllocation {
 
 const ONE_WEEK_SECONDS = 86_400 * 7;
 const FETCH_FREQUENCY = 60 * 60; // one hour in seconds
-const WEEK_DURATION_FOR_FETCHES = ONE_WEEK_SECONDS;
 const ONE_MINERAL_IN_WEI = new BigNumber('1000000000000000000');
 
 export async function calculateMineralRewardsForPendle(
@@ -101,7 +100,7 @@ export async function calculateMineralRewardsForPendle(
     marketIdToRewardMap,
   );
 
-  const maxTimestamp = Math.min(startTimestamp + WEEK_DURATION_FOR_FETCHES, Math.floor(Date.now() / 1000));
+  const maxTimestamp = Math.min(startTimestamp + ONE_WEEK_SECONDS, Math.floor(Date.now() / 1000));
   const syncTimestamp = mineralOutputFile.metadata.syncTimestamp;
   const numberOfTimestampsToFetch = Math.ceil((maxTimestamp - syncTimestamp) / FETCH_FREQUENCY);
 
@@ -109,7 +108,12 @@ export async function calculateMineralRewardsForPendle(
     { length: numberOfTimestampsToFetch },
     (_, i) => syncTimestamp + (FETCH_FREQUENCY * i),
   );
-  if (timestamps.length === 1) {
+  if (timestamps.length === 0) {
+    Logger.info({
+      at: 'calculateMineralRewardsForPendle',
+      message: 'Skipping fetch since the number of required fetches is equal to 0',
+    });
+  } else if (timestamps.length === 1) {
     Logger.info({
       at: 'calculateMineralRewardsForPendle',
       message: `Retrieving Pendle data for the following timestamps: [${timestamps[0]}]`,
@@ -117,11 +121,6 @@ export async function calculateMineralRewardsForPendle(
       timestampsLength: `${timestamps.length} / ${numberOfTimestampsToFetch}`,
       syncTimestamp,
       maxTimestamp,
-    });
-  } else if (timestamps.length === 0) {
-    Logger.info({
-      at: 'calculateMineralRewardsForPendle',
-      message: 'Skipping fetch since the number of required fetches is equal to 0',
     });
   } else {
     const firstTimestamp = timestamps[0];
@@ -199,7 +198,7 @@ export async function calculateMineralRewardsForPendle(
 
   mineralOutputFile.metadata.totalUsers = Object.keys(mineralOutputFile.users).length;
 
-  if (isTimeElapsed || syncTimestamp === endTimestamp) {
+  if (mineralOutputFile.metadata.syncTimestamp === startTimestamp + ONE_WEEK_SECONDS) {
     const userToAmountMap = Object.keys(mineralOutputFile.users).reduce((memo, k) => {
       memo[k] = new BigNumber(mineralOutputFile.users[k].amount);
       return memo;
