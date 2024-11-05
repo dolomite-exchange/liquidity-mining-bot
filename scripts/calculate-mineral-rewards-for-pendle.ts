@@ -90,7 +90,7 @@ export async function calculateMineralRewardsForPendle(
     subgraphUrl: process.env.SUBGRAPH_URL,
   });
 
-  const { mineralOutputFile, mineralFileName } = await getOrCreateMineralOutputFile(
+  const { mineralOutputFile, mineralFileName } = await getOrCreateMineralPendleOutputFile(
     networkId,
     epoch,
     startBlockNumber,
@@ -103,18 +103,7 @@ export async function calculateMineralRewardsForPendle(
 
   const maxTimestamp = Math.min(startTimestamp + WEEK_DURATION_FOR_FETCHES, Math.floor(Date.now() / 1000));
   const syncTimestamp = mineralOutputFile.metadata.syncTimestamp;
-  const numberOfTimestampsToFetch = Math.floor((maxTimestamp - syncTimestamp) / FETCH_FREQUENCY);
-  if (numberOfTimestampsToFetch <= 0) {
-    Logger.info({
-      at: 'calculateMineralRewardsForPendle',
-      message: 'Skipping fetch since the number of required fetches is <= 0',
-    });
-
-    return {
-      epoch,
-      merkleRoot: mineralOutputFile.metadata.merkleRoot,
-    };
-  }
+  const numberOfTimestampsToFetch = Math.ceil((maxTimestamp - syncTimestamp) / FETCH_FREQUENCY);
 
   const timestamps = Array.from(
     { length: numberOfTimestampsToFetch },
@@ -128,6 +117,11 @@ export async function calculateMineralRewardsForPendle(
       timestampsLength: `${timestamps.length} / ${numberOfTimestampsToFetch}`,
       syncTimestamp,
       maxTimestamp,
+    });
+  } else if (timestamps.length === 0) {
+    Logger.info({
+      at: 'calculateMineralRewardsForPendle',
+      message: 'Skipping fetch since the number of required fetches is equal to 0',
     });
   } else {
     const firstTimestamp = timestamps[0];
@@ -145,8 +139,10 @@ export async function calculateMineralRewardsForPendle(
 
   const blockNumbers = Object.values(await getTimestampToBlockNumberMap(timestamps));
 
-  mineralOutputFile.metadata.syncTimestamp = timestamps[timestamps.length - 1];
-  mineralOutputFile.metadata.syncBlockNumber = blockNumbers[blockNumbers.length - 1];
+  if (numberOfTimestampsToFetch >= 1) {
+    mineralOutputFile.metadata.syncTimestamp = timestamps[timestamps.length - 1] + FETCH_FREQUENCY;
+    mineralOutputFile.metadata.syncBlockNumber = blockNumbers[blockNumbers.length - 1];
+  }
 
   const marketIdToUserToMineralsMaps: Record<string, Record<string, UserMineralAllocation>[]> = {};
   for (let marketId of Object.keys(marketIdToRewardMap)) {
@@ -180,7 +176,7 @@ export async function calculateMineralRewardsForPendle(
           };
         }
 
-        const userObject  = mineralOutputFile.users[user];
+        const userObject = mineralOutputFile.users[user];
         if (!userObject.marketIdToAmountMap[marketId]) {
           userObject.marketIdToAmountMap[marketId] = '0';
         }
@@ -203,7 +199,7 @@ export async function calculateMineralRewardsForPendle(
 
   mineralOutputFile.metadata.totalUsers = Object.keys(mineralOutputFile.users).length;
 
-  if (isTimeElapsed) {
+  if (isTimeElapsed || syncTimestamp === endTimestamp) {
     const userToAmountMap = Object.keys(mineralOutputFile.users).reduce((memo, k) => {
       memo[k] = new BigNumber(mineralOutputFile.users[k].amount);
       return memo;
@@ -268,7 +264,7 @@ export async function calculateMineralRewardsForPendle(
   return { epoch, merkleRoot: mineralOutputFile.metadata.merkleRoot };
 }
 
-async function getOrCreateMineralOutputFile(
+async function getOrCreateMineralPendleOutputFile(
   networkId: number,
   epoch: number,
   startBlockNumber: number,
