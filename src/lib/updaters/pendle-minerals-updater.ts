@@ -32,6 +32,12 @@ export default class PendleMineralsUpdater {
       try {
         const { epochNumber: epoch } = await calculateMineralSeasonConfig(MineralConfigType.PendleConfig);
         await calculateMineralPendleRewards(epoch);
+
+        Logger.info({
+          at: 'PendleMineralsUpdater#updatePendleMinerals',
+          message: `Finished updating Pendle Minerals, waiting ${WAIT_DURATION_MILLIS}ms before next run`,
+          waitDurationMillis: WAIT_DURATION_MILLIS,
+        });
         await delay(WAIT_DURATION_MILLIS);
       } catch (error: any) {
         Logger.error({
