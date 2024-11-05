@@ -125,6 +125,9 @@ export async function calculateMineralRewardsForPendle(
       at: 'calculateMineralRewardsForPendle',
       message: `Retrieving Pendle data for the following timestamps: [${timestamps[0]}]`,
       firstTimestamp: timestamps[0],
+      timestampsLength: `${timestamps.length} / ${numberOfTimestampsToFetch}`,
+      syncTimestamp,
+      maxTimestamp,
     });
   } else {
     const firstTimestamp = timestamps[0];
@@ -134,6 +137,9 @@ export async function calculateMineralRewardsForPendle(
       message: `Retrieving Pendle data for the following timestamps: [${firstTimestamp} ... ${lastTimestamp}]`,
       firstTimestamp,
       lastTimestamp,
+      timestampsLength: `${timestamps.length} / ${numberOfTimestampsToFetch}`,
+      syncTimestamp,
+      maxTimestamp,
     });
   }
 
