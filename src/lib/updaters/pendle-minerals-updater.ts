@@ -27,6 +27,11 @@ export default class PendleMineralsUpdater {
     // noinspection InfiniteLoopJS
     for (; ;) {
       try {
+        Logger.info({
+          at: 'PendleMineralsUpdater#updatePendleMinerals',
+          message: 'Starting run...',
+        });
+
         const { epochNumber: epoch } = await calculateMineralSeasonConfig(MineralConfigType.PendleConfig);
         await calculateMineralPendleRewards(epoch);
 
