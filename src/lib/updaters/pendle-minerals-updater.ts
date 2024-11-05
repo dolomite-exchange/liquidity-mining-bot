@@ -3,7 +3,6 @@ import { calculateMineralSeasonConfig, MineralConfigType } from '../../../script
 import { delay } from '../delay';
 import Logger from '../logger';
 
-const WAIT_DURATION_MILLIS = 60 * 60 * 1_000; // 1 hour in millis
 const SHORT_WAIT_DURATION_MILLIS = 60 * 1_000; // 1 minute in millis
 
 export default class PendleMineralsUpdater {
@@ -16,16 +15,14 @@ export default class PendleMineralsUpdater {
   }
 
   _updatePendleMinerals = async () => {
-    const currentTimestamp = Math.floor(new Date().getTime() / 1_000);
-    const timestampNormalized = Math.floor(currentTimestamp / 3_600) * 3_600 + 3_900;
-    const deltaSeconds = timestampNormalized - currentTimestamp;
 
+    const { durationSeconds } = getDurationToNextTimestamp();
     Logger.info({
       at: 'PendleMineralsUpdater#updatePendleMinerals',
-      message: `Sleeping for ${deltaSeconds}s before the first iteration`,
-      waitDurationSeconds: deltaSeconds,
+      message: `Sleeping for ${durationSeconds}s before the first iteration`,
+      waitDurationSeconds: durationSeconds,
     });
-    await delay(deltaSeconds * 1_000);
+    await delay(durationSeconds * 1_000);
 
     // noinspection InfiniteLoopJS
     for (; ;) {
@@ -33,12 +30,13 @@ export default class PendleMineralsUpdater {
         const { epochNumber: epoch } = await calculateMineralSeasonConfig(MineralConfigType.PendleConfig);
         await calculateMineralPendleRewards(epoch);
 
+        const { durationSeconds } = getDurationToNextTimestamp();
         Logger.info({
           at: 'PendleMineralsUpdater#updatePendleMinerals',
-          message: `Finished updating Pendle Minerals, waiting ${WAIT_DURATION_MILLIS}ms before next run`,
-          waitDurationMillis: WAIT_DURATION_MILLIS,
+          message: `Finished updating Pendle Minerals, waiting ${durationSeconds}s before next run`,
+          waitDurationSeconds: durationSeconds,
         });
-        await delay(WAIT_DURATION_MILLIS);
+        await delay(durationSeconds * 1_000);
       } catch (error: any) {
         Logger.error({
           at: 'PendleMineralsUpdater#updatePendleMinerals',
@@ -50,4 +48,10 @@ export default class PendleMineralsUpdater {
       }
     }
   }
+}
+
+function getDurationToNextTimestamp(): { durationSeconds: number } {
+  const currentTimestamp = Math.floor(new Date().getTime() / 1_000);
+  const nextTimestamp = Math.floor(currentTimestamp / 3_600) * 3_600 + 3_900;
+  return { durationSeconds: nextTimestamp - currentTimestamp };
 }
