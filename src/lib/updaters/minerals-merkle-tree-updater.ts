@@ -62,10 +62,12 @@ export default class MineralsMerkleTreeUpdater {
     const mineralConfigFile = await readFileFromGitHub<MineralConfigFile>(getMineralConfigFileNameWithPath(this.networkId));
     await this._checkConfigFileAndWriteOnChain(mineralConfigFile, ConfigFileType.NormalMineral);
 
-    const mineralPendleConfigFile = await readFileFromGitHub<MineralPendleConfigFile>(
-      getMineralPendleConfigFileNameWithPath(this.networkId),
-    );
-    await this._checkConfigFileAndWriteOnChain(mineralPendleConfigFile, ConfigFileType.PendleMineral);
+    if (process.env.PENDLE_MINERALS_ENABLED === 'true') {
+      const mineralPendleConfigFile = await readFileFromGitHub<MineralPendleConfigFile>(
+        getMineralPendleConfigFileNameWithPath(this.networkId),
+      );
+      await this._checkConfigFileAndWriteOnChain(mineralPendleConfigFile, ConfigFileType.PendleMineral);
+    }
 
     Logger.info({
       at: 'MineralsMerkleTreeUpdater#_update',
