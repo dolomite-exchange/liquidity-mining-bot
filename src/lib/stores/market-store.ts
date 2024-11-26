@@ -4,12 +4,12 @@ import { getDolomiteMarkets } from '../../clients/dolomite';
 import { isMarketIgnored } from '../../helpers/market-helpers';
 import { dolomite } from '../../helpers/web3';
 import { ApiMarket, MarketIndex } from '../api-types';
-import BlockStore from './block-store';
 import { ONE_ETH_WEI } from '../constants';
 import { delay } from '../delay';
 import Logger from '../logger';
 import Pageable from '../pageable';
 import { chunkArray } from '../utils';
+import BlockStore from './block-store';
 
 export default class MarketStore {
   private marketMap: { [marketId: string]: ApiMarket };
@@ -34,8 +34,7 @@ export default class MarketStore {
       marketIds.map(marketId => {
         return {
           target: dolomite.contracts.dolomiteMargin.options.address,
-          callData: dolomite.contracts.dolomiteMargin.methods.getMarketCurrentIndex(marketId)
-            .encodeABI(),
+          callData: dolomite.contracts.dolomiteMargin.methods.getMarketCurrentIndex(marketId).encodeABI(),
         };
       }),
       10,

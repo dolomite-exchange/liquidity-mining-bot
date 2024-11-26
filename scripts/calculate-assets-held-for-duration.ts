@@ -68,6 +68,7 @@ const CHAIN_TO_MARKET_ID_REWARDS_MAP: Record<ChainId, Record<string, Integer | u
     [WO_ETH_MARKET_ID]: new BigNumber('4000').times(ONE_ETH_WEI), // for 3 weeks
   },
   [ChainId.Base]: {},
+  [ChainId.Berachain]: {},
   [ChainId.Mantle]: {},
   [ChainId.PolygonZkEvm]: {},
   [ChainId.XLayer]: {},
@@ -87,7 +88,6 @@ export async function calculateAssetHeldForDuration(validMarketId: number = pars
 
   const epoch = parseInt(process.env.MINERAL_EPOCH_NUMBER ?? 'NaN', 10);
   const ignorePendle = process.env.IGNORE_PENDLE === 'true';
-  console.log('process.env.IGNORE_PENDLE', process.env.IGNORE_PENDLE, ignorePendle);
   let startTimestamp = parseInt(process.env.START_TIMESTAMP ?? 'NaN', 10);
   let endTimestamp = parseInt(process.env.END_TIMESTAMP ?? 'NaN', 10);
   if (Number.isNaN(epoch) && Number.isNaN(startTimestamp) && Number.isNaN(endTimestamp)) {

@@ -1,6 +1,7 @@
 export enum ChainId {
   ArbitrumOne = 42161,
   Base = 8453,
+  Berachain = 80084,
   Mantle = 5000,
   PolygonZkEvm = 1101,
   XLayer = 196,

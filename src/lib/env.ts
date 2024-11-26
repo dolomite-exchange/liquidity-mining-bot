@@ -6,6 +6,7 @@ import Logger from './logger';
 const NETWORK_TO_ENV_FILE_MAP: Record<ChainId, string> = {
   [ChainId.ArbitrumOne]: path.resolve(process.cwd(), 'detonator.arbitrum-one.production.env'),
   [ChainId.Base]: path.resolve(process.cwd(), 'detonator.base.production.env'),
+  [ChainId.Berachain]: path.resolve(process.cwd(), 'detonator.berachain.production.env'),
   [ChainId.Mantle]: path.resolve(process.cwd(), 'detonator.mantle.production.env'),
   [ChainId.PolygonZkEvm]: path.resolve(process.cwd(), 'detonator.polygon-zkevm.production.env'),
   [ChainId.XLayer]: path.resolve(process.cwd(), 'detonator.x-layer.production.env'),

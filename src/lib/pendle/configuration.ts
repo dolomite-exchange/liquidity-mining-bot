@@ -11,6 +11,7 @@ const USDC_MARKET_ID = 17;
 const PENDLE_TREASURY_MAP: Record<ChainId, string | undefined> = {
   [ChainId.ArbitrumOne]: '0xC328dFcD2C8450e2487a91daa9B75629075b7A43'.toLowerCase(),
   [ChainId.Base]: undefined,
+  [ChainId.Berachain]: undefined,
   [ChainId.Mantle]: '0x9F72a06084EdD040E973C32Bf026b1ACf65db9aB'.toLowerCase(),
   [ChainId.PolygonZkEvm]: undefined,
   [ChainId.XLayer]: undefined,
@@ -92,6 +93,7 @@ export const POOL_INFO: Record<ChainId, Record<number, PoolConfiguration>> = {
     },
   },
   [ChainId.Base]: {},
+  [ChainId.Berachain]: {},
   [ChainId.Mantle]: {},
   [ChainId.PolygonZkEvm]: {},
   [ChainId.XLayer]: {},

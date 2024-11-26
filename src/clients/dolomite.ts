@@ -1259,6 +1259,54 @@ export async function getWithdrawals(
   return { withdrawals };
 }
 
+export async function getAllUsersWithAtLeastBorrowPositions(
+  borrowPositionCount: number,
+  blockNumber: number,
+  lastId: string,
+): Promise<{ users: any[] }> {
+  const query = `
+    query getWithdrawals($borrowPositionCount: BigInt, $blockNumber: Int, $lastId: ID) {
+      users(
+        first: ${Pageable.MAX_PAGE_SIZE},
+        orderBy: id
+        block: { number: $blockNumber }
+        where: {
+          id_gt: $lastId
+          isEffectiveUser: true
+          totalBorrowPositionCount_gte: $borrowPositionCount 
+        }
+    ) {
+        id
+      }
+    }
+  `;
+  const result = await axios.post(
+    subgraphUrl,
+    {
+      query,
+      variables: {
+        blockNumber,
+        lastId,
+        borrowPositionCount: borrowPositionCount.toString(),
+      },
+    },
+    defaultAxiosConfig,
+  )
+    .then(response => response.data);
+
+  if (result.errors && typeof result.errors === 'object') {
+    return Promise.reject(result.errors[0]);
+  }
+
+  const users = result.data.users.map(user => {
+    return {
+      id: user.id,
+    }
+  });
+
+  return { users };
+}
+
 export async function getAllDolomiteAccountsWithSupplyValue(
   marketIndexMap: { [marketId: string]: MarketIndex },
   blockNumber: number,
