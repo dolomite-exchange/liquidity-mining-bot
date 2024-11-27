@@ -10,6 +10,7 @@ import { getAllPricesByBlockNumbers } from './lib/price-parser';
 const ORIGINAL_START_BLOCK_NUMBER_MAP: Record<ChainId, number> = {
   [ChainId.ArbitrumOne]: 28_220_369,
   [ChainId.Base]: 10_010_605,
+  [ChainId.Berachain]: 0,
   [ChainId.Mantle]: 63_091_469,
   [ChainId.PolygonZkEvm]: 9_597_567,
   [ChainId.XLayer]: 832_938,

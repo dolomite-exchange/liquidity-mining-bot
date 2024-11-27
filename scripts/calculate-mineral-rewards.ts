@@ -68,6 +68,7 @@ const BOOSTED_POOLS: Record<ChainId, Record<string, BigNumber | undefined>> = {
     ['0x905Fea083FbbcaCf1cF1c7Bb15f6504A458cCACb'.toLowerCase()]: HARVEST_MULTIPLIER, // Harvest Finance ETH
   },
   [ChainId.Base]: {},
+  [ChainId.Berachain]: {},
   [ChainId.Mantle]: {},
   [ChainId.PolygonZkEvm]: {},
   [ChainId.XLayer]: {},
