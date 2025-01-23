@@ -2903,6 +2903,11 @@ cssstyle@^2.3.0:
   dependencies:
     cssom "~0.3.6"
 
+csv-parser@^3.1.0:
+  version "3.1.0"
+  resolved "https://registry.yarnpkg.com/csv-parser/-/csv-parser-3.1.0.tgz#aadb8ba86f9ade01edce1a1095ef2e1614c82297"
+  integrity sha512-egOwFF+imkpAE0gTrbzdf7c322lonHAmLPT2Ou1b5lhTSeXyfEdaMBdWuVeUJ6fsYuR0/ENonFo16kEXWKOQFw==
+
 d@1, d@^1.0.1, d@^1.0.2:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/d/-/d-1.0.2.tgz#2aefd554b81981e7dccf72d6842ae725cb17e5de"

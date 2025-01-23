@@ -10,7 +10,11 @@ export async function getWeb3RequestWithBackoff<T>(
     try {
       return await request();
     } catch (e: any) {
-      if (e.message.includes('429') || e.message.includes('request limit reached')) {
+      if (
+        e.message.includes('429')
+        || e.message.includes('request limit reached')
+        || e.message.includes('call rate limit')
+      ) {
         await sleep(Math.min(15_000, sleepDurationMillis * Math.pow(2, retryCount)));
       } else {
         throw new Error(e);

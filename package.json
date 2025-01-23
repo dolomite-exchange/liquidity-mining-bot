@@ -19,6 +19,7 @@
     "execute:calculate-mineral-rewards": "SCRIPT=true npx ts-node scripts/calculate-mineral-rewards.ts",
     "execute:calculate-mineral-rewards-for-yt": "SCRIPT=true npx ts-node scripts/calculate-mineral-rewards-for-pendle.ts",
     "execute:calculate-mineral-season-config": "SCRIPT=true npx ts-node scripts/calculate-mineral-season-config.ts",
+    "execute:calculate-options-airdrop": "SCRIPT=true npx ts-node scripts/calculate-options-airdrop.ts",
     "execute:calculate-otoken-rewards": "SCRIPT=true npx ts-node scripts/calculate-otoken-rewards.ts",
     "execute:calculate-otoken-season-config": "SCRIPT=true npx ts-node scripts/calculate-otoken-season-config.ts",
     "execute:get-all-berachain-testnet-users": "NETWORK_ID=80084 SCRIPT=true npx ts-node scripts/get-all-berachain-testnet-users.ts",
@@ -31,6 +32,7 @@
     "execute:rectify-oarb-rewards-for-arb": "SCRIPT=true npx ts-node scripts/rectify-oarb-rewards-for-arb.ts",
     "execute:rectify-oarb-rewards-for-deltas": "SCRIPT=true npx ts-node scripts/rectify-oarb-rewards-for-deltas.ts",
     "execute:rectify-old-pendle-epochs": "SCRIPT=true npx ts-node scripts/rectify-old-pendle-epochs.ts",
+    "execute:transform-csv-to-json": "SCRIPT=true npx ts-node scripts/transform-csv-to-json.ts",
     "execute:verify-all-prices": "SCRIPT=true npx ts-node scripts/verify-all-prices.ts",
     "flow:arb-stip:arbitrum": "ENV_FILENAME=local.arbitrum.production.env npx ts-node scripts/flow/execute-arb-stip-flow.ts",
     "flow:pendle-arb-stip:arbitrum": "ENV_FILENAME=local.arbitrum.production.env npx ts-node scripts/flow/execute-pendle-arb-stip-flow.ts",
@@ -50,6 +52,7 @@
   "dependencies": {
     "@dolomite-exchange/dolomite-margin": "^0.12.13",
     "@dolomite-exchange/zap-sdk": "^0.3.32",
+    "csv-parser": "^3.1.0",
     "dotenv-flow": "^0.4.0",
     "ethers": "^5.5.3",
     "lru-cache": "^5.1.1",

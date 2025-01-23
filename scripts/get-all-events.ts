@@ -1,8 +1,8 @@
 import v8 from 'v8';
 import { dolomite } from '../src/helpers/web3';
-import BlockStore from '../src/lib/stores/block-store';
 import { ChainId } from '../src/lib/chain-id';
 import Logger from '../src/lib/logger';
+import BlockStore from '../src/lib/stores/block-store';
 import { getBalanceChangingEvents } from './lib/event-parser';
 import { readOutputFile, writeOutputFile } from './lib/file-helpers';
 import { setupRemapping } from './lib/remapper';
@@ -66,6 +66,7 @@ export async function getAllEvents(): Promise<void> {
       blobEndBlockNumber: allEventsBlob.endBlockNumber,
       requestedEndBlockNumber: endBlockNumber,
     });
+    checkEventsOrdering(allEventsBlob);
     return;
   }
 
@@ -119,9 +120,28 @@ export async function getAllEvents(): Promise<void> {
   allEventsBlob.endBlockNumber = endBlockNumber;
   allEventsBlob.endTimestamp = endTimestamp;
 
+  console.log('Finishing adding all events. Saving...');
   writeOutputFile(allEventsFileName, allEventsBlob);
+  console.log('Finished saving data to output file!');
 
   return undefined;
+}
+
+function checkEventsOrdering(blob: AllEventsBlob) {
+  const serialIdSet: Record<string, boolean> = {};
+  let maxSerialId = 1;
+  Object.keys(blob.data).forEach(account => {
+    Object.keys(blob.data[account]!).forEach(subAccount => {
+      Object.keys(blob.data[account]![subAccount]!).forEach(asset => {
+        blob.data[account]![subAccount]![asset]!.forEach(event => {
+          serialIdSet[event.serialId] = true;
+          if (event.serialId > maxSerialId) {
+            maxSerialId = event.serialId;
+          }
+        });
+      });
+    });
+  });
 }
 
 getAllEvents()

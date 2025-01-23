@@ -21,9 +21,27 @@ export async function getAllPricesByBlockNumbers(
       const blockNumber = timestampToBlockNumberMap[timestamp];
       const marketIdCount = await getWeb3RequestWithBackoff(() => dolomite.getters.getNumMarkets({ blockNumber }));
       result[timestamp] = {};
+
+      const calls: any[] = []
       for (let marketId = 0; marketId < marketIdCount.toNumber(); marketId++) {
         if (dolomite.networkId !== 42161 || marketId !== 10 || marketIdCount.toNumber() < 44) {
-          result[timestamp][marketId] = await getPrice(marketId, blockNumber);
+          calls.push({
+            target: dolomite.address,
+            callData: dolomite.contracts.dolomiteMargin.methods.getMarketPrice(marketId).encodeABI(),
+          });
+        }
+      }
+
+      const { results: callResults } = await getWeb3RequestWithBackoff(() => {
+        return dolomite.multiCall.aggregate(
+          calls,
+          { blockNumber },
+        );
+      })
+      let j = 0;
+      for (let marketId = 0; marketId < marketIdCount.toNumber(); marketId++) {
+        if (dolomite.networkId !== 42161 || marketId !== 10 || marketIdCount.toNumber() < 44) {
+          result[timestamp][marketId] = await decodePrice(marketId, callResults[j++]);
         }
       }
     }),
@@ -31,13 +49,19 @@ export async function getAllPricesByBlockNumbers(
   return result;
 }
 
-async function getPrice(marketId: number, blockNumber: number): Promise<BigNumber> {
-  const price = await getWeb3RequestWithBackoff(() => dolomite.getters.getMarketPrice(
-    new BigNumber(marketId),
-    { blockNumber },
-  ));
+// async function getPrice(marketId: number, blockNumber: number): Promise<BigNumber> {
+//   const price = await getWeb3RequestWithBackoff(() => dolomite.getters.getMarketPrice(
+//     new BigNumber(marketId),
+//     { blockNumber },
+//   ));
+//   const decimals = await getWeb3RequestWithBackoff(() => getDecimalsByMarketId(marketId));
+//   return price.div(TEN.pow(TOTAL_DECIMALS.minus(decimals)));
+// }
+
+async function decodePrice(marketId: number, priceEncoded: string): Promise<BigNumber> {
+  const price = dolomite.web3.eth.abi.decodeParameter('uint256', priceEncoded);
   const decimals = await getWeb3RequestWithBackoff(() => getDecimalsByMarketId(marketId));
-  return price.div(TEN.pow(TOTAL_DECIMALS.minus(decimals)));
+  return new BigNumber(price.toString()).div(TEN.pow(TOTAL_DECIMALS.minus(decimals)));
 }
 
 async function getDecimalsByMarketId(marketId: number): Promise<Integer> {
