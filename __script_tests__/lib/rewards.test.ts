@@ -1,19 +1,17 @@
-import { BigNumber } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import { ethers } from 'ethers';
 import { defaultAbiCoder, keccak256, parseEther } from 'ethers/lib/utils';
 import { MerkleTree } from 'merkletreejs';
-import liquidityMiningConfig from '../../scripts/config/oarb-season-0.json';
 import {
-  AccountToSubAccountToMarketToBalanceMap,
+  AccountToSubAccountToMarketToBalanceAndPointsMap,
   AccountToVirtualLiquidityBalanceMap,
   AccountToVirtualLiquiditySnapshotsMap,
   BalanceAndRewardPoints,
   BalanceChangeEvent,
-  BalanceChangeType,
   calculateFinalEquityRewards,
   calculateVirtualLiquidityPoints,
-  processEventsUntilEndTimestamp,
   LiquidityPositionsAndEvents,
+  processEventsUntilEndTimestamp,
 } from '../../scripts/lib/rewards';
 
 const blockRewardStartTimestamp = 1697000000;
@@ -36,7 +34,6 @@ const DEPOSIT_EVENT: BalanceChangeEvent = {
   timestamp: 10,
   serialId: 1,
   effectiveUser: user1,
-  type: BalanceChangeType.DEPOSIT,
 };
 
 const WITHDRAWAL_EVENT: BalanceChangeEvent = {
@@ -44,7 +41,6 @@ const WITHDRAWAL_EVENT: BalanceChangeEvent = {
   timestamp: 15,
   serialId: 2,
   effectiveUser: user1,
-  type: BalanceChangeType.WITHDRAW,
 };
 
 const FINAL_EVENT: BalanceChangeEvent = {
@@ -52,48 +48,89 @@ const FINAL_EVENT: BalanceChangeEvent = {
   timestamp: 20,
   serialId: 0,
   effectiveUser: user1,
-  type: BalanceChangeType.INITIALIZE,
 };
 
-const accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceMap = {
+const accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceAndPointsMap = {
   [user1]: {
     [subAccount1]: {
-      17: new BalanceAndRewardPoints(blockRewardStartTimestamp, user1, new BigNumber('100000000')),
+      17: new BalanceAndRewardPoints(user1, 17, INTEGERS.ONE, blockRewardStartTimestamp, new BigNumber('100000000')),
     },
   },
   [user2]: {
     [subAccount1]: {
-      0: new BalanceAndRewardPoints(blockRewardStartTimestamp, user2, new BigNumber('500000000000000000')),
-      17: new BalanceAndRewardPoints(blockRewardStartTimestamp, user2, new BigNumber('100000000')),
+      0: new BalanceAndRewardPoints(
+        user2,
+        0,
+        INTEGERS.ONE,
+        blockRewardStartTimestamp,
+        new BigNumber('500000000000000000'),
+      ),
+      17: new BalanceAndRewardPoints(user2, 17, INTEGERS.ONE, blockRewardStartTimestamp, new BigNumber('100000000')),
     },
   },
   [user3]: {
     [subAccount1]: {
-      0: new BalanceAndRewardPoints(blockRewardStartTimestamp, user3, new BigNumber('500000000000000000')),
+      0: new BalanceAndRewardPoints(
+        user3,
+        0,
+        INTEGERS.ONE,
+        blockRewardStartTimestamp,
+        new BigNumber('500000000000000000'),
+      ),
     },
   },
   [user4]: {
     [subAccount1]: {
-      0: new BalanceAndRewardPoints(blockRewardStartTimestamp, user4, new BigNumber('500000000000000000')),
-      17: new BalanceAndRewardPoints(blockRewardStartTimestamp, user4, new BigNumber('-3000000')),
+      0: new BalanceAndRewardPoints(
+        user4,
+        0,
+        INTEGERS.ONE,
+        blockRewardStartTimestamp,
+        new BigNumber('500000000000000000'),
+      ),
+      17: new BalanceAndRewardPoints(user4, 17, INTEGERS.ONE, blockRewardStartTimestamp, new BigNumber('-3000000')),
     },
   },
   [user5]: {
     [subAccount1]: {
-      0: new BalanceAndRewardPoints(blockRewardStartTimestamp, user5, new BigNumber('200000000000000000')),
-      17: new BalanceAndRewardPoints(blockRewardStartTimestamp, user5, new BigNumber('300000000')),
+      0: new BalanceAndRewardPoints(
+        user5,
+        0,
+        INTEGERS.ONE,
+        blockRewardStartTimestamp,
+        new BigNumber('200000000000000000'),
+      ),
+      17: new BalanceAndRewardPoints(user5, 17, INTEGERS.ONE, blockRewardStartTimestamp, new BigNumber('300000000')),
     },
   },
   [user6]: {
     [subAccount1]: {
-      0: new BalanceAndRewardPoints(blockRewardStartTimestamp, user6, new BigNumber('300000000000000000')),
-      17: new BalanceAndRewardPoints(blockRewardStartTimestamp, user6, new BigNumber('0')),
+      0: new BalanceAndRewardPoints(
+        user6,
+        0,
+        INTEGERS.ONE,
+        blockRewardStartTimestamp,
+        new BigNumber('300000000000000000'),
+      ),
+      17: new BalanceAndRewardPoints(user6, 17, INTEGERS.ONE, blockRewardStartTimestamp, new BigNumber('0')),
     },
   },
   [LIQUIDITY_POOL]: {
     [subAccount1]: {
-      0: new BalanceAndRewardPoints(blockRewardStartTimestamp, LIQUIDITY_POOL, new BigNumber('2000000000000000000')),
-      17: new BalanceAndRewardPoints(blockRewardStartTimestamp, LIQUIDITY_POOL, new BigNumber('500000000')),
+      0: new BalanceAndRewardPoints(
+        LIQUIDITY_POOL,
+        0,
+        INTEGERS.ONE,
+        blockRewardStartTimestamp,
+        new BigNumber('2000000000000000000'),
+      ),
+      17: new BalanceAndRewardPoints(
+        LIQUIDITY_POOL,
+        17,
+        INTEGERS.ONE,
+        blockRewardStartTimestamp,
+        new BigNumber('500000000'),
+      ),
     },
   },
 }

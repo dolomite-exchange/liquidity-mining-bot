@@ -35,8 +35,8 @@ import { getMineralFinalizedFileNameWithPath, getMineralPendleConfigFileNameWith
 import { MineralPendleConfigFile, MineralPendleOutputFile } from './data-types';
 import { readFileFromGitHub } from './file-helpers';
 import {
+  AccountToSubAccountToMarketToBalanceAndPointsMap,
   AccountToSubAccountToMarketToBalanceChangeMap,
-  AccountToSubAccountToMarketToBalanceMap,
   AccountToVirtualLiquidityBalanceMap,
   AccountToVirtualLiquiditySnapshotsMap,
   ARB_VESTER_PROXY,
@@ -55,8 +55,8 @@ export function getAccountBalancesByMarket(
   accounts: ApiAccount[],
   startTimestamp: number,
   rewardMultipliersMap: Record<string, Decimal>,
-): AccountToSubAccountToMarketToBalanceMap {
-  const accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceMap = {};
+): AccountToSubAccountToMarketToBalanceAndPointsMap {
+  const accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceAndPointsMap = {};
   accounts.forEach(account => {
     const accountOwner = account.owner;
     const accountNumber = account.number.toString();
@@ -67,8 +67,8 @@ export function getAccountBalancesByMarket(
     Object.values(account.balances).forEach(balance => {
       accountToDolomiteBalanceMap[accountOwner]![accountNumber]![balance.marketId] = new BalanceAndRewardPoints(
         account.effectiveUser,
-        rewardMultipliersMap[balance.marketId] ?? INTEGERS.ONE,
         balance.marketId,
+        rewardMultipliersMap[balance.marketId] ?? INTEGERS.ONE,
         startTimestamp,
         balance.par.dividedBy(TEN.pow(balance.tokenDecimals)), // convert to Decimals from "BigInt" format
       );
@@ -217,10 +217,14 @@ export async function getPoolAddressToVirtualLiquidityPositionsAndEvents(
     );
   }
 
+  const arbVesterData = networkId === ChainId.ArbitrumOne
+    ? { [ARB_VESTER_PROXY]: oTokenVestingPositionsAndEventsMap }
+    : {};
+
   return {
     ...syAddressToPendlePositionsAndEventsMap,
     ...pairToAmmPositionsAndEventsMap,
-    [ARB_VESTER_PROXY]: oTokenVestingPositionsAndEventsMap,
+    ...arbVesterData,
   };
 }
 
@@ -269,6 +273,12 @@ async function getAmmLiquidityPositionAndEvents(
     return snapshots.map<VirtualLiquiditySnapshotInternal>(snapshot => {
       if (!pairToSnapshots[snapshot.pairAddress]) {
         pairToSnapshots[snapshot.pairAddress] = [];
+      }
+      if (!pairToFinalPositionsAndEventsMap[snapshot.pairAddress]) {
+        pairToFinalPositionsAndEventsMap[snapshot.pairAddress] = {
+          userToLiquiditySnapshots: {},
+          virtualLiquidityBalances: {},
+        };
       }
 
       const virtualSnapshot: VirtualLiquiditySnapshotInternal = {

@@ -2,6 +2,7 @@ import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomi
 import { ethers } from 'ethers';
 import { MarketIndex } from '../../src/lib/api-types';
 import { ONE_ETH_WEI } from '../../src/lib/constants';
+import { toNextDailyTimestamp } from '../../src/lib/utils';
 import { remapAccountToClaimableAccount } from './remapper';
 
 export const ARB_VESTER_PROXY = '0x531BC6E97b65adF8B3683240bd594932Cfb63797'.toLowerCase();
@@ -32,7 +33,7 @@ type AccountNumber = string;
 type AccountMarketId = string;
 
 // eslint-disable-next-line max-len
-export type AccountToSubAccountToMarketToBalanceMap = Record<AccountOwner, Record<AccountNumber, Record<AccountMarketId, BalanceAndRewardPoints | undefined> | undefined> | undefined>;
+export type AccountToSubAccountToMarketToBalanceAndPointsMap = Record<AccountOwner, Record<AccountNumber, Record<AccountMarketId, BalanceAndRewardPoints | undefined> | undefined> | undefined>;
 // eslint-disable-next-line max-len
 export type AccountToSubAccountToMarketToBalanceChangeMap = Record<AccountOwner, Record<AccountNumber, Record<AccountMarketId, BalanceChangeEvent[] | undefined> | undefined> | undefined>;
 export type AccountToVirtualLiquidityBalanceMap = Record<AccountOwner, VirtualBalanceAndRewardPoints | undefined>;
@@ -64,6 +65,13 @@ export interface LiquidityPositionsAndEvents {
   virtualLiquidityBalances: AccountToVirtualLiquidityBalanceMap;
 }
 
+export interface FinalPointsStruct {
+  userToPointsMap: Record<string, Integer>;
+  userToMarketToPointsMap: Record<string, Record<string, Integer>>;
+  marketToPointsMap: Record<string, Integer>;
+  totalUserPoints: Integer,
+}
+
 export enum InterestOperation {
   ADD_POSITIVE = 'ADD_POSITIVE',
   ADD_NEGATIVE = 'ADD_NEGATIVE',
@@ -81,8 +89,8 @@ export class BalanceAndRewardPoints {
 
   constructor(
     public readonly effectiveUser: string,
-    public readonly pointsPerSecond: Decimal,
     public readonly marketId: number,
+    public pointsPerSecond: Decimal,
     private lastUpdated: number,
     private balancePar: Decimal,
   ) {
@@ -111,7 +119,7 @@ export class BalanceAndRewardPoints {
     if (operation !== InterestOperation.NOTHING) {
       if (this.balancePar.lt(INTEGERS.ZERO)) {
         const indexDelta = event.interestIndex.borrow.minus(INTEGERS.ONE);
-        negativeInterestDelta = this.balancePar.times(indexDelta).abs();
+        negativeInterestDelta = this.balancePar.abs().times(indexDelta);
         this.negativeInterestAccrued = this.negativeInterestAccrued.plus(negativeInterestDelta);
       } else if (this.balancePar.gt(INTEGERS.ZERO)) {
         const indexDelta = event.interestIndex.supply.minus(INTEGERS.ONE);
@@ -121,15 +129,21 @@ export class BalanceAndRewardPoints {
     }
 
     // Accrue balance-based points
-    if (this.balancePar.gt(0)) {
-      pointsUpdate = pointsUpdate.plus(this.balancePar.times(timeDelta).times(this.pointsPerSecond));
+    if (operation === InterestOperation.ADD_NEGATIVE) {
+      if (this.balancePar.lt(INTEGERS.ZERO)) {
+        pointsUpdate = pointsUpdate.plus(this.balancePar.abs().times(timeDelta).times(this.pointsPerSecond));
+      }
+    } else {
+      if (this.balancePar.gt(INTEGERS.ZERO)) {
+        pointsUpdate = pointsUpdate.plus(this.balancePar.times(timeDelta).times(this.pointsPerSecond));
+      }
     }
 
     // Accrue interest-based points
     if (operation === InterestOperation.ADD_POSITIVE) {
       pointsUpdate = pointsUpdate.plus(positiveInterestDelta.times(timeDelta).times(this.pointsPerSecond));
     } else if (operation === InterestOperation.ADD_NEGATIVE) {
-      pointsUpdate = pointsUpdate.plus(negativeInterestDelta.abs().times(timeDelta).times(this.pointsPerSecond));
+      pointsUpdate = pointsUpdate.plus(negativeInterestDelta.times(timeDelta).times(this.pointsPerSecond));
     } else if (operation === InterestOperation.NEGATE) {
       pointsUpdate = pointsUpdate.plus(positiveInterestDelta.minus(negativeInterestDelta)
         .times(timeDelta)
@@ -147,7 +161,7 @@ export class BalanceAndRewardPoints {
 }
 
 export class VirtualBalanceAndRewardPoints {
-  equityPoints: Decimal;
+  public equityPoints: Decimal;
 
   constructor(
     public readonly effectiveUser: string,
@@ -176,7 +190,7 @@ export class VirtualBalanceAndRewardPoints {
 }
 
 export function processEventsUntilEndTimestamp(
-  accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceMap,
+  accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceAndPointsMap,
   accountToMarketToEventsMap: AccountToSubAccountToMarketToBalanceChangeMap,
   endInterestIndexMap: Record<string, MarketIndex>,
   marketToPointsPerSecondMap: Record<string, Decimal>,
@@ -203,8 +217,8 @@ export function processEventsUntilEndTimestamp(
             // if interest needs to be accrued for the `InterestOperation`
             userBalanceStruct = new BalanceAndRewardPoints(
               event.effectiveUser,
-              marketToPointsPerSecondMap[market] ?? INTEGERS.ONE,
               event.interestIndex.marketId,
+              marketToPointsPerSecondMap[market] ?? INTEGERS.ONE,
               event.timestamp,
               event.amountDeltaPar,
             );
@@ -242,6 +256,95 @@ export function processEventsUntilEndTimestamp(
         const userBalanceStruct = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
         const endInterestIndex = endInterestIndexMap[market];
         if (endInterestIndex) {
+          userBalanceStruct.processEvent(
+            {
+              amountDeltaPar: INTEGERS.ZERO,
+              timestamp: endTimestamp,
+              serialId: 0,
+              effectiveUser: userBalanceStruct.effectiveUser,
+              interestIndex: endInterestIndex,
+              marketId: parseInt(market, 10),
+            },
+            operation,
+          );
+        }
+      });
+    });
+  });
+}
+
+export function processEventsWithDifferingPointsBasedOnTimestampUntilEndTimestamp(
+  accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceAndPointsMap,
+  accountToMarketToEventsMap: AccountToSubAccountToMarketToBalanceChangeMap,
+  endInterestIndexMap: Record<string, MarketIndex>,
+  dailyTimestampToMarketToPointsPerSecondMap: Record<string, Record<string, Decimal>>,
+  endTimestamp: number,
+  operation: InterestOperation,
+) {
+  Object.keys(accountToMarketToEventsMap).forEach(account => {
+    Object.keys(accountToMarketToEventsMap[account]!).forEach(subAccount => {
+      // Make sure user => subAccount ==> market => balance record exists
+      if (!accountToDolomiteBalanceMap[account]) {
+        accountToDolomiteBalanceMap[account] = {};
+      }
+      if (!accountToDolomiteBalanceMap[account]![subAccount]) {
+        accountToDolomiteBalanceMap[account]![subAccount] = {};
+      }
+      const marketToEventsMap = accountToMarketToEventsMap[account]![subAccount]!;
+      Object.keys(marketToEventsMap).forEach(market => {
+        // Sort and process events
+        marketToEventsMap[market]!.sort((a, b) => a.serialId - b.serialId);
+        marketToEventsMap[market]!.forEach(event => {
+          let userBalanceStruct = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
+          const dailyTimestamp = toNextDailyTimestamp(event.timestamp);
+          const pointsPerSecond = dailyTimestampToMarketToPointsPerSecondMap[dailyTimestamp][market]!;
+          if (!userBalanceStruct) {
+            // For the first event, initialize the struct. Don't process it because we need to normalize the par value
+            // if interest needs to be accrued for the `InterestOperation`
+            userBalanceStruct = new BalanceAndRewardPoints(
+              event.effectiveUser,
+              event.interestIndex.marketId,
+              pointsPerSecond,
+              event.timestamp,
+              event.amountDeltaPar,
+            );
+            accountToDolomiteBalanceMap[account]![subAccount]![market] = userBalanceStruct;
+          } else {
+            userBalanceStruct.pointsPerSecond = pointsPerSecond;
+            userBalanceStruct.processEvent(event, operation);
+          }
+
+          if (userBalanceStruct.effectiveUser !== event.effectiveUser) {
+            throw new Error('Effective user mismatch!');
+          }
+        });
+
+        const userBalanceStruct = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
+        if (userBalanceStruct.isZero() && userBalanceStruct.rewardPoints.eq(0)) {
+          delete accountToDolomiteBalanceMap[account]![subAccount]![market];
+        }
+      });
+      if (Object.keys(accountToDolomiteBalanceMap[account]![subAccount]!).length === 0) {
+        delete accountToDolomiteBalanceMap[account]![subAccount];
+      }
+    });
+    if (
+      accountToDolomiteBalanceMap[account]
+      && Object.keys(accountToDolomiteBalanceMap[account]!).length === 0
+    ) {
+      delete accountToDolomiteBalanceMap[account];
+    }
+  });
+
+  // Do final loop through all balances to finish reward point calculation
+  Object.keys(accountToDolomiteBalanceMap).forEach(account => {
+    Object.keys(accountToDolomiteBalanceMap[account]!).forEach(subAccount => {
+      Object.keys(accountToDolomiteBalanceMap[account]![subAccount]!).forEach(market => {
+        const userBalanceStruct = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
+        const endInterestIndex = endInterestIndexMap[market];
+        if (endInterestIndex) {
+          const dailyTimestamp = toNextDailyTimestamp(endTimestamp);
+          userBalanceStruct.pointsPerSecond = dailyTimestampToMarketToPointsPerSecondMap[dailyTimestamp][market]!;
           userBalanceStruct.processEvent(
             {
               amountDeltaPar: INTEGERS.ZERO,
@@ -316,17 +419,14 @@ export function calculateVirtualLiquidityPoints(
  */
 export function calculateFinalPoints(
   networkId: number,
-  accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceMap,
+  accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceAndPointsMap,
   validMarketIdsMap: Record<string, Integer | Decimal>,
   poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
   poolToTotalSubLiquidityPoints: Record<string, Decimal>,
   oldUserToPointsMap: Record<string, string> = {},
   oldUserToMarketToPointsMap: Record<string, string> = {},
-): {
-  userToPointsMap: Record<string, Integer>;
-  userToMarketToPointsMap: Record<string, Record<string, Integer>>;
-  marketToPointsMap: Record<string, Integer>;
-} {
+): FinalPointsStruct {
+  let totalUserPoints = INTEGERS.ZERO;
   const marketToPointsMap: Record<string, Integer> = {};
   const userToPointsMap: Record<string, Integer> = Object.keys(oldUserToPointsMap)
     .reduce<Record<string, Integer>>((memo, key) => {
@@ -363,6 +463,7 @@ export function calculateFinalPoints(
           }
 
           const points = balanceStruct.rewardPoints.times(ONE_ETH_WEI).integerValue();
+          totalUserPoints = totalUserPoints.plus(points);
           userToPointsMap[remappedAccount] = userToPointsMap[remappedAccount].plus(points);
           marketToPointsMap[market] = marketToPointsMap[market].plus(points);
           userToMarketToPointsMap[remappedAccount][market] = userToMarketToPointsMap[remappedAccount][market].plus(
@@ -433,12 +534,12 @@ export function calculateFinalPoints(
     }
   });
 
-  return { userToPointsMap, userToMarketToPointsMap, marketToPointsMap };
+  return { userToPointsMap, userToMarketToPointsMap, marketToPointsMap, totalUserPoints };
 }
 
 export function calculateFinalEquityRewards(
   networkId: number,
-  accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceMap,
+  accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceAndPointsMap,
   poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
   totalPointsPerMarket: Record<number, Decimal>,
   totalLiquidityPointsPerPool: Record<string, Decimal>,
