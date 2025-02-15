@@ -21,7 +21,7 @@ async function transformCsvToJson() {
       });
   });
 
-  writeOutputFile(`minerals/minerals-${networkId}.json`, jsonResult);
+  writeOutputFile(`minerals-transformations/minerals-${networkId}.json`, jsonResult);
 }
 
 transformCsvToJson()

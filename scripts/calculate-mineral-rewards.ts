@@ -27,11 +27,11 @@ import { setupRemapping } from './lib/remapper';
 import {
   BLACKLIST_ADDRESSES,
   calculateFinalPoints,
-  calculateMerkleRootAndProofs,
   calculateVirtualLiquidityPoints,
   InterestOperation,
   processEventsUntilEndTimestamp,
 } from './lib/rewards';
+import { calculateMerkleRootAndProofs } from './lib/utils';
 
 /* eslint-enable */
 

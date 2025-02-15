@@ -16,14 +16,17 @@ import {
   addToBlacklist,
   BalanceChangeEvent,
   calculateFinalPoints,
-  calculateVirtualLiquidityPoints, FinalPointsStruct,
+  calculateVirtualLiquidityPoints,
+  FinalPointsStruct,
   InterestOperation,
+  LiquidityPositionsAndEvents,
   processEventsWithDifferingPointsBasedOnTimestampUntilEndTimestamp,
+  VirtualBalanceAndRewardPoints,
 } from './lib/rewards';
 
 /* eslint-enable */
 
-const OUTPUT_FILE_NAME = `${process.cwd()}/scripts/output/regular-airdrop-data-${dolomite.networkId}-borrows.json`;
+const OUTPUT_FILE_NAME = `${process.cwd()}/scripts/output/airdrop-results/regular-airdrop-data-${dolomite.networkId}-with_virtual-supply.json`;
 const TOTAL_DOLO_TOKENS = new BigNumber(parseEther(`${90_000_000}`).toString());
 
 interface OutputFile {
@@ -89,6 +92,9 @@ const CHAIN_TO_MARKET_TO_EXTRA_MULTIPLIER_MAP: Record<ChainId, Record<string, De
   [ChainId.XLayer]: {},
 }
 
+const SUPPLY_MULTIPLIER = INTEGERS.ONE;
+const BORROW_MULTIPLIER = new BigNumber(1);
+
 const FOLDER_NAME = `${__dirname}/output`;
 
 export async function calculateRegularAirdrop() {
@@ -134,13 +140,16 @@ export async function calculateRegularAirdrop() {
 
   const goArbVesterProxy = ModuleDeployments.GravitaExternalVesterProxy[networkId];
   if (goArbVesterProxy) {
+    addToBlacklist('0xbDEf2b2051E2aE113297ee8301e011FD71A83738');
+    addToBlacklist('0x52256ef863a713Ef349ae6E97A7E8f35785145dE');
+    addToBlacklist('0xa75c21C5BE284122a87A37a76cc6C4DD3E55a1D4');
     addToBlacklist(goArbVesterProxy.address);
   }
 
   await setupRemapping(networkId, metadata.endBlockNumber);
 
   const supplyAccountToDolomiteBalanceMap = {};
-  const allSupplyPriceMap = getAllPricesFromFile(networkId, INTEGERS.ONE);
+  const allSupplyPriceMap = getAllPricesFromFile(networkId, SUPPLY_MULTIPLIER);
   processEventsWithDifferingPointsBasedOnTimestampUntilEndTimestamp(
     supplyAccountToDolomiteBalanceMap,
     getUserToAccountNumberToAssetToEventsMapFromFile(networkId),
@@ -151,7 +160,7 @@ export async function calculateRegularAirdrop() {
   );
 
   const borrowAccountToDolomiteBalanceMap = {};
-  const allBorrowPriceMap = getAllPricesFromFile(networkId, INTEGERS.ONE);
+  const allBorrowPriceMap = getAllPricesFromFile(networkId, BORROW_MULTIPLIER);
   processEventsWithDifferingPointsBasedOnTimestampUntilEndTimestamp(
     borrowAccountToDolomiteBalanceMap,
     getUserToAccountNumberToAssetToEventsMapFromFile(networkId),
@@ -161,14 +170,9 @@ export async function calculateRegularAirdrop() {
     InterestOperation.ADD_NEGATIVE,
   );
 
-  // const poolToVirtualLiquidityPositionsAndEvents = await getPoolAddressToVirtualLiquidityPositionsAndEvents(
-  //   networkId,
-  //   metadata.startBlockNumber,
-  //   metadata.startTimestamp,
-  //   metadata.endTimestamp,
-  //   ignorePendle,
-  // );
-  const poolToVirtualLiquidityPositionsAndEvents = {};
+  // Aggregate results from each network
+  // Check for multisigs/contracts on each network (generate an airdrop file for each network, so we know which network to ping for)
+  const poolToVirtualLiquidityPositionsAndEvents = getPoolAddressToVirtualLiquidityPositionsAndEventsFromFile(networkId);
 
   const poolToTotalSubLiquidityPoints = calculateVirtualLiquidityPoints(
     poolToVirtualLiquidityPositionsAndEvents,
@@ -183,7 +187,6 @@ export async function calculateRegularAirdrop() {
     poolToVirtualLiquidityPositionsAndEvents,
     poolToTotalSubLiquidityPoints,
   );
-  typeof supplyFinalPoints;
   const borrowFinalPoints = calculateFinalPoints(
     networkId,
     borrowAccountToDolomiteBalanceMap,
@@ -191,8 +194,9 @@ export async function calculateRegularAirdrop() {
     {},
     {},
   );
+  typeof borrowFinalPoints;
 
-  const allFinalPoints = [borrowFinalPoints];
+  const allFinalPoints = [supplyFinalPoints];
   const totalUserPoints = allFinalPoints.reduce((acc, struct) => acc.plus(struct.totalUserPoints), INTEGERS.ZERO);
   const dataToWrite: OutputFile = {
     users: {},
@@ -259,6 +263,47 @@ function getUserToAccountNumberToAssetToEventsMapFromFile(networkId: number): Ac
       });
       return acc1;
     }, {} as AccountToSubAccountToMarketToBalanceChangeMap);
+}
+
+function getPoolAddressToVirtualLiquidityPositionsAndEventsFromFile(networkId: number): Record<string, LiquidityPositionsAndEvents> {
+  const poolToVirtualEventsToEventsMapRaw = JSON.parse(fs.readFileSync(
+    `${process.cwd()}/scripts/output/data/all-virtual-events-${networkId}.json`,
+    'utf8',
+  ))['data'];
+
+  return Object.keys(poolToVirtualEventsToEventsMapRaw)
+    .reduce((acc1, pool) => {
+      acc1[pool] = {
+        userToLiquiditySnapshots: {},
+        virtualLiquidityBalances: {},
+      };
+
+      Object.keys(poolToVirtualEventsToEventsMapRaw[pool].userToLiquiditySnapshots).forEach(user => {
+        const snapshots = poolToVirtualEventsToEventsMapRaw[pool].userToLiquiditySnapshots[user];
+        snapshots.forEach(snapshot => {
+          if (!acc1[pool].userToLiquiditySnapshots[user]) {
+            acc1[pool].userToLiquiditySnapshots[user] = [];
+          }
+          acc1[pool].userToLiquiditySnapshots[user]!.push({
+            id: snapshot.id,
+            effectiveUser: snapshot.effectiveUser,
+            timestamp: snapshot.timestamp,
+            balancePar: new BigNumber(snapshot.balancePar),
+          });
+        });
+      });
+
+      Object.keys(poolToVirtualEventsToEventsMapRaw[pool].virtualLiquidityBalances).forEach(user => {
+        const balanceSnapshot = poolToVirtualEventsToEventsMapRaw[pool].virtualLiquidityBalances[user]!;
+        acc1[pool].virtualLiquidityBalances[user] = new VirtualBalanceAndRewardPoints(
+          balanceSnapshot.effectiveUser,
+          balanceSnapshot.lastUpdated,
+          new BigNumber(balanceSnapshot.balancePar),
+        );
+      });
+
+      return acc1;
+    }, {} as Record<string, LiquidityPositionsAndEvents>);
 }
 
 function getFinalDoloAllocations(finalPointsStructs: FinalPointsStruct[]) {
