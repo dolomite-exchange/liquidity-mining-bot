@@ -1,15 +1,12 @@
-import { BigNumber, Decimal, INTEGERS } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Decimal, DolomiteMargin, INTEGERS, Web3 } from '@dolomite-exchange/dolomite-margin';
 import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import { parseEther } from 'ethers/lib/utils';
 import fs from 'fs';
 import v8 from 'v8';
-import { dolomite } from '../src/helpers/web3';
 import { ChainId } from '../src/lib/chain-id';
 import { isScript } from '../src/lib/env';
 import Logger from '../src/lib/logger';
-import BlockStore from '../src/lib/stores/block-store';
 import MarketStore from '../src/lib/stores/market-store';
-import '../src/lib/env'
 import { setupRemapping } from './lib/remapper';
 import {
   AccountToSubAccountToMarketToBalanceChangeMap,
@@ -23,10 +20,13 @@ import {
   processEventsWithDifferingPointsBasedOnTimestampUntilEndTimestamp,
   VirtualBalanceAndRewardPoints,
 } from './lib/rewards';
+import { setSubgraphUrl } from '../src/clients/dolomite';
+import { setMarketIgnored } from '../src/helpers/market-helpers';
 
 /* eslint-enable */
 
-const OUTPUT_FILE_NAME = `${process.cwd()}/scripts/output/airdrop-results/regular-airdrop-data-${dolomite.networkId}-with_virtual-supply.json`;
+const OUTPUT_DIRECTORY = `${process.cwd()}/scripts/output/airdrop-results`;
+const OUTPUT_FILE_NAME = `${OUTPUT_DIRECTORY}/regular-airdrop-data-all_networks-supply.json`;
 const TOTAL_DOLO_TOKENS = new BigNumber(parseEther(`${90_000_000}`).toString());
 
 interface OutputFile {
@@ -35,10 +35,6 @@ interface OutputFile {
   };
   metadata: {
     totalUserPoints: string // big int
-    startBlock: number
-    endBlock: number
-    startTimestamp: number
-    endTimestamp: number
     totalUsers: number
   };
 }
@@ -51,6 +47,28 @@ interface Metadata {
 }
 
 type TimestampToMarketToPriceMap = Record<string, Record<string, Decimal>>;
+
+const LEVEL_TO_MULTIPLIER_MAP: Record<number, BigNumber | undefined> = {
+  10: new BigNumber(2),
+};
+
+const CHAIN_ID_TO_WEB3_PROVIDER_URL_MAP: Record<ChainId, string | undefined> = {
+  [ChainId.ArbitrumOne]: process.env.ARBITRUM_WEB3_PROVIDER,
+  [ChainId.Base]: undefined,
+  [ChainId.Berachain]: undefined,
+  [ChainId.Mantle]: process.env.MANTLE_WEB3_PROVIDER,
+  [ChainId.PolygonZkEvm]: process.env.POLYGON_ZKEVM_WEB3_PROVIDER,
+  [ChainId.XLayer]: process.env.X_LAYER_WEB3_PROVIDER,
+};
+
+const CHAIN_ID_TO_SUBGRAPH_URL_MAP: Record<ChainId, string | undefined> = {
+  [ChainId.ArbitrumOne]: process.env.ARBITRUM_SUBGRAPH_URL,
+  [ChainId.Base]: undefined,
+  [ChainId.Berachain]: undefined,
+  [ChainId.Mantle]: process.env.MANTLE_SUBGRAPH_URL,
+  [ChainId.PolygonZkEvm]: process.env.POLYGON_ZKEVM_SUBGRAPH_URL,
+  [ChainId.XLayer]: process.env.X_LAYER_SUBGRAPH_URL,
+};
 
 const CHAIN_ID_TO_METADATA_MAP: Record<ChainId, Metadata | undefined> = {
   [ChainId.ArbitrumOne]: {
@@ -83,7 +101,7 @@ const CHAIN_ID_TO_METADATA_MAP: Record<ChainId, Metadata | undefined> = {
 
 const CHAIN_TO_MARKET_TO_EXTRA_MULTIPLIER_MAP: Record<ChainId, Record<string, Decimal>> = {
   [ChainId.ArbitrumOne]: {
-    [0]: new BigNumber(1),
+    0: new BigNumber(1),
   },
   [ChainId.Base]: {},
   [ChainId.Berachain]: {},
@@ -98,38 +116,50 @@ const BORROW_MULTIPLIER = new BigNumber(1);
 const FOLDER_NAME = `${__dirname}/output`;
 
 export async function calculateRegularAirdrop() {
-  const { networkId } = dolomite;
-
-  const metadata = CHAIN_ID_TO_METADATA_MAP[networkId as ChainId]!;
-  const ignorePendle = networkId !== ChainId.ArbitrumOne;
-
-  const blockStore = new BlockStore();
-  const marketStore = new MarketStore(blockStore, true);
-
-  const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address;
-  if (networkId !== Number(process.env.NETWORK_ID)) {
-    const message = `Invalid network ID found!\n
-    { network: ${networkId} environment: ${Number(process.env.NETWORK_ID)} }`;
-    Logger.error(message);
-    return Promise.reject(new Error(message));
-  }
-
   Logger.info({
-    message: 'DolomiteMargin data',
-    blockRewardStart: metadata.startBlockNumber,
-    blockRewardStartTimestamp: metadata.startTimestamp,
-    blockRewardEnd: metadata.endBlockNumber,
-    blockRewardEndTimestamp: metadata.endTimestamp,
-    dolomiteMargin: libraryDolomiteMargin,
-    ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
+    message: 'Calculating regular airdrop...',
     heapSize: `${v8.getHeapStatistics().heap_size_limit / (1024 * 1024)} MB`,
-    ignorePendle,
-    networkId,
-    subgraphUrl: process.env.SUBGRAPH_URL,
   });
 
-  await marketStore._update(metadata.startBlockNumber);
+  const allFinalPoints = [
+    ...await getAllPointsByNetworkId(ChainId.ArbitrumOne, false),
+    ...await getAllPointsByNetworkId(ChainId.Mantle, false),
+    ...await getAllPointsByNetworkId(ChainId.PolygonZkEvm, false),
+    ...await getAllPointsByNetworkId(ChainId.XLayer, false),
+  ];
+  const totalUserPoints = allFinalPoints.reduce((acc, struct) => acc.plus(struct.totalUserPoints), INTEGERS.ZERO);
+  const dataToWrite: OutputFile = {
+    users: {},
+    metadata: {
+      totalUserPoints: totalUserPoints.div(parseEther('1').toString()).toFixed(0),
+      totalUsers: 0,
+    },
+  };
 
+  dataToWrite.users = getFinalDoloAllocations(allFinalPoints, getUserXpLevelData());
+  dataToWrite.metadata.totalUsers = Object.keys(dataToWrite.users).length;
+
+  writeOutputFile(dataToWrite);
+
+  return true;
+}
+
+async function getAllPointsByNetworkId(networkId: ChainId, includeBorrows: boolean): Promise<FinalPointsStruct[]> {
+  const metadata = CHAIN_ID_TO_METADATA_MAP[networkId]!;
+  const dolomite = new DolomiteMargin(
+    new Web3.providers.HttpProvider(CHAIN_ID_TO_WEB3_PROVIDER_URL_MAP[networkId]!),
+    networkId,
+  );
+  setSubgraphUrl(CHAIN_ID_TO_SUBGRAPH_URL_MAP[networkId]!);
+
+  const J_USDC_MARKET_ID = 10;
+  if (networkId === ChainId.ArbitrumOne) {
+    setMarketIgnored(J_USDC_MARKET_ID, true);
+  } else {
+    setMarketIgnored(J_USDC_MARKET_ID, false);
+  }
+
+  const marketStore = new MarketStore(null as any, true, dolomite);
   await marketStore._update(metadata.endBlockNumber);
   const endMarketMap = marketStore.getMarketMap();
   const endMarketIndexMap = await marketStore.getMarketIndexMap(endMarketMap, { blockNumber: metadata.endBlockNumber });
@@ -140,14 +170,13 @@ export async function calculateRegularAirdrop() {
 
   const goArbVesterProxy = ModuleDeployments.GravitaExternalVesterProxy[networkId];
   if (goArbVesterProxy) {
-    addToBlacklist('0xbDEf2b2051E2aE113297ee8301e011FD71A83738');
-    addToBlacklist('0x52256ef863a713Ef349ae6E97A7E8f35785145dE');
-    addToBlacklist('0xa75c21C5BE284122a87A37a76cc6C4DD3E55a1D4');
     addToBlacklist(goArbVesterProxy.address);
   }
+  addToBlacklist('0xbDEf2b2051E2aE113297ee8301e011FD71A83738');
+  addToBlacklist('0x52256ef863a713Ef349ae6E97A7E8f35785145dE');
+  addToBlacklist('0xa75c21C5BE284122a87A37a76cc6C4DD3E55a1D4');
 
   await setupRemapping(networkId, metadata.endBlockNumber);
-
   const supplyAccountToDolomiteBalanceMap = {};
   const allSupplyPriceMap = getAllPricesFromFile(networkId, SUPPLY_MULTIPLIER);
   processEventsWithDifferingPointsBasedOnTimestampUntilEndTimestamp(
@@ -170,9 +199,9 @@ export async function calculateRegularAirdrop() {
     InterestOperation.ADD_NEGATIVE,
   );
 
-  // Aggregate results from each network
-  // Check for multisigs/contracts on each network (generate an airdrop file for each network, so we know which network to ping for)
-  const poolToVirtualLiquidityPositionsAndEvents = getPoolAddressToVirtualLiquidityPositionsAndEventsFromFile(networkId);
+  const poolToVirtualLiquidityPositionsAndEvents = getPoolAddressToVirtualLiquidityPositionsAndEventsFromFile(
+    networkId,
+  );
 
   const poolToTotalSubLiquidityPoints = calculateVirtualLiquidityPoints(
     poolToVirtualLiquidityPositionsAndEvents,
@@ -194,51 +223,38 @@ export async function calculateRegularAirdrop() {
     {},
     {},
   );
-  typeof borrowFinalPoints;
 
-  const allFinalPoints = [supplyFinalPoints];
-  const totalUserPoints = allFinalPoints.reduce((acc, struct) => acc.plus(struct.totalUserPoints), INTEGERS.ZERO);
-  const dataToWrite: OutputFile = {
-    users: {},
-    metadata: {
-      totalUserPoints: totalUserPoints.div(parseEther('1').toString()).toFixed(0),
-      startBlock: metadata.startBlockNumber,
-      endBlock: metadata.endBlockNumber,
-      startTimestamp: metadata.startTimestamp,
-      endTimestamp: metadata.endTimestamp,
-      totalUsers: 0,
-    },
-  };
+  if (includeBorrows) {
+    return [supplyFinalPoints, borrowFinalPoints];
+  }
 
-  dataToWrite.users = getFinalDoloAllocations(allFinalPoints);
-  dataToWrite.metadata.totalUsers = Object.keys(dataToWrite.users).length;
-
-  writeOutputFile(dataToWrite);
-
-  return true;
+  return [supplyFinalPoints];
 }
 
-function getAllPricesFromFile(networkId: number, extraMultiplier: Decimal): TimestampToMarketToPriceMap {
+function getAllPricesFromFile(networkId: ChainId, extraMultiplier: Decimal): TimestampToMarketToPriceMap {
   const allPriceMapRaw = JSON.parse(fs.readFileSync(
     `${process.cwd()}/scripts/output/data/all-prices-${networkId}.json`,
     'utf8',
-  ))['data'];
+  )).data;
 
   return Object.keys(allPriceMapRaw).reduce((acc, key) => {
     acc[key] = {};
     Object.keys(allPriceMapRaw[key]).forEach(marketId => {
       const inlineMultiplier = CHAIN_TO_MARKET_TO_EXTRA_MULTIPLIER_MAP[networkId][marketId] ?? INTEGERS.ONE;
-      acc[key][marketId] = new BigNumber(allPriceMapRaw[key][marketId]).times(inlineMultiplier).times(extraMultiplier);
+      const price = new BigNumber(allPriceMapRaw[key][marketId]);
+      acc[key][marketId] = price.times(inlineMultiplier).times(extraMultiplier);
     });
     return acc;
   }, {} as TimestampToMarketToPriceMap);
 }
 
-function getUserToAccountNumberToAssetToEventsMapFromFile(networkId: number): AccountToSubAccountToMarketToBalanceChangeMap {
+function getUserToAccountNumberToAssetToEventsMapFromFile(
+  networkId: ChainId,
+): AccountToSubAccountToMarketToBalanceChangeMap {
   const userToAccountNumberToAssetToEventsMapRaw = JSON.parse(fs.readFileSync(
     `${process.cwd()}/scripts/output/data/all-events-${networkId}.json`,
     'utf8',
-  ))['data'];
+  )).data;
 
   return Object.keys(userToAccountNumberToAssetToEventsMapRaw)
     .reduce((acc1, user) => {
@@ -265,11 +281,13 @@ function getUserToAccountNumberToAssetToEventsMapFromFile(networkId: number): Ac
     }, {} as AccountToSubAccountToMarketToBalanceChangeMap);
 }
 
-function getPoolAddressToVirtualLiquidityPositionsAndEventsFromFile(networkId: number): Record<string, LiquidityPositionsAndEvents> {
+function getPoolAddressToVirtualLiquidityPositionsAndEventsFromFile(
+  networkId: ChainId,
+): Record<string, LiquidityPositionsAndEvents> {
   const poolToVirtualEventsToEventsMapRaw = JSON.parse(fs.readFileSync(
     `${process.cwd()}/scripts/output/data/all-virtual-events-${networkId}.json`,
     'utf8',
-  ))['data'];
+  )).data;
 
   return Object.keys(poolToVirtualEventsToEventsMapRaw)
     .reduce((acc1, pool) => {
@@ -306,7 +324,17 @@ function getPoolAddressToVirtualLiquidityPositionsAndEventsFromFile(networkId: n
     }, {} as Record<string, LiquidityPositionsAndEvents>);
 }
 
-function getFinalDoloAllocations(finalPointsStructs: FinalPointsStruct[]) {
+function getUserXpLevelData(): Record<string, number> {
+  return JSON.parse(fs.readFileSync(
+    `${process.cwd()}/scripts/output/data/all-level-data.json`,
+    'utf8',
+  ));
+}
+
+function getFinalDoloAllocations(
+  finalPointsStructs: FinalPointsStruct[],
+  userToLevelMap: Record<string, number>,
+) {
   let totalUserPoints = INTEGERS.ZERO;
   // Add supply data
   const allUsersMap = {};
@@ -317,11 +345,12 @@ function getFinalDoloAllocations(finalPointsStructs: FinalPointsStruct[]) {
         allUsersMap[user] = INTEGERS.ZERO;
       }
 
-      const points = struct.userToPointsMap[user];
+      const pointsBeforeXp = struct.userToPointsMap[user];
+      const points = pointsBeforeXp.times(LEVEL_TO_MULTIPLIER_MAP[userToLevelMap[user]] ?? INTEGERS.ONE);
+
       totalUserPoints = totalUserPoints.plus(points);
       allUsersMap[user] = allUsersMap[user].plus(points);
-      return allUsersMap;
-    }, {});
+    });
   });
 
   return Object.keys(allUsersMap).reduce((memo, user) => {

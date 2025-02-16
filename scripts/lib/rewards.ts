@@ -1,3 +1,4 @@
+/* eslint-disable max-classes-per-file */
 import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import { ethers } from 'ethers';
 import { MarketIndex } from '../../src/lib/api-types';
@@ -133,10 +134,8 @@ export class BalanceAndRewardPoints {
       if (this.balancePar.lt(INTEGERS.ZERO)) {
         pointsUpdate = pointsUpdate.plus(this.balancePar.abs().times(timeDelta).times(this.pointsPerSecond));
       }
-    } else {
-      if (this.balancePar.gt(INTEGERS.ZERO)) {
-        pointsUpdate = pointsUpdate.plus(this.balancePar.times(timeDelta).times(this.pointsPerSecond));
-      }
+    } else if (this.balancePar.gt(INTEGERS.ZERO)) {
+      pointsUpdate = pointsUpdate.plus(this.balancePar.times(timeDelta).times(this.pointsPerSecond));
     }
 
     // Accrue interest-based points
@@ -428,19 +427,17 @@ export function calculateFinalPoints(
 ): FinalPointsStruct {
   let totalUserPoints = INTEGERS.ZERO;
   const marketToPointsMap: Record<string, Integer> = {};
-  const userToPointsMap: Record<string, Integer> = Object.keys(oldUserToPointsMap)
-    .reduce<Record<string, Integer>>((memo, key) => {
-      memo[key] = new BigNumber(oldUserToPointsMap[key]);
-      return memo;
+  const userToPointsMap = Object.keys(oldUserToPointsMap).reduce((memo, key) => {
+    memo[key] = new BigNumber(oldUserToPointsMap[key]);
+    return memo;
+  }, {} as Record<string, Integer>);
+  const userToMarketToPointsMap = Object.keys(oldUserToMarketToPointsMap).reduce((memo1, user) => {
+    memo1[user] = Object.keys(userToMarketToPointsMap[user]).reduce<Record<string, Integer>>((memo2, market) => {
+      memo2[market] = new BigNumber(oldUserToMarketToPointsMap[user][market]);
+      return memo2;
     }, {});
-  const userToMarketToPointsMap: Record<string, Record<string, Integer>> = Object.keys(oldUserToMarketToPointsMap)
-    .reduce<Record<string, Record<string, Integer>>>((memo1, user) => {
-      memo1[user] = Object.keys(userToMarketToPointsMap[user]).reduce<Record<string, Integer>>((memo2, market) => {
-        memo2[market] = new BigNumber(oldUserToMarketToPointsMap[user][market]);
-        return memo2;
-      }, {});
-      return memo1;
-    }, {});
+    return memo1;
+  }, {} as Record<string, Record<string, Integer>>);
 
   Object.keys(accountToDolomiteBalanceMap).forEach(account => {
     Object.keys(accountToDolomiteBalanceMap[account]!).forEach(subAccount => {

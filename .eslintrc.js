@@ -66,6 +66,7 @@ module.exports = {
     ],
     'max-len': ['error', 120],
     "operator-linebreak": ["error", "before"],
+    "import/no-extraneous-dependencies": 0,
   },
   // silence dumb react warning
   settings: { react: { version: '999.999.999' } },

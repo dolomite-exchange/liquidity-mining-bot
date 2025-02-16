@@ -1,8 +1,8 @@
-import { BigNumber } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, DolomiteMargin } from '@dolomite-exchange/dolomite-margin';
 import { ContractConstantCallOptions } from '@dolomite-exchange/dolomite-margin/dist/src/types';
 import { getDolomiteMarkets } from '../../clients/dolomite';
 import { isMarketIgnored } from '../../helpers/market-helpers';
-import { dolomite } from '../../helpers/web3';
+import { dolomite as globalDolomite } from '../../helpers/web3';
 import { ApiMarket, MarketIndex } from '../api-types';
 import { ONE_ETH_WEI } from '../constants';
 import { delay } from '../delay';
@@ -17,6 +17,7 @@ export default class MarketStore {
   constructor(
     private readonly blockStore: BlockStore,
     public skipOraclePriceRetrieval: boolean,
+    private readonly dolomite: DolomiteMargin = globalDolomite,
   ) {
     this.marketMap = {};
   }
@@ -33,8 +34,8 @@ export default class MarketStore {
     const indexCalls = chunkArray(
       marketIds.map(marketId => {
         return {
-          target: dolomite.contracts.dolomiteMargin.options.address,
-          callData: dolomite.contracts.dolomiteMargin.methods.getMarketCurrentIndex(marketId).encodeABI(),
+          target: this.dolomite.contracts.dolomiteMargin.options.address,
+          callData: this.dolomite.contracts.dolomiteMargin.methods.getMarketCurrentIndex(marketId).encodeABI(),
         };
       }),
       10,
@@ -42,12 +43,15 @@ export default class MarketStore {
 
     const indexResults: string[] = [];
     for (let i = 0; i < indexCalls.length; i += 1) {
-      const { results: chunkedResults } = await dolomite.multiCall.aggregate(indexCalls[i], options);
+      const { results: chunkedResults } = await this.dolomite.multiCall.aggregate(indexCalls[i], options);
       indexResults.push(...chunkedResults);
     }
 
     return indexResults.reduce<{ [marketId: string]: MarketIndex }>((memo, rawIndexResult, i) => {
-      const decodedResults = dolomite.web3.eth.abi.decodeParameters(['uint256', 'uint256', 'uint256'], rawIndexResult);
+      const decodedResults = this.dolomite.web3.eth.abi.decodeParameters(
+        ['uint256', 'uint256', 'uint256'],
+        rawIndexResult,
+      );
       memo[marketIds[i]] = {
         marketId: Number(marketIds[i]),
         borrow: new BigNumber(decodedResults[0]).div(ONE_ETH_WEI),
@@ -100,6 +104,7 @@ export default class MarketStore {
     Logger.info({
       at: 'MarketStore#_update',
       message: 'Updating markets...',
+      networkId: this.dolomite.networkId,
       blockNumber,
     });
 
@@ -121,15 +126,18 @@ export default class MarketStore {
     if (!this.skipOraclePriceRetrieval) {
       const marketPriceCalls = Object.values(nextMarketMap).map(market => {
         return {
-          target: dolomite.address,
-          callData: dolomite.contracts.dolomiteMargin.methods.getMarketPrice(market.marketId).encodeABI(),
+          target: this.dolomite.address,
+          callData: this.dolomite.contracts.dolomiteMargin.methods.getMarketPrice(market.marketId).encodeABI(),
         };
       });
 
-      const { results: marketPriceResults } = await dolomite.multiCall.aggregate(marketPriceCalls, { blockNumber });
+      const { results: marketPriceResults } = await this.dolomite.multiCall.aggregate(
+        marketPriceCalls,
+        { blockNumber },
+      );
 
       Object.values(nextMarketMap).forEach((market, i) => {
-        const oraclePrice = dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i]);
+        const oraclePrice = this.dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i]);
         market.oraclePrice = new BigNumber(oraclePrice);
       });
     }
@@ -139,6 +147,7 @@ export default class MarketStore {
     Logger.info({
       at: 'MarketStore#_update',
       message: 'Finished updating markets',
+      networkId: this.dolomite.networkId,
       blockNumber,
     });
   };

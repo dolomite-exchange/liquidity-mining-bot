@@ -182,9 +182,13 @@ const defaultAxiosConfig = {
   headers: { 'Accept-Encoding': 'gzip,deflate,compress' },
 };
 
-const subgraphUrl = process.env.SUBGRAPH_URL ?? '';
+let subgraphUrl = process.env.SUBGRAPH_URL ?? '';
 if (!subgraphUrl) {
   throw new Error('SUBGRAPH_URL is not set')
+}
+
+export function setSubgraphUrl(_subgraphUrl: string) {
+  subgraphUrl = _subgraphUrl;
 }
 
 async function getAccounts(
@@ -481,8 +485,9 @@ export async function getVaporizations(
     return Promise.reject(result.errors[0]);
   }
 
-  const vaporizations = result.data.vaporizations.map(vaporization => _mapVaporizationsGqlToApiVaporizations(
-    vaporization));
+  const vaporizations = result.data.vaporizations.map(
+    vaporization => _mapVaporizationsGqlToApiVaporizations(vaporization),
+  );
   return { vaporizations };
 }
 
@@ -527,8 +532,9 @@ export async function getVaporizationsByHeldToken(
     return Promise.reject(result.errors[0]);
   }
 
-  const vaporizations = result.data.vaporizations.map(vaporization => _mapVaporizationsGqlToApiVaporizations(
-    vaporization));
+  const vaporizations = result.data.vaporizations.map(
+    vaporization => _mapVaporizationsGqlToApiVaporizations(vaporization),
+  );
   return { vaporizations };
 }
 
@@ -573,8 +579,9 @@ export async function getVaporizationsByBorrowedToken(
     return Promise.reject(result.errors[0]);
   }
 
-  const vaporizations = result.data.vaporizations.map(vaporization => _mapVaporizationsGqlToApiVaporizations(
-    vaporization));
+  const vaporizations = result.data.vaporizations.map(
+    vaporization => _mapVaporizationsGqlToApiVaporizations(vaporization),
+  );
   return { vaporizations };
 }
 

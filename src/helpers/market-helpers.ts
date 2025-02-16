@@ -9,6 +9,10 @@ const ignoredMarketIds: Record<string, true | undefined> = (process.env.IGNORED_
     return memo;
   }, {} as Record<string, true | undefined>);
 
+export function setMarketIgnored(marketId: number, ignore: boolean) {
+  ignoredMarketIds[marketId] = ignore ? true : undefined;
+}
+
 export function isMarketIgnored(marketId: number): boolean {
   return ignoredMarketIds[marketId] === true;
 }
