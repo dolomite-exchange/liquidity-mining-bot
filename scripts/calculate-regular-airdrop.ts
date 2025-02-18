@@ -168,13 +168,14 @@ async function getAllPointsByNetworkId(networkId: ChainId, includeBorrows: boole
     return acc;
   }, {});
 
-  const goArbVesterProxy = ModuleDeployments.GravitaExternalVesterProxy[networkId];
+  const goArbVesterProxy = ModuleDeployments.GravitaExternalVesterProxy[ChainId.ArbitrumOne];
   if (goArbVesterProxy) {
     addToBlacklist(goArbVesterProxy.address);
   }
-  addToBlacklist('0xbDEf2b2051E2aE113297ee8301e011FD71A83738');
   addToBlacklist('0x52256ef863a713Ef349ae6E97A7E8f35785145dE');
+  addToBlacklist('0x59f8cad377e4c66473460ce5ee8976760a04f138');
   addToBlacklist('0xa75c21C5BE284122a87A37a76cc6C4DD3E55a1D4');
+  addToBlacklist('0xbDEf2b2051E2aE113297ee8301e011FD71A83738');
 
   await setupRemapping(networkId, metadata.endBlockNumber);
   const supplyAccountToDolomiteBalanceMap = {};

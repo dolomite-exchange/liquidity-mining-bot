@@ -6,7 +6,7 @@ export async function getWeb3RequestWithBackoff<T>(
   request: () => Promise<T>,
   sleepDurationMillis: number = 10,
 ): Promise<T> {
-  for (let retryCount = 0; retryCount < MAX_RETRIES; retryCount++) {
+  for (let retryCount = 0; retryCount < MAX_RETRIES; retryCount += 1) {
     try {
       return await request();
     } catch (e: any) {
@@ -15,7 +15,7 @@ export async function getWeb3RequestWithBackoff<T>(
         || e.message.includes('request limit reached')
         || e.message.includes('call rate limit')
       ) {
-        await sleep(Math.min(15_000, sleepDurationMillis * Math.pow(2, retryCount)));
+        await sleep(Math.min(15_000, sleepDurationMillis * (2 ** retryCount)));
       } else {
         throw new Error(e);
       }
