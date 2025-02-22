@@ -26,7 +26,7 @@ import { setMarketIgnored } from '../src/helpers/market-helpers';
 /* eslint-enable */
 
 const OUTPUT_DIRECTORY = `${process.cwd()}/scripts/output/airdrop-results`;
-const OUTPUT_FILE_NAME = `${OUTPUT_DIRECTORY}/regular-airdrop-data-all_networks-supply.json`;
+const OUTPUT_FILE_NAME = `${OUTPUT_DIRECTORY}/regular-airdrop-data-all_networks-1x_supply-1x_borrow-0_5x_level.json`;
 const TOTAL_DOLO_TOKENS = new BigNumber(parseEther(`${90_000_000}`).toString());
 
 interface OutputFile {
@@ -48,8 +48,40 @@ interface Metadata {
 
 type TimestampToMarketToPriceMap = Record<string, Record<string, Decimal>>;
 
-const LEVEL_TO_MULTIPLIER_MAP: Record<number, BigNumber | undefined> = {
-  10: new BigNumber(2),
+// const LEVEL_TO_MULTIPLIER_MAP: Record<number, BigNumber> = {
+//   0: INTEGERS.ONE,
+//   1: INTEGERS.ONE,
+//   2: new BigNumber(2),
+//   3: new BigNumber(3),
+//   4: new BigNumber(4),
+//   5: new BigNumber(5),
+//   6: new BigNumber(6),
+//   7: new BigNumber(7),
+//   8: new BigNumber(8),
+//   9: new BigNumber(9),
+//   10: new BigNumber(10),
+//   11: new BigNumber(11),
+//   12: new BigNumber(12),
+//   13: new BigNumber(13),
+//   14: new BigNumber(14),
+// };
+
+const LEVEL_TO_MULTIPLIER_MAP: Record<number, BigNumber> = {
+  0: INTEGERS.ONE,
+  1: INTEGERS.ONE,
+  2: INTEGERS.ONE,
+  3: new BigNumber(1.5),
+  4: new BigNumber(2),
+  5: new BigNumber(2.5),
+  6: new BigNumber(3),
+  7: new BigNumber(3.5),
+  8: new BigNumber(4),
+  9: new BigNumber(4.5),
+  10: new BigNumber(5),
+  11: new BigNumber(5.5),
+  12: new BigNumber(6),
+  13: new BigNumber(6.5),
+  14: new BigNumber(7),
 };
 
 const CHAIN_ID_TO_WEB3_PROVIDER_URL_MAP: Record<ChainId, string | undefined> = {
@@ -101,7 +133,7 @@ const CHAIN_ID_TO_METADATA_MAP: Record<ChainId, Metadata | undefined> = {
 
 const CHAIN_TO_MARKET_TO_EXTRA_MULTIPLIER_MAP: Record<ChainId, Record<string, Decimal>> = {
   [ChainId.ArbitrumOne]: {
-    0: new BigNumber(1),
+    0: new BigNumber(1), // This is an example (using a multiplier of 1 doesn't do anything)
   },
   [ChainId.Base]: {},
   [ChainId.Berachain]: {},
@@ -122,10 +154,10 @@ export async function calculateRegularAirdrop() {
   });
 
   const allFinalPoints = [
-    ...await getAllPointsByNetworkId(ChainId.ArbitrumOne, false),
-    ...await getAllPointsByNetworkId(ChainId.Mantle, false),
-    ...await getAllPointsByNetworkId(ChainId.PolygonZkEvm, false),
-    ...await getAllPointsByNetworkId(ChainId.XLayer, false),
+    ...await getAllPointsByNetworkId(ChainId.ArbitrumOne, true),
+    ...await getAllPointsByNetworkId(ChainId.Mantle, true),
+    ...await getAllPointsByNetworkId(ChainId.PolygonZkEvm, true),
+    ...await getAllPointsByNetworkId(ChainId.XLayer, true),
   ];
   const totalUserPoints = allFinalPoints.reduce((acc, struct) => acc.plus(struct.totalUserPoints), INTEGERS.ZERO);
   const dataToWrite: OutputFile = {
@@ -325,7 +357,7 @@ function getPoolAddressToVirtualLiquidityPositionsAndEventsFromFile(
     }, {} as Record<string, LiquidityPositionsAndEvents>);
 }
 
-function getUserXpLevelData(): Record<string, number> {
+function getUserXpLevelData(): Record<string, number | undefined> {
   return JSON.parse(fs.readFileSync(
     `${process.cwd()}/scripts/output/data/all-level-data.json`,
     'utf8',
@@ -334,7 +366,7 @@ function getUserXpLevelData(): Record<string, number> {
 
 function getFinalDoloAllocations(
   finalPointsStructs: FinalPointsStruct[],
-  userToLevelMap: Record<string, number>,
+  userToLevelMap: Record<string, number | undefined>,
 ) {
   let totalUserPoints = INTEGERS.ZERO;
   // Add supply data
@@ -347,7 +379,12 @@ function getFinalDoloAllocations(
       }
 
       const pointsBeforeXp = struct.userToPointsMap[user];
-      const points = pointsBeforeXp.times(LEVEL_TO_MULTIPLIER_MAP[userToLevelMap[user]] ?? INTEGERS.ONE);
+      const userLevel = userToLevelMap[user];
+      const levelMultiplier = userLevel ? LEVEL_TO_MULTIPLIER_MAP[userLevel] : INTEGERS.ONE;
+      if (levelMultiplier.isNaN()) {
+        throw new Error(`Could not find level multiplier: ${user} // ${userLevel}`);
+      }
+      const points = pointsBeforeXp.times(levelMultiplier);
 
       totalUserPoints = totalUserPoints.plus(points);
       allUsersMap[user] = allUsersMap[user].plus(points);
