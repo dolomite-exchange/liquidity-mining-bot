@@ -37,6 +37,7 @@
     "execute:rectify-old-pendle-epochs": "SCRIPT=true npx ts-node scripts/rectify-old-pendle-epochs.ts",
     "execute:transform-csv-to-json": "SCRIPT=true npx ts-node scripts/transform-csv-to-json.ts",
     "execute:transform-all-pendle-minerals-to-events": "SCRIPT=true npx ts-node scripts/transform-all-pendle-minerals-to-events.ts",
+    "execute:transform-regular-airdrop-to-json": "SCRIPT=true npx ts-node scripts/transform-regular-airdrop-to-json.ts",
     "execute:verify-all-prices": "SCRIPT=true npx ts-node scripts/verify-all-prices.ts",
     "flow:arb-stip:arbitrum": "ENV_FILENAME=local.arbitrum.production.env npx ts-node scripts/flow/execute-arb-stip-flow.ts",
     "flow:pendle-arb-stip:arbitrum": "ENV_FILENAME=local.arbitrum.production.env npx ts-node scripts/flow/execute-pendle-arb-stip-flow.ts",
