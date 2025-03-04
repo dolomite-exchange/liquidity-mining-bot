@@ -23,6 +23,7 @@
     "execute:calculate-otoken-rewards": "SCRIPT=true npx ts-node scripts/calculate-otoken-rewards.ts",
     "execute:calculate-otoken-season-config": "SCRIPT=true npx ts-node scripts/calculate-otoken-season-config.ts",
     "execute:calculate-regular-airdrop": "SCRIPT=true ENV_FILENAME=.env.production npx ts-node scripts/calculate-regular-airdrop.ts",
+    "execute:chunk-regular-airdrop-to-json": "SCRIPT=true npx ts-node scripts/chunk-regular-airdrop-to-json.ts",
     "execute:get-all-berachain-testnet-users": "NETWORK_ID=80084 SCRIPT=true npx ts-node scripts/get-all-berachain-testnet-users.ts",
     "execute:get-queried-berachain-testnet-users": "NETWORK_ID=80084 SCRIPT=true npx ts-node scripts/get-queried-berachain-testnet-users.ts",
     "execute:get-all-events": "SCRIPT=true npx ts-node scripts/get-all-events.ts",
