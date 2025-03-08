@@ -27,17 +27,17 @@ import {
 /* eslint-enable */
 
 const OUTPUT_DIRECTORY = `${process.cwd()}/scripts/output/airdrop-results`;
-const OUTPUT_FILE_NAME = `${OUTPUT_DIRECTORY}/regular-airdrop-data-all_networks-1x_supply-0_5x_borrow_1x_level-additional_level_amounts-binary_250k_cap.json`;
+const OUTPUT_FILE_NAME = `${OUTPUT_DIRECTORY}/regular-airdrop-data-all_networks-1x_supply-0_5x_borrow_1x_level-additional_level_amounts-binary_500k_cap.json`;
 const TOTAL_LEVEL_ADDITION = new BigNumber(parseEther(`${3_050_000}`).toString());
 /**
  * Max amount of DOLO a user can get from their level multiplier bonus
  */
-const DOLO_CAP_FOR_LEVEL_MULTIPLIER = new BigNumber(parseEther(`${250_000}`).toString())
+const DOLO_CAP_FOR_LEVEL_MULTIPLIER = new BigNumber(parseEther(`${500_000}`).toString())
 // 66,147,106 == 89,999,999.059025008715581808 (100k cap)
 // 56,261,159 == 89,999,999.167930390554439746 (250k cap)
 // 49,220,483 == 89,999,999.509053658496937593 (500k cap)
 
-const TOTAL_DOLO_TOKENS = new BigNumber(parseEther(`${56_261_159}`).toString()).minus(TOTAL_LEVEL_ADDITION);
+const TOTAL_DOLO_TOKENS = new BigNumber(parseEther(`${49_220_483}`).toString()).minus(TOTAL_LEVEL_ADDITION);
 
 const SUPPLY_MULTIPLIER = INTEGERS.ONE;
 const BORROW_MULTIPLIER = new BigNumber(0.5);
@@ -444,6 +444,8 @@ function getFinalDoloAllocations(
       totalLevelDistributed = totalLevelDistributed.plus(levelAmount);
     }
   });
+
+
 
   Logger.info({
     message: 'DOLO distribution stats',
