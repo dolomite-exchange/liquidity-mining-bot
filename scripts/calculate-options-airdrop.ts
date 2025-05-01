@@ -1,4 +1,4 @@
-import { BigNumber } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import { ethers } from 'ethers';
 import { readFileSync } from 'fs';
 import path from 'path';
@@ -6,9 +6,11 @@ import { ChainId } from '../src/lib/chain-id';
 import { writeOutputFile } from './lib/file-helpers';
 import { calculateMerkleRootAndProofs } from './lib/utils';
 
+const AIRDROP_AMOUNT = ethers.utils.parseEther(`${100_000_000}`);
+
 function readJson(network: ChainId): any {
   return JSON.parse(
-    readFileSync(path.join(process.cwd(), 'scripts/output/minerals', `minerals-${network}.json`)).toString(),
+    readFileSync(path.join(process.cwd(), 'scripts/output/minerals-transformations', `minerals-${network}.json`)).toString(),
   );
 }
 
@@ -45,9 +47,10 @@ async function calculateOptionsAirdrop() {
     }
   }
 
-  const airdropAmount = ethers.utils.parseEther(`${100_000_000}`);
+  let totalAmount = INTEGERS.ZERO;
   for (const key in userToAmountMap) {
-    userToAmountMap[key] = new BigNumber(airdropAmount.mul(userToAmountMap[key]).div(totalMinerals).toString())
+    userToAmountMap[key] = new BigNumber(AIRDROP_AMOUNT.mul(userToAmountMap[key]).div(totalMinerals).toString())
+    totalAmount = totalAmount.plus(userToAmountMap[key]);
   }
 
   const {
@@ -67,7 +70,7 @@ async function calculateOptionsAirdrop() {
   const jsonResult = {
     merkleRoot,
     mineralsTotal: totalMinerals.toString(),
-    airdropAmount: airdropAmount.toString(),
+    airdropAmount: totalAmount.toString(),
     data: finalResults,
   };
 
