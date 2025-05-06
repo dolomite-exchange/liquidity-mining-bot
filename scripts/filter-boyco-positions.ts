@@ -48,6 +48,7 @@ async function filterBoycoPositions() {
 
   const totalByHash = {} as Record<string, Integer>;
   let total = INTEGERS.ZERO;
+  const concreteBeraEthDepositor = '0x3451e9e21dc9705ccaeb0e61971862897818be23';
   filtered.forEach(f => {
     const index = f.token_1_ids.indexOf(VE_DOLO_P_ADDRESS);
     if (index === -1) {
@@ -58,6 +59,9 @@ async function filterBoycoPositions() {
     }
 
     const amount = new BigNumber(f.token_1_amounts[index]);
+    if (f.account_address.toLowerCase() === concreteBeraEthDepositor.toLowerCase()) {
+      console.log('concreteBeraEthDepositor amount:', amount.toFixed());
+    }
 
     totalByHash[f.market_id] = totalByHash[f.market_id].plus(amount);
     total = total.plus(amount);
