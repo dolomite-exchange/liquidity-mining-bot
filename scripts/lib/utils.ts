@@ -4,7 +4,7 @@ import { MerkleTree } from 'merkletreejs';
 
 export interface MerkleRootAndProofs {
   merkleRoot: string;
-  walletAddressToLeavesMap: Record<string, AmountAndProof>; // wallet ==> proofs + amounts
+  walletAddressToProofsMap: Record<string, AmountAndProof>; // wallet ==> proofs + amounts
 }
 
 export interface AmountAndProof {
@@ -12,7 +12,9 @@ export interface AmountAndProof {
   proofs: string[];
 }
 
-export function calculateMerkleRootAndProofs(userToAmounts: Record<string, Integer>): MerkleRootAndProofs {
+export async function calculateMerkleRootAndProofs(
+  userToAmounts: Record<string, Integer>,
+): Promise<MerkleRootAndProofs> {
   const walletAddressToFinalDataMap: Record<string, AmountAndProof> = {};
   const leaves: string[] = [];
   const userAccounts = Object.keys(userToAmounts);
@@ -32,12 +34,12 @@ export function calculateMerkleRootAndProofs(userToAmounts: Record<string, Integ
   });
 
   const tree = new MerkleTree(leaves, keccak256, { sort: true });
-  const merkleRoot = tree.getHexRoot();
 
+  // Update proofs for final data
   userAccounts.forEach(account => {
-    const finalData = walletAddressToFinalDataMap[account.toLowerCase()];
-    finalData.proofs = tree.getHexProof(finalData.proofs[0]);
+    walletAddressToFinalDataMap[account.toLowerCase()].proofs
+      = tree.getHexProof(walletAddressToFinalDataMap[account].proofs[0]);
   });
 
-  return { merkleRoot, walletAddressToLeavesMap: walletAddressToFinalDataMap };
+  return { merkleRoot: tree.getHexRoot(), walletAddressToProofsMap: walletAddressToFinalDataMap };
 }

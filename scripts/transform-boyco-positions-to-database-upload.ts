@@ -1,12 +1,16 @@
+import { chunkArray } from '../src/lib/utils';
 import { readOutputFile, writeOutputFile } from './lib/file-helpers';
 
 async function filterBoycoPositions() {
-  const { userData } = JSON.parse(readOutputFile('royco/boyco-allocations-FINAL.json')!)
+  const { userData } = JSON.parse(readOutputFile('royco/boyco-partner-allocations-FINAL.json')!)
   const result = Object.entries(userData).map(([user, data]: [string, any]) => {
     return [user, data.amount, data.proofs];
   });
 
-  writeOutputFile('royco/boyco-allocations-FINAL-DB.json', result);
+  const chunks = chunkArray(result, 10_000);
+  chunks.forEach((chunk, i) => {
+    writeOutputFile(`royco/boyco-partner-allocations-FINAL-DB-${i}.json`, chunk);
+  });
 }
 
 filterBoycoPositions()

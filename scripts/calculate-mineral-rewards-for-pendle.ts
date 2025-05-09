@@ -15,7 +15,8 @@ import {
 } from './lib/config-helper';
 import { MineralPendleConfigFile, MineralPendleOutputFile } from './lib/data-types';
 import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
-import { BLACKLIST_ADDRESSES, calculateMerkleRootAndProofs } from './lib/rewards';
+import { BLACKLIST_ADDRESSES } from './lib/rewards';
+import { calculateMerkleRootAndProofs } from './lib/utils';
 
 /* eslint-enable */
 
@@ -205,14 +206,14 @@ export async function calculateMineralRewardsForPendle(
     }, {} as Record<string, Integer>);
     const {
       merkleRoot: calculatedMerkleRoot,
-      walletAddressToLeavesMap,
-    } = calculateMerkleRootAndProofs(userToAmountMap);
+      walletAddressToProofsMap,
+    } = await calculateMerkleRootAndProofs(userToAmountMap);
 
     Object.keys(mineralOutputFile.users).forEach((user) => {
       mineralOutputFile.users[user] = {
         ...mineralOutputFile.users[user],
-        amount: walletAddressToLeavesMap[user].amount,
-        proofs: walletAddressToLeavesMap[user].proofs,
+        amount: walletAddressToProofsMap[user].amount,
+        proofs: walletAddressToProofsMap[user].proofs,
       };
     });
     mineralOutputFile.metadata.merkleRoot = calculatedMerkleRoot;

@@ -40,11 +40,11 @@ async function transformRegularAirdropToJson() {
     totalDoloDistributed = totalDoloDistributed.plus(amount);
   });
 
-  const proofData = calculateMerkleRootAndProofs(addressToAmountMap);
+  const proofData = await calculateMerkleRootAndProofs(addressToAmountMap);
 
-  const finalUserResult = Object.keys(proofData.walletAddressToLeavesMap).reduce((memo, user) => {
+  const finalUserResult = Object.keys(proofData.walletAddressToProofsMap).reduce((memo, user) => {
     memo[user] = {
-      ...proofData.walletAddressToLeavesMap[user],
+      ...proofData.walletAddressToProofsMap[user],
       isSmartContract: addressToIsSmartContractMap[user] ?? false,
       level: addressToLevelMap[user] ?? 0,
     };

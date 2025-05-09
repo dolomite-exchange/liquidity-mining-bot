@@ -226,15 +226,15 @@ export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH
     }, {});
     const {
       merkleRoot: calculatedMerkleRoot,
-      walletAddressToLeavesMap,
-    } = calculateMerkleRootAndProofs(userToAmountMap);
+      walletAddressToProofsMap,
+    } = await calculateMerkleRootAndProofs(userToAmountMap);
 
     merkleRoot = calculatedMerkleRoot;
-    userToMineralsMapForFile = Object.keys(walletAddressToLeavesMap).reduce((memo, k) => {
+    userToMineralsMapForFile = Object.keys(walletAddressToProofsMap).reduce((memo, k) => {
       memo[k] = {
-        amount: walletAddressToLeavesMap[k].amount,
+        amount: walletAddressToProofsMap[k].amount,
         multiplier: userToMineralsDataMap[k].multiplier.toFixed(2),
-        proofs: walletAddressToLeavesMap[k].proofs,
+        proofs: walletAddressToProofsMap[k].proofs,
       }
       return memo;
     }, {} as Record<string, UserMineralAllocationForFile>);

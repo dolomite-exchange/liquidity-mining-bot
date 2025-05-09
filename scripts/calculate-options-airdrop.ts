@@ -55,15 +55,15 @@ async function calculateOptionsAirdrop() {
 
   const {
     merkleRoot,
-    walletAddressToLeavesMap,
-  } = calculateMerkleRootAndProofs(userToAmountMap);
+    walletAddressToProofsMap,
+  } = await calculateMerkleRootAndProofs(userToAmountMap);
 
   const finalResults: any[] = [];
-  for (const wallet in walletAddressToLeavesMap) {
+  for (const wallet in walletAddressToProofsMap) {
     finalResults.push([
       wallet,
-      walletAddressToLeavesMap[wallet].amount,
-      walletAddressToLeavesMap[wallet].proofs,
+      walletAddressToProofsMap[wallet].amount,
+      walletAddressToProofsMap[wallet].proofs,
     ]);
   }
 

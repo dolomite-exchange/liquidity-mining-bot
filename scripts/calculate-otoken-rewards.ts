@@ -25,11 +25,11 @@ import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/fi
 import { setupRemapping } from './lib/remapper';
 import {
   calculateFinalPoints,
-  calculateMerkleRootAndProofs,
   calculateVirtualLiquidityPoints,
   InterestOperation,
   processEventsUntilEndTimestamp,
 } from './lib/rewards';
+import { calculateMerkleRootAndProofs } from './lib/utils';
 
 const REWARD_MULTIPLIERS_MAP = {};
 
@@ -173,11 +173,11 @@ export async function calculateOTokenRewards(
     return memo;
   }, {});
 
-  const { merkleRoot, walletAddressToLeavesMap } = calculateMerkleRootAndProofs(userToOTokenRewards);
+  const { merkleRoot, walletAddressToProofsMap } = await calculateMerkleRootAndProofs(userToOTokenRewards);
 
   const oTokenFileName = getOTokenFinalizedFileNameWithPath(networkId, oTokenType, epoch);
   const oTokenOutputFile: OTokenOutputFile = {
-    users: walletAddressToLeavesMap,
+    users: walletAddressToProofsMap,
     metadata: {
       epoch,
       merkleRoot,

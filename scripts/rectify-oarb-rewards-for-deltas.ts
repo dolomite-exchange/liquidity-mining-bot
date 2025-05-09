@@ -2,7 +2,7 @@ import { BigNumber } from '@dolomite-exchange/dolomite-margin';
 import { ethers } from 'ethers';
 import fs from 'fs';
 import '../src/lib/env'
-import { calculateMerkleRootAndProofs } from './lib/rewards';
+import { calculateMerkleRootAndProofs } from './lib/utils';
 
 interface OutputFile {
   epochs: {
@@ -67,10 +67,10 @@ async function start() {
   });
   console.log(`Total added to epoch ${FIXED_EPOCH_NUMBER}:`, total.div(1e18).toFixed());
 
-  const accountToValuesMap = calculateMerkleRootAndProofs(walletToDeltasMap);
+  const accountToValuesMap = await calculateMerkleRootAndProofs(walletToDeltasMap);
   const outputFileName = `${FINALIZED_FOLDER_NAME}/oarb-season-0-epoch-deltas-output.json`;
   const outputFile = readOutputFile(outputFileName);
-  outputFile.epochs[FIXED_EPOCH_NUMBER] = accountToValuesMap.walletAddressToLeavesMap;
+  outputFile.epochs[FIXED_EPOCH_NUMBER] = accountToValuesMap.walletAddressToProofsMap;
   outputFile.metadata[FIXED_EPOCH_NUMBER] = {
     merkleRoot: accountToValuesMap.merkleRoot,
     isFinalized: true,

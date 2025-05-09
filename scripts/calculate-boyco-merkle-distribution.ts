@@ -127,7 +127,7 @@ async function calculateBoycoMerkleDistribution() {
   await readConcreteData(walletToVeDoloMap);
   await readBoycoMarketData(walletToVeDoloMap);
 
-  const merkleRootData = calculateMerkleRootAndProofs(walletToVeDoloMap);
+  const merkleRootData = await calculateMerkleRootAndProofs(walletToVeDoloMap);
 
   const veDoloFigures = Object.values(walletToVeDoloMap);
   const totalVeDolo = veDoloFigures.reduce((prev, curr) => prev.plus(curr));
@@ -147,7 +147,7 @@ async function calculateBoycoMerkleDistribution() {
       pendleTotal: PENDLE_TOTAL.toFixed(),
       hourglassTotal: HOURGLASS_TOTAL.toFixed(),
     },
-    userData: merkleRootData.walletAddressToLeavesMap,
+    userData: merkleRootData.walletAddressToProofsMap,
   }
   writeOutputFile(`royco/boyco-allocations-FINAL.json`, finalResult);
 }
