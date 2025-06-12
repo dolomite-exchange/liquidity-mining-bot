@@ -75,6 +75,7 @@ export interface MineralPendleConfigFile extends ConfigFile<MineralPendleConfigE
 
 export enum OTokenType {
   oARB = 'oarb',
+  oDOLO = 'odolo',
   oMATIC = 'omatic',
 }
 
@@ -87,6 +88,22 @@ export interface OTokenOutputFile {
     [walletAddressLowercase: string]: {
       amount: string // big int
       proofs: string[]
+    }
+  };
+  metadata: {
+    epoch: number;
+    merkleRoot: string | null;
+    marketTotalPointsForEpoch: {
+      [market: string]: string // big int
+    }
+  };
+}
+
+export interface ODoloOutputFile {
+  users: {
+    [walletAddressLowercase: string]: {
+      amount: string // big int
+      leaf: string
     }
   };
   metadata: {

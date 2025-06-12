@@ -9,6 +9,7 @@ import {
   getLiquiditySnapshots,
   getMakerTrades,
   getTakerTrades,
+  getTimestampToBlockNumberMap,
   getTrades,
   getTransfers,
   getVaporizations,
@@ -31,6 +32,7 @@ import { ChainId } from '../../src/lib/chain-id';
 import { ONE_ETH_WEI } from '../../src/lib/constants';
 import Pageable from '../../src/lib/pageable';
 import { POOL_INFO } from '../../src/lib/pendle/configuration';
+import { fetchPendleUserBalanceSnapshotBatch } from '../../src/lib/pendle/fetcher';
 import { getMineralFinalizedFileNameWithPath, getMineralPendleConfigFileNameWithPath } from './config-helper';
 import { MineralPendleConfigFile, MineralPendleOutputFile } from './data-types';
 import { readFileFromGitHub } from './file-helpers';
@@ -49,6 +51,7 @@ import {
   VirtualLiquiditySnapshotDeltaPar,
 } from './rewards';
 
+const PENDLE_FETCH_FREQUENCY = 60 * 60; // one hour in seconds
 const TEN = new BigNumber(10);
 
 export function getAccountBalancesByMarket(
@@ -210,7 +213,7 @@ export async function getPoolAddressToVirtualLiquidityPositionsAndEvents(
   if (ignorePendle) {
     syAddressToPendlePositionsAndEventsMap = {};
   } else {
-    syAddressToPendlePositionsAndEventsMap = await getPendleSyAddressToLiquidityPositionAndEvents(
+    syAddressToPendlePositionsAndEventsMap = await getPendleSyAddressToLiquidityPositionAndEventsForOToken(
       networkId,
       startTimestamp,
       endTimestamp,
@@ -359,7 +362,7 @@ async function getOTokenVestingLiquidityPositionAndEvents(
   return { virtualLiquidityBalances, userToLiquiditySnapshots };
 }
 
-async function getPendleSyAddressToLiquidityPositionAndEvents(
+async function getPendleSyAddressToLiquidityPositionAndEventsFromGitHub(
   networkId: number,
   startTimestamp: number,
   endTimestamp: number,
@@ -399,6 +402,65 @@ async function getPendleSyAddressToLiquidityPositionAndEvents(
       const syAddress = POOL_INFO[networkId as ChainId][marketId].SY;
       syAddressToVirtualLiquidityPositions[syAddress] = { virtualLiquidityBalances, userToLiquiditySnapshots: {} };
     });
+  }
+
+  return syAddressToVirtualLiquidityPositions;
+}
+
+async function getPendleSyAddressToLiquidityPositionAndEventsForOToken(
+  networkId: number,
+  startTimestamp: number,
+  endTimestamp: number,
+): Promise<Record<string, LiquidityPositionsAndEvents>> {
+  const virtualLiquidityBalances: AccountToVirtualLiquidityBalanceMap = {};
+
+  const duration = endTimestamp - startTimestamp;
+  if (duration % PENDLE_FETCH_FREQUENCY !== 0) {
+    return Promise.reject(
+      new Error(`Invalid duration for getting Pendle events. Expected to be divisible by ${PENDLE_FETCH_FREQUENCY}`),
+    );
+  }
+
+  const numberOfTimestampsToFetch = Math.ceil(duration / PENDLE_FETCH_FREQUENCY);
+  const timestamps = Array.from(
+    { length: numberOfTimestampsToFetch },
+    (_, i) => startTimestamp + (PENDLE_FETCH_FREQUENCY * i),
+  );
+  const blockNumbers = Object.values(await getTimestampToBlockNumberMap(timestamps));
+
+  const marketIdToPoolInfoMap = POOL_INFO[networkId as ChainId];
+  const syAddressToVirtualLiquidityPositions = {};
+  for (const marketId of Object.keys(marketIdToPoolInfoMap)) {
+    const userToBalanceMapsForBlockNumbers = await fetchPendleUserBalanceSnapshotBatch(
+      parseInt(marketId),
+      blockNumbers,
+    );
+    const userToPositionMap = {} as Record<string, VirtualLiquidityPosition>;
+    for (const userToBalanceMap of userToBalanceMapsForBlockNumbers) {
+      for (let [user, balance] of Object.entries(userToBalanceMap)) {
+        if (!userToPositionMap[user]) {
+          userToPositionMap[user] = {
+            id: `PENDLE-${user}-${marketId}`,
+            effectiveUser: user,
+            marketId: Number(marketId),
+            balancePar: INTEGERS.ZERO,
+          };
+        } else {
+          const amountForFrequency = balance.times(PENDLE_FETCH_FREQUENCY).div(duration);
+          userToPositionMap[user].balancePar = userToPositionMap[user].balancePar.plus(amountForFrequency);
+        }
+      }
+    }
+
+    const positions = Object.values(userToPositionMap);
+    parseVirtualLiquidityPositions(
+      virtualLiquidityBalances,
+      positions,
+      startTimestamp,
+    );
+
+    const syAddress = POOL_INFO[networkId as ChainId][marketId].SY;
+    syAddressToVirtualLiquidityPositions[syAddress] = { virtualLiquidityBalances, userToLiquiditySnapshots: {} };
   }
 
   return syAddressToVirtualLiquidityPositions;
