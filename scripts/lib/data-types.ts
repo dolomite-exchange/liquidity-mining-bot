@@ -108,7 +108,8 @@ export interface ODoloOutputFile {
   };
   metadata: {
     epoch: number;
-    merkleRoot: string | null;
+    totalUsers: number;
+    merkleRoot: string;
     marketTotalPointsForEpoch: {
       [market: string]: string // big int
     }

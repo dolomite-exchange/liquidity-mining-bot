@@ -56,7 +56,10 @@ export async function setupRemapping(chainId: ChainId, endBlockNumber: number): 
 
     if (isScript()) {
       const fileName = 'external-remapping.json';
-      console.log('Writing external remapping to file:', fileName);
+      Logger.info({
+        file: __filename,
+        message: 'Writing external remapping to file:'
+      })
       writeOutputFile(fileName, remapping);
     } else {
       Logger.info({

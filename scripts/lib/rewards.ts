@@ -54,11 +54,11 @@ interface VirtualLiquiditySnapshotBase {
 }
 
 export interface VirtualLiquiditySnapshotDeltaPar extends VirtualLiquiditySnapshotBase {
-  deltaPar: BigNumber; // can be positive or negative
+  deltaPar: Decimal; // can be positive or negative
 }
 
 export interface VirtualLiquiditySnapshotBalance extends VirtualLiquiditySnapshotBase {
-  balancePar: BigNumber; // the user's balance
+  balancePar: Decimal; // the user's balance
 }
 
 export interface LiquidityPositionsAndEvents {
@@ -176,7 +176,7 @@ export class VirtualBalanceAndRewardPoints {
     }
 
     let pointsUpdate = INTEGERS.ZERO;
-    if (this.balancePar.gt(0)) {
+    if (this.balancePar.gt(INTEGERS.ZERO)) {
       const timeDelta = new BigNumber(liquiditySnapshot.timestamp - this.lastUpdated);
       pointsUpdate = this.balancePar.times(timeDelta);
       this.equityPoints = this.equityPoints.plus(pointsUpdate);
@@ -365,6 +365,10 @@ export function addToBlacklist(account: string): void {
   blacklistMap[account.toLowerCase()] = true;
 }
 
+/**
+ * @return A map from pool address to total points earned by the pool. This is used to divvy up earnings by the pool to
+ * each user of the pool.
+ */
 export function calculateVirtualLiquidityPoints(
   poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPositionsAndEvents>,
   startTimestamp: number,
@@ -477,6 +481,7 @@ export function calculateFinalPoints(
     const totalMarketToLiquidityPoolPointsMap = userToMarketToPointsMap[pool];
     const totalPoolEquityPoints = poolToTotalSubLiquidityPoints[pool];
     let totalWhitelistPoints = INTEGERS.ZERO;
+
     if (totalLiquidityPoolPoints && totalPoolEquityPoints && totalMarketToLiquidityPoolPointsMap) {
       const events = poolToVirtualLiquidityPositionsAndEvents[pool];
       Object.keys(events.virtualLiquidityBalances).forEach(account => {

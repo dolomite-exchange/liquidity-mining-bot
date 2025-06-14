@@ -12,10 +12,7 @@ import Pageable from '../src/lib/pageable';
 import BlockStore from '../src/lib/stores/block-store';
 import MarketStore from '../src/lib/stores/market-store';
 import { readODoloMetadataFromApi } from './lib/api-helpers';
-import {
-  getOTokenFinalizedFileNameWithPath,
-  getSeasonForOTokenType,
-} from './lib/config-helper';
+import { getOTokenFinalizedFileNameWithPath, getSeasonForOTokenType } from './lib/config-helper';
 import { ODoloOutputFile, OTokenType } from './lib/data-types';
 import {
   getAccountBalancesByMarket,
@@ -34,42 +31,31 @@ import { calculateMerkleRootAndLeafs } from './lib/utils';
 
 const DEFAULT_EQUITY_PER_SECOND = INTEGERS.ONE;
 const ODOLO_TYPE = OTokenType.oDOLO;
-const REWARD_MULTIPLIERS_MAP = {};
 
-export async function calculateODoloRewards(
+export async function calculateAggregateOdoloRewards(
   epoch: number = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10),
 ): Promise<{
   epoch: number;
   merkleRoot: string | null
 }> {
   const networkId = dolomite.networkId;
-  const oDoloConfig = await readODoloMetadataFromApi(epoch);
 
-  if (Number.isNaN(epoch) || !oDoloConfig.epochs[epoch]) {
+  if (Number.isNaN(epoch)) {
     return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
   }
 
-  const blockStore = new BlockStore();
-  await blockStore._update();
+  const oDoloConfig = await readODoloMetadataFromApi(epoch);
 
-  const marketStore = new MarketStore(blockStore, true);
-
-  if (epoch === oDoloConfig.currentEpochIndex) {
-    // There's nothing to do. The week has not passed yet
-    return { epoch, merkleRoot: null };
-  }
-
-  // We need to check if `newEndBlockNumberResult` is the last block of the week
-  const startTimestamp = oDoloConfig.epochStartTimestamp;
-  const startBlockNumber = (await getLatestBlockDataByTimestamp(startTimestamp)).blockNumber;
-  const endTimestamp = startTimestamp + ONE_WEEK_SECONDS;
-  const endBlockNumber = (await getLatestBlockDataByTimestamp(startTimestamp)).blockNumber;
+  const allNetworks = Object.keys(oDoloConfig.allChainWeights) as ChainId[]
 
   // The week is over if the block is at the end OR if the next block goes into next week
-  const nextBlockData = await getBlockDataByBlockNumber(endBlockNumber + 1);
-  const isTimeElapsed = !!nextBlockData && nextBlockData.timestamp > endTimestamp;
-  if (!isTimeElapsed) {
+  const isReadyToPostData = !!nextBlockData && nextBlockData.timestamp > endTimestamp;
+  if (!isReadyToPostData) {
     // There's nothing to do. The week has not passed yet
+    Logger.info({
+      file: __filename,
+      message: 'Epoch has not passed yet. Returning...',
+    });
     return { epoch, merkleRoot: null };
   }
 
@@ -89,6 +75,7 @@ export async function calculateODoloRewards(
   }
 
   Logger.info({
+    file: __filename,
     message: `DolomiteMargin data for oDOLO rewards`,
     blockRewardStart: startBlockNumber,
     blockRewardStartTimestamp: startTimestamp,
@@ -112,14 +99,15 @@ export async function calculateODoloRewards(
 
   const tokenAddressToMarketMap = marketStore.getTokenAddressToMarketMap();
   const tokenAddressToRewardMap = oDoloConfig.allChainWeights[networkId as ChainId];
-  const marketToPointsPerSecondMap = {} as Record<string, Integer>;
-  const oTokenRewardWeiMap = Object.keys(tokenAddressToRewardMap).reduce((acc, tokenAddress) => {
+  const marketToPointsPerSecondMap: Record<string, Integer> = {};
+  const oTokenRewardWeiMap: Record<string, Integer> = Object.keys(tokenAddressToRewardMap).reduce((acc, tokenAddress) => {
     const marketId = tokenAddressToMarketMap[tokenAddress.toLowerCase()].marketId;
     acc[marketId] = new BigNumber(parseEther(tokenAddressToRewardMap[tokenAddress].toFixed(18)).toString());
     marketToPointsPerSecondMap[marketId] = DEFAULT_EQUITY_PER_SECOND;
     return acc;
   }, {} as Record<string, Integer>);
   Logger.info({
+    file: __filename,
     message: 'oDOLO Rewards',
     tokenAddressToRewardMap,
   })
@@ -166,7 +154,7 @@ export async function calculateODoloRewards(
     poolToTotalSubLiquidityPoints,
   );
 
-  const userToOTokenRewards = Object.keys(userToMarketToPointsMap).reduce<Record<string, Integer>>((memo, user) => {
+  const userToOTokenRewards: Record<string, Integer> = Object.keys(userToMarketToPointsMap).reduce((memo, user) => {
     Object.keys(userToMarketToPointsMap[user]).forEach(market => {
       const userPoints = userToMarketToPointsMap[user][market];
       const totalPoints = marketToPointsMap[market];
@@ -174,10 +162,15 @@ export async function calculateODoloRewards(
         memo[user] = INTEGERS.ZERO;
       }
 
-      memo[user] = memo[user].plus(oTokenRewardWeiMap[market].times(userPoints).div(totalPoints));
+      memo[user] = memo[user].plus(oTokenRewardWeiMap[market].times(userPoints).dividedToIntegerBy(totalPoints));
+
+      if (memo[user].eq(INTEGERS.ZERO)) {
+        // Remove the user if the balance is still zero
+        delete memo[user];
+      }
     });
     return memo;
-  }, {});
+  }, {} as Record<string, Integer>);
 
   const { merkleRoot, walletAddressToLeafMap } = await calculateMerkleRootAndLeafs(userToOTokenRewards);
 
@@ -185,6 +178,7 @@ export async function calculateODoloRewards(
   const oTokenOutputFile: ODoloOutputFile = {
     users: walletAddressToLeafMap,
     metadata: {
+      totalUsers: Object.keys(walletAddressToLeafMap).length,
       epoch,
       merkleRoot,
       marketTotalPointsForEpoch: {
@@ -200,6 +194,7 @@ export async function calculateODoloRewards(
     await writeFileToGitHub(oTokenFileName, oTokenOutputFile, false);
   } else {
     Logger.info({
+      file: __filename,
       message: 'Skipping output file upload due to script execution',
     });
     const season = getSeasonForOTokenType(ODOLO_TYPE);
@@ -210,7 +205,7 @@ export async function calculateODoloRewards(
 }
 
 if (isScript()) {
-  calculateODoloRewards()
+  calculateAggregateOdoloRewards()
     .then(() => {
       console.log('Finished executing script!');
     })

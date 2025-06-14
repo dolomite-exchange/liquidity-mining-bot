@@ -47,8 +47,7 @@ export async function calculateMerkleRootAndProofs(
 
   // Update proofs for final data
   userAccounts.forEach(account => {
-    walletAddressToFinalDataMap[account.toLowerCase()].proofs
-      = tree.getHexProof(walletAddressToFinalDataMap[account].proofs[0]);
+    walletAddressToFinalDataMap[account].proofs = tree.getHexProof(walletAddressToFinalDataMap[account].proofs[0]);
   });
 
   return { merkleRoot: tree.getHexRoot(), walletAddressToProofsMap: walletAddressToFinalDataMap };
