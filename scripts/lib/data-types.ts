@@ -116,6 +116,35 @@ export interface ODoloOutputFile {
   };
 }
 
+export interface ODoloMetadataPerNetwork {
+  totalUsers: number;
+  amount: string; // big int
+}
+
+export interface ODoloAggregateUserData {
+  amount: string // big int
+  amountPerNetwork: {
+    [network: string]: {
+      amount: string; // big int
+    };
+  };
+  leaf: string;
+}
+
+export interface ODoloAggregateOutputFile {
+  users: {
+    [walletAddressLowercase: string]: ODoloAggregateUserData;
+  };
+  metadata: {
+    epoch: number;
+    totalUsers: number;
+    merkleRoot: string;
+    metadataPerNetwork: {
+      [network: string]: ODoloMetadataPerNetwork;
+    };
+  };
+}
+
 export interface OTokenConfigEpoch extends EpochConfig {
   oTokenAmount: string;
   rewardWeights: Record<string, string>;
