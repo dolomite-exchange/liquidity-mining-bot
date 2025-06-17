@@ -6,13 +6,6 @@ type Market = {
   deployedBlock: number;
 };
 
-type LiquidLocker = {
-  address: string;
-  receiptToken: string;
-  lpToken: string;
-  deployedBlock: number;
-};
-
 export type YTInterestData = {
   index: ethers.BigNumber;
   accrue: ethers.BigNumber;
@@ -24,7 +17,6 @@ export interface PoolConfiguration {
   LPs: Market[];
   decimals: number;
   deployedBlock: number;
-  liquidLockers: LiquidLocker[];
 }
 
 export type UserRecord = Record<string, ethers.BigNumber>;

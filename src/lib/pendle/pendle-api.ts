@@ -4,6 +4,13 @@ import axios from 'axios';
 
 const SLEEP_DURATION_BETWEEN_QUERIES = 1_000;
 
+export type LiquidLockerData = {
+  name: string;
+  lpHolder: string;
+  receiptToken: string;
+  users: string[];
+};
+
 export class PendleAPI {
   static async queryAllTokens(tokens: string[]): Promise<string[]> {
     const allResults = await Promise.all(
@@ -25,5 +32,15 @@ export class PendleAPI {
       `https://api-v2.pendle.finance/core/v1/statistics/get-distinct-user-from-token?token=${token.toLowerCase()}&size=100000`,
     );
     return resp.data.users;
+  }
+
+  static async queryLL(
+    chainId: number,
+    market: string
+  ): Promise<LiquidLockerData[]> {
+    const resp = await axios.get(
+      `https://api-v2.pendle.finance/core/v1/statistics/liquid-locker-pools?chainId=${chainId}&lpAddress=${market.toLowerCase()}`
+    );
+    return resp.data.results;
   }
 }

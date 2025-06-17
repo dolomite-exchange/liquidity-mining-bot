@@ -14,6 +14,7 @@ export async function getWeb3RequestWithBackoff<T>(
         e.message.includes('429')
         || e.message.includes('request limit reached')
         || e.message.includes('call rate limit')
+        || e.message.includes('account limited to')
         || e.message.includes('Invalid JSON RPC response')
       ) {
         await sleep(Math.min(15_000, sleepDurationMillis * (2 ** retryCount)));

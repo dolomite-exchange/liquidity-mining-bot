@@ -92,6 +92,10 @@ export function getOTokenFinalizedFileNameWithPath(networkId: number, oTokenType
   return getFinalizedFilePath(networkId, oTokenType, season, epoch);
 }
 
+export function getODoloAggregatedFileNameWithPath(networkId: number): string {
+  return `finalized/${networkId}/odolo/odolo-aggregated-output.json`;
+}
+
 export function getOTokenTypeFromEnvironment(): OTokenType {
   const oTokenType = process.env.OTOKEN_TYPE;
   const oTokens = Object.values(OTokenType);

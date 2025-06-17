@@ -109,6 +109,8 @@ export interface ODoloOutputFile {
   metadata: {
     epoch: number;
     totalUsers: number;
+    totalODolo: string // big int
+    cumulativeODolo: string // big int
     merkleRoot: string;
     marketTotalPointsForEpoch: {
       [market: string]: string // big int
@@ -138,6 +140,8 @@ export interface ODoloAggregateOutputFile {
   metadata: {
     epoch: number;
     totalUsers: number;
+    totalODolo: string; // big int
+    cumulativeODolo: string; // big int
     merkleRoot: string;
     metadataPerNetwork: {
       [network: string]: ODoloMetadataPerNetwork;

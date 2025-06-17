@@ -35,6 +35,27 @@ async function doCall(
   });
 }
 
+export async function getAllERC20BalancesWithManualCheck(
+  token: string,
+  addresses: string[],
+  blockNumber: number,
+): Promise<BigNumber[] | null> {
+  const code = await getWeb3RequestWithBackoff(() => dolomite.web3.eth.getCode(token, blockNumber));
+  if (code == '0x') {
+    return null;
+  }
+
+  const callDatas = addresses.map((address) => ({
+    target: token,
+    callData: constants.Contracts.marketInterface.encodeFunctionData(
+      'balanceOf',
+      [address],
+    ),
+  }));
+  const balances = await aggregateMultiCall(callDatas, blockNumber);
+  return balances.map((b) => BigNumber.from(utils.defaultAbiCoder.decode(['uint256'], b)[0]));
+}
+
 export async function getAllERC20Balances(
   token: string,
   addresses: string[],

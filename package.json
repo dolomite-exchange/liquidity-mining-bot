@@ -59,8 +59,8 @@
   },
   "homepage": "https://github.com/dolomite-exchange/liquidity-mining-bot#readme",
   "dependencies": {
-    "@dolomite-exchange/dolomite-margin": "^0.12.13",
-    "@dolomite-exchange/zap-sdk": "^0.3.32",
+    "@dolomite-exchange/dolomite-margin": "^0.14.3",
+    "@dolomite-exchange/zap-sdk": "^0.4.15",
     "csv-parser": "^3.1.0",
     "dotenv-flow": "^0.4.0",
     "ethers": "^5.5.3",

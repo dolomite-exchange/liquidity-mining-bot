@@ -430,7 +430,6 @@ export function calculateFinalPoints(
   oldUserToMarketToPointsMap: Record<string, string> = {},
 ): FinalPointsStruct {
   let totalUserPoints = INTEGERS.ZERO;
-  const marketToPointsMap: Record<string, Integer> = {};
   const userToPointsMap = Object.keys(oldUserToPointsMap).reduce((memo, key) => {
     memo[key] = new BigNumber(oldUserToPointsMap[key]);
     return memo;
@@ -448,9 +447,6 @@ export function calculateFinalPoints(
       Object.keys(accountToDolomiteBalanceMap[account]![subAccount]!).forEach(market => {
         if (validMarketIdsMap[market] && !blacklistMap[account]) {
           const balanceStruct = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
-          if (!marketToPointsMap[market]) {
-            marketToPointsMap[market] = INTEGERS.ZERO;
-          }
 
           const remappedAccount = remapAccountToClaimableAccount(networkId, balanceStruct.effectiveUser);
           if (!userToPointsMap[remappedAccount]) {
@@ -466,7 +462,6 @@ export function calculateFinalPoints(
           const points = balanceStruct.rewardPoints.times(ONE_ETH_WEI).integerValue();
           totalUserPoints = totalUserPoints.plus(points);
           userToPointsMap[remappedAccount] = userToPointsMap[remappedAccount].plus(points);
-          marketToPointsMap[market] = marketToPointsMap[market].plus(points);
           userToMarketToPointsMap[remappedAccount][market] = userToMarketToPointsMap[remappedAccount][market].plus(
             points,
           );
@@ -513,15 +508,6 @@ export function calculateFinalPoints(
       });
     }
 
-    Object.keys(userToMarketToPointsMap[pool] ?? {}).forEach(market => {
-      // Get rid of points accrued by the blacklist for that particular market's total points
-      const pointsFromMarket = userToMarketToPointsMap[pool][market];
-      const whitelistPointsFromMarket = pointsFromMarket.times(totalWhitelistPoints)
-        .dividedToIntegerBy(totalLiquidityPoolPoints);
-      const blacklistPoints = pointsFromMarket.minus(whitelistPointsFromMarket);
-      marketToPointsMap[market] = marketToPointsMap[market].minus(blacklistPoints);
-    });
-
     delete userToPointsMap[pool];
 
     if (userToMarketToPointsMap[pool] && Object.keys(userToMarketToPointsMap[pool]).length === 0) {
@@ -534,6 +520,16 @@ export function calculateFinalPoints(
     if (userToPointsMap[user].eq(INTEGERS.ZERO)) {
       delete userToPointsMap[user];
     }
+  });
+
+  const marketToPointsMap: Record<string, Integer> = {};
+  Object.keys(userToMarketToPointsMap).forEach(user => {
+    Object.keys(userToMarketToPointsMap[user]).forEach(market => {
+      if (!marketToPointsMap[market]) {
+        marketToPointsMap[market] = INTEGERS.ZERO;
+      }
+      marketToPointsMap[market] = marketToPointsMap[market].plus(userToMarketToPointsMap[user][market]);
+    });
   });
 
   return { userToPointsMap, userToMarketToPointsMap, marketToPointsMap, totalUserPoints };

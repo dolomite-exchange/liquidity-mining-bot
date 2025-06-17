@@ -1,6 +1,7 @@
 import v8 from 'v8';
 // eslint-disable-next-line
 import '../src/lib/env';
+import MineralsMerkleTreeUpdater from '../build/src/lib/updaters/minerals-merkle-tree-updater';
 
 import { getDolomiteRiskParams } from './clients/dolomite';
 import { dolomite, loadAccounts } from './helpers/web3';
@@ -23,10 +24,12 @@ import LevelUpdateRequestCache from './lib/caches/level-update-request-cache';
 import LevelUpdateRequestStore from './lib/stores/level-update-request-store';
 import Logger from './lib/logger';
 import MarketStore from './lib/stores/market-store';
-import MineralsMerkleTreeUpdater from './lib/updaters/minerals-merkle-tree-updater';
+import ODoloAggregatorUpdater from './lib/updaters/odolo-aggregator-updater';
+import ODoloAggregatorMerkleTreeUpdater from './lib/updaters/odolo-merkle-tree-updater';
 import MineralsUpdater from './lib/updaters/minerals-updater';
 import VestingPositionCache from './lib/caches/vesting-position-cache';
 import VestingPositionStore from './lib/stores/vesting-position-store';
+import ODoloUpdater from './lib/updaters/odolo-updater';
 import PendleMineralsUpdater from './lib/updaters/pendle-minerals-updater';
 
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
@@ -38,6 +41,7 @@ checkBooleanValue('DETONATIONS_ENABLED');
 checkDuration('DETONATIONS_KEY_EXPIRATION_SECONDS', 1, false);
 checkDuration('DETONATIONS_POLL_INTERVAL_MS', 1000);
 checkExists('ETHEREUM_NODE_URL');
+checkExists('ETHERSCAN_API_KEY');
 checkBigNumber('GAS_PRICE_ADDITION');
 checkBigNumber('GAS_PRICE_MULTIPLIER');
 checkBigNumber('GAS_PRICE_POLL_INTERVAL_MS');
@@ -48,6 +52,8 @@ checkBooleanValue('LEVEL_REQUESTS_ENABLED');
 checkDuration('LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS', 1, false);
 checkDuration('LEVEL_REQUESTS_POLL_INTERVAL_MS', 1000, true);
 checkBooleanValue('MINERALS_ENABLED');
+checkBooleanValue('ODOLO_AGGREGATOR_ENABLED');
+checkBooleanValue('ODOLO_ENABLED');
 checkJsNumber('NETWORK_ID');
 checkBooleanValue('PENDLE_MINERALS_ENABLED');
 checkDuration('SEQUENTIAL_TRANSACTION_DELAY_MS', 100);
@@ -84,8 +90,11 @@ async function start() {
   const { riskParams } = await getDolomiteRiskParams(subgraphBlockNumber);
   const networkId = await dolomite.web3.eth.net.getId();
   const mineralsUpdater = new MineralsUpdater();
-  const pendleMineralsUpdater = new PendleMineralsUpdater();
   const mineralsMerkleTreeUpdater = new MineralsMerkleTreeUpdater(networkId);
+  const pendleMineralsUpdater = new PendleMineralsUpdater();
+  const oDoloAggregatorUpdater = new ODoloAggregatorUpdater();
+  const oDoloUpdater = new ODoloUpdater();
+  const oDoloMerkleTreeUpdater = new ODoloAggregatorMerkleTreeUpdater(networkId);
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address
   if (riskParams.dolomiteMargin !== libraryDolomiteMargin) {
@@ -122,6 +131,8 @@ async function start() {
     levelRequestsKeyExpirationSeconds: process.env.LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS,
     levelRequestsPollIntervalMillis: process.env.LEVEL_REQUESTS_POLL_INTERVAL_MS,
     mineralsEnabled: process.env.MINERALS_ENABLED,
+    oDoloAggregatorEnabled: process.env.ODOLO_AGGREGATOR_ENABLED,
+    oDoloEnabled: process.env.ODOLO_ENABLED,
     networkId,
     pendleMineralsEnabled: process.env.PENDLE_MINERALS_ENABLED,
     sequentialTransactionDelayMillis: process.env.SEQUENTIAL_TRANSACTION_DELAY_MS,
@@ -146,6 +157,13 @@ async function start() {
   if (process.env.MINERALS_ENABLED === 'true') {
     mineralsUpdater.start();
     mineralsMerkleTreeUpdater.start();
+  }
+  if (process.env.ODOLO_ENABLED === 'true') {
+    oDoloUpdater.start();
+  }
+  if (process.env.ODOLO_AGGREGATOR_ENABLED === 'true') {
+    oDoloAggregatorUpdater.start();
+    oDoloMerkleTreeUpdater.start();
   }
   if (process.env.PENDLE_MINERALS_ENABLED === 'true') {
     pendleMineralsUpdater.start();

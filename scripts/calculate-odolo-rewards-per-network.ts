@@ -19,7 +19,7 @@ import {
   getBalanceChangingEvents,
   getPoolAddressToVirtualLiquidityPositionsAndEvents,
 } from './lib/event-parser';
-import { writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
+import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
 import { setupRemapping } from './lib/remapper';
 import {
   calculateFinalPoints,
@@ -54,6 +54,10 @@ export async function calculateOdoloRewardsPerNetwork(
 
   if (epoch === oDoloConfig.currentEpochIndex) {
     // There's nothing to do. The week has not passed yet
+    Logger.info({
+      file: __filename,
+      message: 'Epoch has not passed yet. Returning...',
+    });
     return { epoch, merkleRoot: null };
   }
 
@@ -72,6 +76,23 @@ export async function calculateOdoloRewardsPerNetwork(
       file: __filename,
       message: 'Epoch has not passed yet. Returning...',
     });
+    return { epoch, merkleRoot: null };
+  }
+
+  const oTokenFileName = getOTokenFinalizedFileNameWithPath(networkId, ODOLO_TYPE, epoch);
+  let hasFile = false;
+  try {
+    await readFileFromGitHub(oTokenFileName)
+    hasFile = true;
+  } catch (e) {
+  }
+  if (hasFile && !shouldForceUpload()) {
+    Logger.info({
+      file: __filename,
+      message: 'Epoch rewards have already been calculated. Returning...',
+      epoch,
+    });
+
     return { epoch, merkleRoot: null };
   }
 
@@ -116,12 +137,13 @@ export async function calculateOdoloRewardsPerNetwork(
   const tokenAddressToMarketMap = marketStore.getTokenAddressToMarketMap();
   const tokenAddressToRewardMap = oDoloConfig.allChainWeights[networkId as ChainId];
   const marketToPointsPerSecondMap: Record<string, Integer> = {};
-  const oTokenRewardWeiMap: Record<string, Integer> = Object.keys(tokenAddressToRewardMap).reduce((acc, tokenAddress) => {
-    const marketId = tokenAddressToMarketMap[tokenAddress.toLowerCase()].marketId;
-    acc[marketId] = new BigNumber(parseEther(tokenAddressToRewardMap[tokenAddress].toFixed(18)).toString());
-    marketToPointsPerSecondMap[marketId] = DEFAULT_EQUITY_PER_SECOND;
-    return acc;
-  }, {} as Record<string, Integer>);
+  const oTokenRewardWeiMap: Record<string, Integer> = Object.keys(tokenAddressToRewardMap)
+    .reduce((acc, tokenAddress) => {
+      const marketId = tokenAddressToMarketMap[tokenAddress.toLowerCase()].marketId;
+      acc[marketId] = new BigNumber(parseEther(tokenAddressToRewardMap[tokenAddress].toFixed(18)).toString());
+      marketToPointsPerSecondMap[marketId] = DEFAULT_EQUITY_PER_SECOND;
+      return acc;
+    }, {} as Record<string, Integer>);
   Logger.info({
     file: __filename,
     message: 'oDOLO Rewards',
@@ -170,6 +192,20 @@ export async function calculateOdoloRewardsPerNetwork(
     poolToTotalSubLiquidityPoints,
   );
 
+  let cumulativeODolo = INTEGERS.ZERO;
+  let previousUsers: Record<string, Integer> = {};
+  if (epoch >= 1) {
+    const file = await readFileFromGitHub<ODoloOutputFile>(
+      getOTokenFinalizedFileNameWithPath(networkId, ODOLO_TYPE, epoch - 1)
+    );
+    previousUsers = Object.keys(file.users).reduce((memo, user) => {
+      memo[user] = new BigNumber(file.users[user].amount);
+      cumulativeODolo = cumulativeODolo.plus(memo[user]);
+      return memo;
+    }, {} as Record<string, Integer>);
+  }
+
+  let totalODolo = INTEGERS.ZERO;
   const userToOTokenRewards: Record<string, Integer> = Object.keys(userToMarketToPointsMap).reduce((memo, user) => {
     Object.keys(userToMarketToPointsMap[user]).forEach(market => {
       const userPoints = userToMarketToPointsMap[user][market];
@@ -178,7 +214,11 @@ export async function calculateOdoloRewardsPerNetwork(
         memo[user] = INTEGERS.ZERO;
       }
 
-      memo[user] = memo[user].plus(oTokenRewardWeiMap[market].times(userPoints).dividedToIntegerBy(totalPoints));
+      const oDoloAmount = oTokenRewardWeiMap[market].times(userPoints).dividedToIntegerBy(totalPoints);
+      totalODolo = totalODolo.plus(oDoloAmount);
+      cumulativeODolo = cumulativeODolo.plus(oDoloAmount);
+
+      memo[user] = memo[user].plus(oDoloAmount);
 
       if (memo[user].eq(INTEGERS.ZERO)) {
         // Remove the user if the balance is still zero
@@ -186,15 +226,16 @@ export async function calculateOdoloRewardsPerNetwork(
       }
     });
     return memo;
-  }, {} as Record<string, Integer>);
+  }, previousUsers);
 
   const { merkleRoot, walletAddressToLeafMap } = await calculateMerkleRootAndLeafs(userToOTokenRewards);
 
-  const oTokenFileName = getOTokenFinalizedFileNameWithPath(networkId, ODOLO_TYPE, epoch);
   const oTokenOutputFile: ODoloOutputFile = {
     users: walletAddressToLeafMap,
     metadata: {
       totalUsers: Object.keys(walletAddressToLeafMap).length,
+      totalODolo: totalODolo.toFixed(),
+      cumulativeODolo: cumulativeODolo.toFixed(),
       epoch,
       merkleRoot,
       marketTotalPointsForEpoch: {
@@ -214,7 +255,7 @@ export async function calculateOdoloRewardsPerNetwork(
       message: 'Skipping output file upload due to script execution',
     });
     const season = getSeasonForOTokenType(ODOLO_TYPE);
-    writeOutputFile(`${ODOLO_TYPE}-${networkId}-season-${season}-epoch-${epoch}-output.json`, oTokenOutputFile);
+    writeOutputFile(`odolo/${ODOLO_TYPE}-${networkId}-season-${season}-epoch-${epoch}-output.json`, oTokenOutputFile);
   }
 
   return { epoch, merkleRoot };
