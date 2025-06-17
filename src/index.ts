@@ -1,14 +1,11 @@
 import v8 from 'v8';
 // eslint-disable-next-line
 import '../src/lib/env';
-import MineralsMerkleTreeUpdater from '../build/src/lib/updaters/minerals-merkle-tree-updater';
 
 import { getDolomiteRiskParams } from './clients/dolomite';
 import { dolomite, loadAccounts } from './helpers/web3';
-import BlockStore from './lib/stores/block-store';
-import DolomiteDetonatorUpdater from './lib/updaters/dolomite-detonator-updater';
-import DolomiteLevelRequestUpdater from './lib/updaters/dolomite-level-request-updater';
-import GasPriceUpdater from './lib/updaters/gas-price-updater';
+import LevelUpdateRequestCache from './lib/caches/level-update-request-cache';
+import VestingPositionCache from './lib/caches/vesting-position-cache';
 import {
   checkBigNumber,
   checkBooleanValue,
@@ -20,15 +17,18 @@ import {
   checkMarketIdList,
   checkPrivateKey,
 } from './lib/invariants';
-import LevelUpdateRequestCache from './lib/caches/level-update-request-cache';
-import LevelUpdateRequestStore from './lib/stores/level-update-request-store';
 import Logger from './lib/logger';
+import BlockStore from './lib/stores/block-store';
+import LevelUpdateRequestStore from './lib/stores/level-update-request-store';
 import MarketStore from './lib/stores/market-store';
+import VestingPositionStore from './lib/stores/vesting-position-store';
+import DolomiteDetonatorUpdater from './lib/updaters/dolomite-detonator-updater';
+import DolomiteLevelRequestUpdater from './lib/updaters/dolomite-level-request-updater';
+import GasPriceUpdater from './lib/updaters/gas-price-updater';
+import MineralsMerkleTreeUpdater from './lib/updaters/minerals-merkle-tree-updater';
+import MineralsUpdater from './lib/updaters/minerals-updater';
 import ODoloAggregatorUpdater from './lib/updaters/odolo-aggregator-updater';
 import ODoloAggregatorMerkleTreeUpdater from './lib/updaters/odolo-merkle-tree-updater';
-import MineralsUpdater from './lib/updaters/minerals-updater';
-import VestingPositionCache from './lib/caches/vesting-position-cache';
-import VestingPositionStore from './lib/stores/vesting-position-store';
 import ODoloUpdater from './lib/updaters/odolo-updater';
 import PendleMineralsUpdater from './lib/updaters/pendle-minerals-updater';
 

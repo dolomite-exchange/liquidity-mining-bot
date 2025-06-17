@@ -2,11 +2,9 @@ import { BigNumber, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin
 import csv from 'csv-parser';
 import { ethers } from 'ethers';
 import { parseEther } from 'ethers/lib/utils';
-import { createReadStream } from 'fs';
+import { createReadStream, readFileSync } from 'fs';
 import { writeOutputFile } from './lib/file-helpers';
 import { calculateMerkleRootAndProofs } from './lib/utils';
-import Remappings from './output/royco/remappings.json';
-import DolomiteBoycoData from './output/royco/third_party_vault_amounts.json';
 
 const STONE_BTC_TOTAL_POINTS = new BigNumber(parseEther('16014853.558945581765831573').toString());
 const STONE_ETH_TOTAL_POINTS = new BigNumber(parseEther('472985448.044011381243781332').toString());
@@ -17,6 +15,7 @@ async function readStakestoneCsvData(
   totalVeDolo: Integer,
   totalPoints: Integer,
 ) {
+  const Remappings = readFileSync('./output/royco/remappings.json')
   return new Promise<void>((resolve, reject) => {
     createReadStream(`${process.cwd()}/scripts/${csvFile}`)
       .pipe(csv())
@@ -41,6 +40,7 @@ async function readStakestoneCsvData(
 }
 
 async function readSolvData(walletToVeDoloMap: Record<string, Integer | undefined>) {
+  const DolomiteBoycoData = JSON.parse(readFileSync('./output/royco/third_party_vault_amounts.json').toString());
   return new Promise<void>((resolve, reject) => {
     const solvVeDoloTotal = ethers.utils.parseEther(DolomiteBoycoData.SolvBTC_Total);
     const basePercentage = parseEther('1');
@@ -61,6 +61,7 @@ async function readSolvData(walletToVeDoloMap: Record<string, Integer | undefine
 }
 
 async function calculateBoycoMerkleDistribution() {
+  const DolomiteBoycoData = JSON.parse(readFileSync('./output/royco/third_party_vault_amounts.json').toString());
   const walletToVeDoloMap: Record<string, Integer> = {};
   await readStakestoneCsvData(
     walletToVeDoloMap,

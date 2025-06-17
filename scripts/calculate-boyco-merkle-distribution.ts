@@ -2,13 +2,13 @@ import { BigNumber, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin
 import csv from 'csv-parser';
 import { ethers } from 'ethers';
 import { parseEther } from 'ethers/lib/utils';
-import { createReadStream } from 'fs';
+import { createReadStream, readFileSync } from 'fs';
 import { writeOutputFile } from './lib/file-helpers';
 import { calculateMerkleRootAndProofs } from './lib/utils';
-import BoycoPositions from './output/royco/dolomite_boyco_positions.json';
-import DolomiteBoycoData from './output/royco/third_party_vault_amounts.json';
-import TotalsByMarketHash from './output/royco/totals_by_market_hash.json';
-import Remappings from './output/royco/remappings.json';
+const BoycoPositions = JSON.parse(readFileSync('./output/royco/dolomite_boyco_positions.json').toString());
+const DolomiteBoycoData = JSON.parse(readFileSync('./output/royco/third_party_vault_amounts.json').toString());
+const TotalsByMarketHash = JSON.parse(readFileSync('./output/royco/totals_by_market_hash.json').toString());
+const Remappings = JSON.parse(readFileSync('./output/royco/remappings.json').toString());
 
 interface BoycoPosition {
   account_address: string;
