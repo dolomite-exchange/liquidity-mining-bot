@@ -28,12 +28,8 @@ import {
   ApiWithdrawal,
 } from '../../src/lib/api-types';
 import { ChainId } from '../../src/lib/chain-id';
-import { ONE_ETH_WEI } from '../../src/lib/constants';
 import Pageable from '../../src/lib/pageable';
-import { POOL_INFO } from '../../src/lib/pendle/configuration';
-import { getMineralFinalizedFileNameWithPath, getMineralPendleConfigFileNameWithPath } from './config-helper';
-import { MineralPendleConfigFile, MineralPendleOutputFile } from './data-types';
-import { readFileFromGitHub } from './file-helpers';
+import { getPendleSyAddressToLiquidityPositionAndEventsForOToken } from './pendle-event-parser';
 import {
   AccountToSubAccountToMarketToBalanceAndPointsMap,
   AccountToSubAccountToMarketToBalanceChangeMap,
@@ -210,7 +206,7 @@ export async function getPoolAddressToVirtualLiquidityPositionsAndEvents(
   if (ignorePendle) {
     syAddressToPendlePositionsAndEventsMap = {};
   } else {
-    syAddressToPendlePositionsAndEventsMap = await getPendleSyAddressToLiquidityPositionAndEvents(
+    syAddressToPendlePositionsAndEventsMap = await getPendleSyAddressToLiquidityPositionAndEventsForOToken(
       networkId,
       startTimestamp,
       endTimestamp,
@@ -357,51 +353,6 @@ async function getOTokenVestingLiquidityPositionAndEvents(
   parseVirtualLiquiditySnapshots(userToLiquiditySnapshots, vestingPositionSnapshots, virtualLiquidityBalances);
 
   return { virtualLiquidityBalances, userToLiquiditySnapshots };
-}
-
-async function getPendleSyAddressToLiquidityPositionAndEvents(
-  networkId: number,
-  startTimestamp: number,
-  endTimestamp: number,
-): Promise<Record<string, LiquidityPositionsAndEvents>> {
-  const virtualLiquidityBalances: AccountToVirtualLiquidityBalanceMap = {};
-  const pendleConfig = await readFileFromGitHub<MineralPendleConfigFile>(getMineralPendleConfigFileNameWithPath(
-    networkId));
-  const epochs = Object.values(pendleConfig.epochs).filter(e => {
-    return e.startTimestamp === startTimestamp && e.endTimestamp === endTimestamp;
-  });
-  if (epochs.length === 0) {
-    const message = `Could not find epoch for start_timestamp, end_timestamp: [${startTimestamp}, ${endTimestamp}]`;
-    return Promise.reject(new Error(`${message}. Did you mean to ignore this function call?`));
-  }
-
-  const syAddressToVirtualLiquidityPositions = {};
-  for (const epoch of epochs) {
-    const outputFile = await readFileFromGitHub<MineralPendleOutputFile>(
-      getMineralFinalizedFileNameWithPath(networkId, epoch.epoch),
-    );
-    Object.keys(outputFile.metadata.marketIdToRewardMap).forEach(marketId => {
-      const positions = Object.keys(outputFile.users).map<VirtualLiquidityPosition>(user => {
-        return {
-          id: user,
-          marketId: parseInt(marketId),
-          effectiveUser: user,
-          balancePar: new BigNumber(outputFile.users[user].marketIdToAmountMap[marketId]).div(ONE_ETH_WEI),
-        };
-      });
-
-      parseVirtualLiquidityPositions(
-        virtualLiquidityBalances,
-        positions,
-        startTimestamp,
-      );
-
-      const syAddress = POOL_INFO[networkId as ChainId][marketId].SY;
-      syAddressToVirtualLiquidityPositions[syAddress] = { virtualLiquidityBalances, userToLiquiditySnapshots: {} };
-    });
-  }
-
-  return syAddressToVirtualLiquidityPositions;
 }
 
 export function parseDeposits(
@@ -687,7 +638,7 @@ export function parseVirtualLiquidityPositions(
       userToVirtualLiquidityBalances[position.effectiveUser] = new VirtualBalanceAndRewardPoints(
         position.effectiveUser,
         blockRewardStartTimestamp,
-        new BigNumber(position.balancePar),
+        position.balancePar,
       );
     } else {
       const balanceStruct = userToVirtualLiquidityBalances[position.effectiveUser]!;

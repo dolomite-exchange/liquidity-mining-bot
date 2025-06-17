@@ -75,6 +75,7 @@ export interface MineralPendleConfigFile extends ConfigFile<MineralPendleConfigE
 
 export enum OTokenType {
   oARB = 'oarb',
+  oDOLO = 'odolo',
   oMATIC = 'omatic',
 }
 
@@ -95,6 +96,56 @@ export interface OTokenOutputFile {
     marketTotalPointsForEpoch: {
       [market: string]: string // big int
     }
+  };
+}
+
+export interface ODoloOutputFile {
+  users: {
+    [walletAddressLowercase: string]: {
+      amount: string // big int
+      leaf: string
+    }
+  };
+  metadata: {
+    epoch: number;
+    totalUsers: number;
+    totalODolo: string // big int
+    cumulativeODolo: string // big int
+    merkleRoot: string;
+    marketTotalPointsForEpoch: {
+      [market: string]: string // big int
+    }
+  };
+}
+
+export interface ODoloMetadataPerNetwork {
+  totalUsers: number;
+  amount: string; // big int
+}
+
+export interface ODoloAggregateUserData {
+  amount: string // big int
+  amountPerNetwork: {
+    [network: string]: {
+      amount: string; // big int
+    };
+  };
+  leaf: string;
+}
+
+export interface ODoloAggregateOutputFile {
+  users: {
+    [walletAddressLowercase: string]: ODoloAggregateUserData;
+  };
+  metadata: {
+    epoch: number;
+    totalUsers: number;
+    totalODolo: string; // big int
+    cumulativeODolo: string; // big int
+    merkleRoot: string;
+    metadataPerNetwork: {
+      [network: string]: ODoloMetadataPerNetwork;
+    };
   };
 }
 

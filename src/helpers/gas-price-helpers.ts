@@ -1,8 +1,10 @@
 import { BigNumber, DolomiteMargin, Integer } from '@dolomite-exchange/dolomite-margin';
 import axios from 'axios';
-import { ChainId, isArbitrum, isMantle } from '../lib/chain-id';
+import { ChainId, isArbitrum, isBerachain, isMantle } from '../lib/chain-id';
 import Logger from '../lib/logger';
 import '../lib/env';
+
+const ONE_GWEI_IN_WEI_UNITS = new BigNumber('1000000000');
 
 let lastPriceWei: string = process.env.INITIAL_GAS_PRICE_WEI as string;
 
@@ -67,6 +69,10 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<{ fast: string }>
     return {
       fast: result.perArbGasTotal.dividedBy('1000000000').toFixed(), // convert to gwei
     };
+  } else if (isBerachain(networkId)) {
+    const response = await dolomite.web3.eth.getGasPrice();
+    const gasPrice = new BigNumber(response).div(ONE_GWEI_IN_WEI_UNITS).toFixed();
+    return { fast: gasPrice };
   } else if (isMantle(networkId)) {
     const result = await dolomite.mantleGasInfo!.getPriceInWei();
     return {

@@ -22,8 +22,22 @@ export default class MarketStore {
     this.marketMap = {};
   }
 
+  /**
+   * @return marketId to ApiMarket map
+   */
   public getMarketMap(): { [marketId: string]: ApiMarket } {
     return this.marketMap;
+  }
+
+  /**
+   * @return tokenAddress (lower case) to ApiMarket map
+   */
+  public getTokenAddressToMarketMap(): { [tokenAddressLower: string]: ApiMarket } {
+    return Object.keys(this.marketMap).reduce((acc, key) => {
+      const market = this.marketMap[key];
+      acc[market.tokenAddress] = market;
+      return acc;
+    }, {} as Record<string, ApiMarket>);
   }
 
   async getMarketIndexMap(

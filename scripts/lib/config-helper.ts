@@ -42,6 +42,7 @@ export async function getNextConfigIfNeeded<T extends EpochConfig>(oldEpoch: T):
 
 export const MINERAL_SEASON = 0;
 export const OARB_SEASON = 0;
+export const ODOLO_SEASON = 0;
 export const OMATIC_SEASON = 0;
 
 /**
@@ -91,6 +92,10 @@ export function getOTokenFinalizedFileNameWithPath(networkId: number, oTokenType
   return getFinalizedFilePath(networkId, oTokenType, season, epoch);
 }
 
+export function getODoloAggregatedFileNameWithPath(networkId: number): string {
+  return `finalized/${networkId}/odolo/odolo-aggregated-output.json`;
+}
+
 export function getOTokenTypeFromEnvironment(): OTokenType {
   const oTokenType = process.env.OTOKEN_TYPE;
   const oTokens = Object.values(OTokenType);
@@ -103,6 +108,8 @@ export function getOTokenTypeFromEnvironment(): OTokenType {
 export function getSeasonForOTokenType(oTokenType: OTokenType): number {
   if (oTokenType === OTokenType.oARB) {
     return OARB_SEASON;
+  } else if (oTokenType === OTokenType.oDOLO) {
+    return ODOLO_SEASON;
   } else if (oTokenType === OTokenType.oMATIC) {
     return OMATIC_SEASON;
   }

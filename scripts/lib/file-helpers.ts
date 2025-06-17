@@ -5,6 +5,9 @@ import { MineralOutputFile, OTokenOutputFile } from './data-types';
 
 const GITHUB_REPOSITORY_API_URL = 'https://api.github.com/repos/dolomite-exchange/liquidity-mining-data';
 
+/**
+ * @throws Error if the file is not found
+ */
 export async function readFileFromGitHub<T>(filePath: string): Promise<T> {
   const headers = {
     Accept: 'application/vnd.github.v3.raw',

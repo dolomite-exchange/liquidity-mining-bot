@@ -1,7 +1,13 @@
-import { BigNumber, ethers } from 'ethers';
+import { ethers } from 'ethers';
 import { CHAIN, PENDLE_TREASURY_ADDRESS, POOL_INFO } from './configuration';
 import * as constants from './consts';
-import { getAllERC20Balances, getAllMarketActiveBalances, getAllYTInterestData } from './multicall';
+import {
+  getAllERC20Balances,
+  getAllERC20BalancesWithManualCheck,
+  getAllMarketActiveBalances,
+  getAllYTInterestData,
+} from './multicall';
+import { LiquidLockerData } from './pendle-api';
 import { UserRecord } from './types';
 
 function increaseUserAmount(
@@ -82,6 +88,7 @@ export async function applyLpHolderShares(
   result: UserRecord,
   lpToken: string,
   allUsers: string[],
+  liquidLockers: LiquidLockerData[],
   marketId: number,
   blockNumber: number,
 ): Promise<void> {
@@ -100,58 +107,48 @@ export async function applyLpHolderShares(
     ethers.BigNumber.from(0),
   );
 
-  async function processLiquidLocker(
-    liquidLocker: string,
-    totalBoostedSy: BigNumber,
-  ) {
-    const validLockers = poolConfiguration.liquidLockers.filter(
-      (v) => v.address === liquidLocker && v.lpToken === lpToken,
-    );
-
-    if (validLockers.length === 0 || validLockers[0].deployedBlock > blockNumber) {
-      return;
-    }
-
-    const { receiptToken, deployedBlock } = validLockers[0];
-    const allReceiptTokenBalances = await getAllERC20Balances(
-      receiptToken,
-      allUsers,
-      blockNumber,
-      deployedBlock,
-    );
-    const totalLiquidLockerShares = allReceiptTokenBalances.reduce(
-      (a, b) => a.add(b),
-      ethers.BigNumber.from(0),
-    );
-
-    if (totalLiquidLockerShares.eq(0)) {
-      return;
-    }
-
-    for (let i = 0; i < allUsers.length; i += 1) {
-      const user = allUsers[i];
-      const receiptTokenBalance = allReceiptTokenBalances[i];
-      const boostedSyBalance = totalBoostedSy
-        .mul(receiptTokenBalance)
-        .div(totalLiquidLockerShares);
-      increaseUserAmount(result, user, boostedSyBalance);
-    }
-  }
-
   for (let i = 0; i < allUsers.length; i += 1) {
-    const holder = allUsers[i];
+    const user = allUsers[i];
+    const liquidLockerIndex = liquidLockers.findIndex(
+      (data) => data.lpHolder.toLowerCase() === user.toLowerCase(),
+    );
     const boostedSyBalance = allActiveBalances[i]
       .mul(totalSy)
       .div(totalActiveSupply);
 
-    if (isLiquidLocker(marketId, holder)) {
-      await processLiquidLocker(holder, boostedSyBalance);
+
+    if (liquidLockerIndex === -1) {
+      increaseUserAmount(result, user, boostedSyBalance);
     } else {
-      increaseUserAmount(result, holder, boostedSyBalance);
+      const liquidLocker = liquidLockers[liquidLockerIndex];
+      const users = liquidLocker.users;
+      const receiptToken = liquidLocker.receiptToken;
+
+      const balances = await getAllERC20BalancesWithManualCheck(receiptToken, users, blockNumber);
+
+      if (!balances) {
+        continue;
+      }
+
+      const totalReceiptBalance = balances.reduce(
+        (a, b) => a.add(b),
+        ethers.BigNumber.from(0),
+      );
+
+      for (let j = 0; j < users.length; ++j) {
+        const user = users[j];
+        const receiptBalance = balances[j];
+
+        if (receiptBalance.isZero()) {
+          continue;
+        }
+
+        const userShare = receiptBalance
+          .mul(boostedSyBalance)
+          .div(totalReceiptBalance);
+
+        increaseUserAmount(result, user, userShare);
+      }
     }
   }
-}
-
-function isLiquidLocker(marketId: number, addr: string) {
-  return POOL_INFO[CHAIN][marketId].liquidLockers.some((v) => addr === v.address);
 }

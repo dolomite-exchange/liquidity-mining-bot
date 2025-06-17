@@ -15,6 +15,10 @@ export function isBase(chainId: ChainId): boolean {
   return chainId === ChainId.Base;
 }
 
+export function isBerachain(chainId: ChainId): boolean {
+  return chainId === ChainId.Berachain;
+}
+
 export function isMantle(chainId: ChainId): boolean {
   return chainId === ChainId.Mantle;
 }
