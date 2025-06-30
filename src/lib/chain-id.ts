@@ -4,6 +4,7 @@ export enum ChainId {
   Berachain = 80094,
   Botanix = 3637,
   Ethereum = 1,
+  Ink = 57073,
   Mantle = 5000,
   PolygonZkEvm = 1101,
   XLayer = 196,
@@ -27,6 +28,10 @@ export function isBotanix(chainId: ChainId): boolean {
 
 export function isEthereum(chainId: ChainId): boolean {
   return chainId === ChainId.Ethereum;
+}
+
+export function isInk(chainId: ChainId): boolean {
+  return chainId === ChainId.Ink;
 }
 
 export function isMantle(chainId: ChainId): boolean {

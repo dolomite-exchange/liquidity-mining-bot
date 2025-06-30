@@ -89,39 +89,27 @@ const LEVEL_TO_ADDITION_MAP: Record<number, BigNumber | undefined> = {
   14: new BigNumber(parseEther(`${25_000}`).toString()),
 };
 
-const CHAIN_ID_TO_WEB3_PROVIDER_URL_MAP: Record<ChainId, string | undefined> = {
+const CHAIN_ID_TO_WEB3_PROVIDER_URL_MAP: Record<number, string | undefined> = {
   [ChainId.ArbitrumOne]: process.env.ARBITRUM_WEB3_PROVIDER,
-  [ChainId.Base]: undefined,
-  [ChainId.Berachain]: undefined,
-  [ChainId.Botanix]: undefined,
-  [ChainId.Ethereum]: undefined,
   [ChainId.Mantle]: process.env.MANTLE_WEB3_PROVIDER,
   [ChainId.PolygonZkEvm]: process.env.POLYGON_ZKEVM_WEB3_PROVIDER,
   [ChainId.XLayer]: process.env.X_LAYER_WEB3_PROVIDER,
 };
 
-const CHAIN_ID_TO_SUBGRAPH_URL_MAP: Record<ChainId, string | undefined> = {
+const CHAIN_ID_TO_SUBGRAPH_URL_MAP: Record<number, string | undefined> = {
   [ChainId.ArbitrumOne]: process.env.ARBITRUM_SUBGRAPH_URL,
-  [ChainId.Base]: undefined,
-  [ChainId.Berachain]: undefined,
-  [ChainId.Botanix]: undefined,
-  [ChainId.Ethereum]: undefined,
   [ChainId.Mantle]: process.env.MANTLE_SUBGRAPH_URL,
   [ChainId.PolygonZkEvm]: process.env.POLYGON_ZKEVM_SUBGRAPH_URL,
   [ChainId.XLayer]: process.env.X_LAYER_SUBGRAPH_URL,
 };
 
-const CHAIN_ID_TO_METADATA_MAP: Record<ChainId, Metadata | undefined> = {
+const CHAIN_ID_TO_METADATA_MAP: Record<number, Metadata | undefined> = {
   [ChainId.ArbitrumOne]: {
     startBlockNumber: 28220369,
     startTimestamp: 1664843669,
     endBlockNumber: 292404278,
     endTimestamp: 1736121600,
   },
-  [ChainId.Base]: undefined,
-  [ChainId.Berachain]: undefined,
-  [ChainId.Botanix]: undefined,
-  [ChainId.Ethereum]: undefined,
   [ChainId.Mantle]: {
     startBlockNumber: 63091469,
     startTimestamp: 1714327650,
@@ -142,17 +130,10 @@ const CHAIN_ID_TO_METADATA_MAP: Record<ChainId, Metadata | undefined> = {
   },
 };
 
-const CHAIN_TO_MARKET_TO_EXTRA_MULTIPLIER_MAP: Record<ChainId, Record<string, Decimal>> = {
+const CHAIN_TO_MARKET_TO_EXTRA_MULTIPLIER_MAP: Record<number, Record<string, Decimal>> = {
   [ChainId.ArbitrumOne]: {
     0: new BigNumber(1), // This is an example (using a multiplier of 1 doesn't do anything)
   },
-  [ChainId.Base]: {},
-  [ChainId.Berachain]: {},
-  [ChainId.Botanix]: {},
-  [ChainId.Ethereum]: {},
-  [ChainId.Mantle]: {},
-  [ChainId.PolygonZkEvm]: {},
-  [ChainId.XLayer]: {},
 }
 
 const FOLDER_NAME = `${__dirname}/output`;

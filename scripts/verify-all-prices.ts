@@ -7,12 +7,9 @@ import Logger from '../src/lib/logger';
 import { readOutputFile } from './lib/file-helpers';
 import { getWeb3RequestWithBackoff } from './lib/web3-helper';
 
-const ORIGINAL_START_BLOCK_NUMBER_MAP: Record<ChainId, number> = {
+const ORIGINAL_START_BLOCK_NUMBER_MAP: Record<number, number> = {
   [ChainId.ArbitrumOne]: 28_220_369,
   [ChainId.Base]: 10_010_605,
-  [ChainId.Berachain]: 0,
-  [ChainId.Botanix]: 0,
-  [ChainId.Ethereum]: 0,
   [ChainId.Mantle]: 63_091_469,
   [ChainId.PolygonZkEvm]: 9_597_567,
   [ChainId.XLayer]: 832_938,
@@ -56,14 +53,16 @@ export async function getAllPrices(): Promise<void> {
   const endTimestamp = (await dolomite.web3.eth.getBlock(endBlockNumber)).timestamp;
 
   const startTimestampNormalized = normalizeTimestamp(originalStartTimestamp);
-  const startBlockNormalized = (await getTimestampToBlockNumberMap([startTimestampNormalized]))[startTimestampNormalized];
+  const startBlockNormalized = (
+    await getTimestampToBlockNumberMap([startTimestampNormalized])
+  )[startTimestampNormalized];
 
   const endTimestampNormalized = normalizeTimestamp(endTimestamp);
   const endBlockNormalized = (await getTimestampToBlockNumberMap([endTimestampNormalized]))[endTimestampNormalized];
 
   let allPricesBlob: AllPricesBlob;
   const allPricesFileName = `/data/all-prices-${networkId}.json`;
-  let allEventsBuffer = await readOutputFile(allPricesFileName);
+  const allEventsBuffer = await readOutputFile(allPricesFileName);
   if (allEventsBuffer) {
     allPricesBlob = JSON.parse(allEventsBuffer.toString());
     Object.keys(allPricesBlob.data).forEach(timestamp => {
@@ -106,10 +105,11 @@ export async function getAllPrices(): Promise<void> {
     message: `Total timestamps: ${timestamps.length}`,
   });
 
-  for (let timestamp of Object.keys(timestampToBlockNumberMap)) {
+  for (let i = 0; i < Object.keys(timestampToBlockNumberMap).length; i += 1) {
+    const timestamp = Object.keys(timestampToBlockNumberMap)[i];
     const blockNumber = timestampToBlockNumberMap[timestamp];
     const marketsLength = await getWeb3RequestWithBackoff(() => dolomite.getters.getNumMarkets({ blockNumber }));
-    for (let marketId = 0; marketId < marketsLength.toNumber(); marketId++) {
+    for (let marketId = 0; marketId < marketsLength.toNumber(); marketId += 1) {
       if (networkId !== 42161 || marketId !== 10 || marketsLength.toNumber() < 44) {
         if (!allPricesBlob.data[timestamp] || !allPricesBlob.data[timestamp][marketId]) {
           throw new Error(`Invalid price at timestamp ${timestamp} for market ID: ${marketId}`)

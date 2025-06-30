@@ -9,6 +9,7 @@ const NETWORK_TO_ENV_FILE_MAP: Record<ChainId, string> = {
   [ChainId.Berachain]: path.resolve(process.cwd(), 'detonator.berachain.production.env'),
   [ChainId.Botanix]: path.resolve(process.cwd(), 'detonator.botanix.production.env'),
   [ChainId.Ethereum]: path.resolve(process.cwd(), 'detonator.ethereum.production.env'),
+  [ChainId.Ink]: path.resolve(process.cwd(), 'detonator.ink.production.env'),
   [ChainId.Mantle]: path.resolve(process.cwd(), 'detonator.mantle.production.env'),
   [ChainId.PolygonZkEvm]: path.resolve(process.cwd(), 'detonator.polygon-zkevm.production.env'),
   [ChainId.XLayer]: path.resolve(process.cwd(), 'detonator.x-layer.production.env'),

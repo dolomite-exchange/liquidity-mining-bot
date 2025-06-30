@@ -8,12 +8,9 @@ import { readOutputFile, writeOutputFile } from './lib/file-helpers';
 import { setupRemapping } from './lib/remapper';
 import { AccountToSubAccountToMarketToBalanceChangeMap } from './lib/rewards';
 
-const ORIGINAL_START_BLOCK_NUMBER_MAP: Record<ChainId, number> = {
+const ORIGINAL_START_BLOCK_NUMBER_MAP: Record<number, number> = {
   [ChainId.ArbitrumOne]: 28_220_369,
   [ChainId.Base]: 10_010_605,
-  [ChainId.Berachain]: 0,
-  [ChainId.Botanix]: 0,
-  [ChainId.Ethereum]: 0,
   [ChainId.Mantle]: 63_091_469,
   [ChainId.PolygonZkEvm]: 9_597_567,
   [ChainId.XLayer]: 832_938,
@@ -49,7 +46,7 @@ export async function getAllEvents(): Promise<void> {
 
   let allEventsBlob: AllEventsBlob;
   const allEventsFileName = `/data/all-events-${networkId}.json`;
-  let allEventsBuffer = await readOutputFile(allEventsFileName);
+  const allEventsBuffer = await readOutputFile(allEventsFileName);
   if (allEventsBuffer) {
     allEventsBlob = JSON.parse(allEventsBuffer.toString());
   } else {
@@ -64,7 +61,9 @@ export async function getAllEvents(): Promise<void> {
 
   if (endBlockNumber <= allEventsBlob.endBlockNumber) {
     Logger.info({
-      message: `All events have been retrieved up to ${allEventsBlob.endBlockNumber} which is greater than the provided block number (${endBlockNumber})`,
+      message:
+        // eslint-disable-next-line max-len
+        `All events have been retrieved up to ${allEventsBlob.endBlockNumber} which is greater than the provided block number (${endBlockNumber})`,
       blobEndBlockNumber: allEventsBlob.endBlockNumber,
       requestedEndBlockNumber: endBlockNumber,
     });
