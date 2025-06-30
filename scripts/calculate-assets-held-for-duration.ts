@@ -69,6 +69,8 @@ const CHAIN_TO_MARKET_ID_REWARDS_MAP: Record<ChainId, Record<string, Integer | u
   },
   [ChainId.Base]: {},
   [ChainId.Berachain]: {},
+  [ChainId.Botanix]: {},
+  [ChainId.Ethereum]: {},
   [ChainId.Mantle]: {},
   [ChainId.PolygonZkEvm]: {},
   [ChainId.XLayer]: {},

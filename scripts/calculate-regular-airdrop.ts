@@ -93,6 +93,8 @@ const CHAIN_ID_TO_WEB3_PROVIDER_URL_MAP: Record<ChainId, string | undefined> = {
   [ChainId.ArbitrumOne]: process.env.ARBITRUM_WEB3_PROVIDER,
   [ChainId.Base]: undefined,
   [ChainId.Berachain]: undefined,
+  [ChainId.Botanix]: undefined,
+  [ChainId.Ethereum]: undefined,
   [ChainId.Mantle]: process.env.MANTLE_WEB3_PROVIDER,
   [ChainId.PolygonZkEvm]: process.env.POLYGON_ZKEVM_WEB3_PROVIDER,
   [ChainId.XLayer]: process.env.X_LAYER_WEB3_PROVIDER,
@@ -102,6 +104,8 @@ const CHAIN_ID_TO_SUBGRAPH_URL_MAP: Record<ChainId, string | undefined> = {
   [ChainId.ArbitrumOne]: process.env.ARBITRUM_SUBGRAPH_URL,
   [ChainId.Base]: undefined,
   [ChainId.Berachain]: undefined,
+  [ChainId.Botanix]: undefined,
+  [ChainId.Ethereum]: undefined,
   [ChainId.Mantle]: process.env.MANTLE_SUBGRAPH_URL,
   [ChainId.PolygonZkEvm]: process.env.POLYGON_ZKEVM_SUBGRAPH_URL,
   [ChainId.XLayer]: process.env.X_LAYER_SUBGRAPH_URL,
@@ -116,6 +120,8 @@ const CHAIN_ID_TO_METADATA_MAP: Record<ChainId, Metadata | undefined> = {
   },
   [ChainId.Base]: undefined,
   [ChainId.Berachain]: undefined,
+  [ChainId.Botanix]: undefined,
+  [ChainId.Ethereum]: undefined,
   [ChainId.Mantle]: {
     startBlockNumber: 63091469,
     startTimestamp: 1714327650,
@@ -142,6 +148,8 @@ const CHAIN_TO_MARKET_TO_EXTRA_MULTIPLIER_MAP: Record<ChainId, Record<string, De
   },
   [ChainId.Base]: {},
   [ChainId.Berachain]: {},
+  [ChainId.Botanix]: {},
+  [ChainId.Ethereum]: {},
   [ChainId.Mantle]: {},
   [ChainId.PolygonZkEvm]: {},
   [ChainId.XLayer]: {},
@@ -444,8 +452,6 @@ function getFinalDoloAllocations(
       totalLevelDistributed = totalLevelDistributed.plus(levelAmount);
     }
   });
-
-
 
   Logger.info({
     message: 'DOLO distribution stats',

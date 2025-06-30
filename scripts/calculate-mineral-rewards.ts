@@ -69,6 +69,8 @@ const BOOSTED_POOLS: Record<ChainId, Record<string, BigNumber | undefined>> = {
   },
   [ChainId.Base]: {},
   [ChainId.Berachain]: {},
+  [ChainId.Botanix]: {},
+  [ChainId.Ethereum]: {},
   [ChainId.Mantle]: {},
   [ChainId.PolygonZkEvm]: {},
   [ChainId.XLayer]: {},
