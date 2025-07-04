@@ -197,7 +197,12 @@ export async function calculateOdoloRewardsPerNetwork(
 
   let cumulativeODolo = INTEGERS.ZERO;
   let previousUsers: Record<string, Integer> = {};
-  if (epoch >= 1) {
+  const startEpoch = oDoloConfig.allChainStartEpochs[networkId as ChainId];
+  if (startEpoch === null) {
+    return Promise.reject(new Error(`Invalid start epoch for network ${networkId}`));
+  }
+
+  if (epoch >= startEpoch + 1) {
     const file = await readFileFromGitHub<ODoloOutputFile>(
       getOTokenFinalizedFileNameWithPath(networkId, ODOLO_TYPE, epoch - 1),
     );

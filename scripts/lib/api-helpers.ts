@@ -15,12 +15,13 @@ export interface ODoloMetadata {
    * Chain ID to token address to oDOLO per week (decimal format)
    */
   allChainWeights: Record<ChainId, Record<string, Decimal>>
+  allChainStartEpochs: Record<ChainId, number | null>
 }
 
 export async function readODoloMetadataFromApi(epoch: number | undefined): Promise<ODoloMetadata> {
   const epochQuery = epoch !== undefined ? `?epoch=${epoch}` : '';
   const response = await axios.get(`${DOLOMITE_API_SERVER_URL}/liquidity-mining/odolo/metadata${epochQuery}`);
-  const allChainWeights = response.data.metadata.allChainWeights;
+  const { allChainWeights } = response.data.metadata;
   return {
     ...response.data.metadata,
     allChainWeights: Object.keys(allChainWeights).reduce((acc, chainId) => {
