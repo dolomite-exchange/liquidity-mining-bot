@@ -33,13 +33,15 @@ const DEFAULT_EQUITY_PER_SECOND = INTEGERS.ONE;
 const ODOLO_TYPE = OTokenType.oDOLO;
 const REWARD_MULTIPLIERS_MAP = {};
 
-export async function calculateOdoloRewardsPerNetwork(
-  epoch: number = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10),
-): Promise<{
+export interface ODoloRewardsPerNetworkCalculation {
   epoch: number;
   merkleRoot: string | null
-}> {
-  const networkId = dolomite.networkId;
+}
+
+export async function calculateOdoloRewardsPerNetwork(
+  epoch: number = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10),
+): Promise<ODoloRewardsPerNetworkCalculation> {
+  const { networkId } = dolomite;
 
   if (Number.isNaN(epoch)) {
     return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
@@ -84,8 +86,9 @@ export async function calculateOdoloRewardsPerNetwork(
   try {
     await readFileFromGitHub(oTokenFileName)
     hasFile = true;
-  } catch (e) {
-  }
+    // eslint-disable-next-line no-empty
+  } catch (e) {}
+
   if (hasFile && !shouldForceUpload()) {
     Logger.info({
       file: __filename,
@@ -113,7 +116,7 @@ export async function calculateOdoloRewardsPerNetwork(
 
   Logger.info({
     file: __filename,
-    message: `DolomiteMargin data for oDOLO rewards`,
+    message: 'DolomiteMargin data for oDOLO rewards',
     blockRewardStart: startBlockNumber,
     blockRewardStartTimestamp: startTimestamp,
     blockRewardEnd: endBlockNumber,
@@ -139,7 +142,7 @@ export async function calculateOdoloRewardsPerNetwork(
   const marketToPointsPerSecondMap: Record<string, Integer> = {};
   const oTokenRewardWeiMap: Record<string, Integer> = Object.keys(tokenAddressToRewardMap)
     .reduce((acc, tokenAddress) => {
-      const marketId = tokenAddressToMarketMap[tokenAddress.toLowerCase()].marketId;
+      const { marketId } = tokenAddressToMarketMap[tokenAddress.toLowerCase()];
       acc[marketId] = new BigNumber(parseEther(tokenAddressToRewardMap[tokenAddress].toFixed(18)).toString());
       marketToPointsPerSecondMap[marketId] = DEFAULT_EQUITY_PER_SECOND;
       return acc;
@@ -194,9 +197,14 @@ export async function calculateOdoloRewardsPerNetwork(
 
   let cumulativeODolo = INTEGERS.ZERO;
   let previousUsers: Record<string, Integer> = {};
-  if (epoch >= 1) {
+  const startEpoch = oDoloConfig.allChainStartEpochs[networkId as ChainId];
+  if (startEpoch === null) {
+    return Promise.reject(new Error(`Invalid start epoch for network ${networkId}`));
+  }
+
+  if (epoch >= startEpoch + 1) {
     const file = await readFileFromGitHub<ODoloOutputFile>(
-      getOTokenFinalizedFileNameWithPath(networkId, ODOLO_TYPE, epoch - 1)
+      getOTokenFinalizedFileNameWithPath(networkId, ODOLO_TYPE, epoch - 1),
     );
     previousUsers = Object.keys(file.users).reduce((memo, user) => {
       memo[user] = new BigNumber(file.users[user].amount);

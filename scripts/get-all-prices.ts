@@ -7,10 +7,9 @@ import Logger from '../src/lib/logger';
 import { readOutputFile, writeOutputFile } from './lib/file-helpers';
 import { getAllPricesByBlockNumbers } from './lib/price-parser';
 
-const ORIGINAL_START_BLOCK_NUMBER_MAP: Record<ChainId, number> = {
+const ORIGINAL_START_BLOCK_NUMBER_MAP: Record<number, number> = {
   [ChainId.ArbitrumOne]: 28_220_369,
   [ChainId.Base]: 10_010_605,
-  [ChainId.Berachain]: 0,
   [ChainId.Mantle]: 63_091_469,
   [ChainId.PolygonZkEvm]: 9_597_567,
   [ChainId.XLayer]: 832_938,
@@ -34,7 +33,7 @@ function normalizeTimestamp(timestamp: number): number {
 }
 
 export async function getAllPrices(): Promise<void> {
-  const endBlockNumber = Number.parseInt(process.env.END_BLOCK_NUMBER ?? 'NaN');
+  const endBlockNumber = Number.parseInt(process.env.END_BLOCK_NUMBER ?? 'NaN', 10);
   if (Number.isNaN(endBlockNumber)) {
     return Promise.reject(new Error('Invalid END_BLOCK_NUMBER'));
   }
@@ -54,14 +53,16 @@ export async function getAllPrices(): Promise<void> {
   const endTimestamp = (await dolomite.web3.eth.getBlock(endBlockNumber)).timestamp;
 
   const startTimestampNormalized = normalizeTimestamp(originalStartTimestamp);
-  const startBlockNormalized = (await getTimestampToBlockNumberMap([startTimestampNormalized]))[startTimestampNormalized];
+  const startBlockNormalized = (
+    await getTimestampToBlockNumberMap([startTimestampNormalized])
+  )[startTimestampNormalized];
 
   const endTimestampNormalized = normalizeTimestamp(endTimestamp);
   const endBlockNormalized = (await getTimestampToBlockNumberMap([endTimestampNormalized]))[endTimestampNormalized];
 
   let allPricesBlob: AllPricesBlob;
   const allPricesFileName = `/data/all-prices-${networkId}.json`;
-  let allEventsBuffer = await readOutputFile(allPricesFileName);
+  const allEventsBuffer = await readOutputFile(allPricesFileName);
   if (allEventsBuffer) {
     allPricesBlob = JSON.parse(allEventsBuffer.toString());
   } else {
@@ -76,11 +77,13 @@ export async function getAllPrices(): Promise<void> {
 
   if (endBlockNormalized <= allPricesBlob.endBlockNumber) {
     Logger.info({
-      message: `All prices have been retrieved up to ${allPricesBlob.endBlockNumber} which is greater than the provided block number (${endBlockNormalized})`,
+      message:
+        // eslint-disable-next-line max-len
+        `All prices have been retrieved up to ${allPricesBlob.endBlockNumber} which is greater than the provided block number (${endBlockNormalized})`,
       blobEndBlockNumber: allPricesBlob.endBlockNumber,
       requestedEndBlockNumber: endBlockNormalized,
     });
-    return;
+    return Promise.resolve();
   }
 
   const startBlockNumber = allPricesBlob.endBlockNumber; // we pick up where the blob left off

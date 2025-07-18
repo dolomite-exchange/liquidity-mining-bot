@@ -57,7 +57,7 @@ interface UserMineralAllocation {
 const SECONDS_PER_WEEK = 86_400 * 7;
 const MAX_MULTIPLIER = new BigNumber('5');
 const HARVEST_MULTIPLIER = new BigNumber(3);
-const BOOSTED_POOLS: Record<ChainId, Record<string, BigNumber | undefined>> = {
+const BOOSTED_POOLS: Record<number, Record<string, BigNumber | undefined>> = {
   [ChainId.ArbitrumOne]: {
     ['0xA95E010aF63196747F459176A1B85d250E8211b4'.toLowerCase()]: HARVEST_MULTIPLIER, // Harvest Finance DAI
     ['0xD174dd89af9F58804B47A67435317bc31f971cee'.toLowerCase()]: HARVEST_MULTIPLIER, // Harvest Finance USDC
@@ -67,11 +67,6 @@ const BOOSTED_POOLS: Record<ChainId, Record<string, BigNumber | undefined>> = {
     ['0x2E53f490FB438c9d2d0d7D7Ab17153A2f4a20870'.toLowerCase()]: HARVEST_MULTIPLIER, // Harvest Finance GMX
     ['0x905Fea083FbbcaCf1cF1c7Bb15f6504A458cCACb'.toLowerCase()]: HARVEST_MULTIPLIER, // Harvest Finance ETH
   },
-  [ChainId.Base]: {},
-  [ChainId.Berachain]: {},
-  [ChainId.Mantle]: {},
-  [ChainId.PolygonZkEvm]: {},
-  [ChainId.XLayer]: {},
 };
 
 export async function calculateMineralRewards(epoch = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10)): Promise<void> {
@@ -327,7 +322,8 @@ async function calculateFinalMinerals(
   return Object.keys(userToPointsMap).reduce((memo, user) => {
     const userCurrent = userToPointsMap[user];
     const userPrevious = new BigNumber(previousMinerals.users[user]?.amount ?? '0');
-    const userPreviousMultiplierPreBoost = new BigNumber(previousMinerals.users[user]?.multiplier ?? '1').times(previousBoost);
+    const userPreviousMultiplierPreBoost = new BigNumber(previousMinerals.users[user]?.multiplier ?? '1')
+      .times(previousBoost);
     const userPreviousMultiplierWithBoost = userPreviousMultiplierPreBoost.times(previousBoost);
     const userPreviousNormalized = userPrevious.dividedToIntegerBy(userPreviousMultiplierWithBoost);
     const userPreviousNormalizedWithSlippage = userPreviousNormalized.times(99).dividedToIntegerBy(100);
