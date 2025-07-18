@@ -7,6 +7,7 @@ import { ApiMarket, MarketIndex } from '../api-types';
 import { ONE_ETH_WEI } from '../constants';
 import { delay } from '../delay';
 import Logger from '../logger';
+import { aggregateWithExceptionHandler } from '../multi-call-with-exception-handler';
 import Pageable from '../pageable';
 import { chunkArray } from '../utils';
 import BlockStore from './block-store';
@@ -145,15 +146,26 @@ export default class MarketStore {
         };
       });
 
-      const { results: marketPriceResults } = await this.dolomite.multiCall.aggregate(
-        marketPriceCalls,
-        { blockNumber },
-      );
+      const marketPriceResults = await aggregateWithExceptionHandler(marketPriceCalls, { blockNumber });
 
+      const invalidMarketIds: number[] = [];
       Object.values(nextMarketMap).forEach((market, i) => {
-        const oraclePrice = this.dolomite.web3.eth.abi.decodeParameter('uint256', marketPriceResults[i]);
-        market.oraclePrice = new BigNumber(oraclePrice);
+        const priceResult = marketPriceResults[i];
+        if (!priceResult.success) {
+          invalidMarketIds.push(market.marketId);
+        } else {
+          const oraclePrice = this.dolomite.web3.eth.abi.decodeParameter('uint256', priceResult.returnData);
+          market.oraclePrice = new BigNumber(oraclePrice);
+        }
       });
+
+      if (invalidMarketIds.length > 0) {
+        Logger.warn({
+          at: 'MarketStore#_update',
+          message: `Found invalid prices!`,
+          marketIds: invalidMarketIds.join(', '),
+        });
+      }
     }
 
     this.marketMap = nextMarketMap

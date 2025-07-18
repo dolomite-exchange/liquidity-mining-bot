@@ -1473,7 +1473,7 @@ export async function getDolomiteMarkets(
 
   // @note: Got rid of oracle price retrieval because it would time out for historical queries
 
-  const markets: Promise<ApiMarket>[] = filteredMarketRiskInfos.map(async market => {
+  const markets: ApiMarket[] = filteredMarketRiskInfos.map(market => {
     const marketId = new BigNumber(market.token.marketId)
     const apiMarket: ApiMarket = {
       marketId: marketId.toNumber(),
@@ -1488,7 +1488,7 @@ export async function getDolomiteMarkets(
     return apiMarket;
   });
 
-  return { markets: await Promise.all(markets) };
+  return { markets };
 }
 
 export async function getDolomiteRiskParams(blockNumber: number): Promise<{ riskParams: ApiRiskParam }> {
