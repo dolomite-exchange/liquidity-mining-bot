@@ -38,16 +38,16 @@ export const POOL_INFO: Record<ChainId, Record<number, PoolConfiguration>> = {
       deployedBlock: 268_865_973,
     },
     [WBTC_MARKET_ID]: {
-      SY: '0x3055a746e040bd05ad1806840ca0114d632bc7e2'.toLowerCase(),
-      YT: '0x458db433b74b1094c8282152500f6d5bdf062eb0'.toLowerCase(),
+      SY: '0x43fe63e84f135a0c3b40270a03e6ddbcb393f9e9'.toLowerCase(),
+      YT: '0xb178ddf95eb08933583908f17bc522bb9a694bfd'.toLowerCase(),
       LPs: [
         {
-          address: '0x8cab5fd029ae2fbf28c53e965e4194c7260adf0c'.toLowerCase(),
-          deployedBlock: 268_953_118,
+          address: '0x0ec0abdd2245cd94a054483ccce50a38ac93eb1b'.toLowerCase(),
+          deployedBlock: 354_020_492,
         },
       ],
       decimals: 8,
-      deployedBlock: 268_953_118,
+      deployedBlock: 354_020_492,
     },
   },
   [ChainId.Base]: {},
