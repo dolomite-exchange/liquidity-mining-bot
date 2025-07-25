@@ -27,11 +27,11 @@ export const POOL_INFO: Record<ChainId, Record<number, PoolConfiguration>> = {
   [ChainId.ArbitrumOne]: {
     [USDC_MARKET_ID]: {
       SY: '0x84e0efc0633041aac9d0196b7ac8af3505e8cc32'.toLowerCase(),
-      YT: '0xc617daee26f67edbed5bd978f4f8e02a1f8c9a6c'.toLowerCase(),
+      YT: '0x24f49a62bcb867639a058120afe4053267991e08'.toLowerCase(),
       LPs: [
         {
-          address: '0x0bd6890b3bb15f16430546147734b254d0b03059'.toLowerCase(),
-          deployedBlock: 268_865_973,
+          address: '0xd6d4648a192c5179b4175e0e431822b64aedf6fc'.toLowerCase(),
+          deployedBlock: 346_627_778,
         },
       ],
       decimals: 6,
