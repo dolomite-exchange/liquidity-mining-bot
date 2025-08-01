@@ -30,6 +30,7 @@ export async function writeFileToGitHub(
     headers: {
       Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
     },
+    maxBodyLength: Infinity,
   }
 
   const fileContentEncoded = Buffer.from(JSON.stringify(fileContent, null, prettyPrint ? 2 : undefined))
