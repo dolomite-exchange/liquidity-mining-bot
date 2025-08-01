@@ -87,7 +87,8 @@ export async function calculateOdoloRewardsPerNetwork(
     await readFileFromGitHub(oTokenFileName)
     hasFile = true;
     // eslint-disable-next-line no-empty
-  } catch (e) {}
+  } catch (e) {
+  }
 
   if (hasFile && !shouldForceUpload()) {
     Logger.info({
@@ -151,7 +152,7 @@ export async function calculateOdoloRewardsPerNetwork(
     file: __filename,
     message: 'oDOLO Rewards',
     tokenAddressToRewardMap,
-  })
+  });
 
   const apiAccounts = await Pageable.getPageableValues(async (lastId) => {
     const result = await getAllDolomiteAccountsWithSupplyValue(startMarketIndexMap, startBlockNumber, lastId);
@@ -172,6 +173,10 @@ export async function calculateOdoloRewardsPerNetwork(
     endTimestamp,
     InterestOperation.NOTHING,
   );
+  Logger.info({
+    file: __filename,
+    message: 'Processed accounts!',
+  });
 
   const poolToVirtualLiquidityPositionsAndEvents = await getPoolAddressToVirtualLiquidityPositionsAndEvents(
     networkId,
@@ -180,6 +185,10 @@ export async function calculateOdoloRewardsPerNetwork(
     endTimestamp,
     false,
   );
+  Logger.info({
+    file: __filename,
+    message: 'Got virtual liquidity positions and events!',
+  });
 
   const poolToTotalSubLiquidityPoints: Record<string, Decimal> = calculateVirtualLiquidityPoints(
     poolToVirtualLiquidityPositionsAndEvents,
@@ -194,6 +203,10 @@ export async function calculateOdoloRewardsPerNetwork(
     poolToVirtualLiquidityPositionsAndEvents,
     poolToTotalSubLiquidityPoints,
   );
+  Logger.info({
+    file: __filename,
+    message: 'Calculated final points!',
+  });
 
   let cumulativeODolo = INTEGERS.ZERO;
   let previousUsers: Record<string, Integer> = {};
@@ -212,6 +225,10 @@ export async function calculateOdoloRewardsPerNetwork(
       return memo;
     }, {} as Record<string, Integer>);
   }
+  Logger.info({
+    file: __filename,
+    message: 'Calculated previous user data!',
+  });
 
   let totalODolo = INTEGERS.ZERO;
   const userToOTokenRewards: Record<string, Integer> = Object.keys(userToMarketToPointsMap).reduce((memo, user) => {
@@ -235,8 +252,16 @@ export async function calculateOdoloRewardsPerNetwork(
     });
     return memo;
   }, previousUsers);
+  Logger.info({
+    file: __filename,
+    message: 'Calculated user to oDOLO amounts!',
+  });
 
   const { merkleRoot, walletAddressToLeafMap } = await calculateMerkleRootAndLeafs(userToOTokenRewards);
+  Logger.info({
+    file: __filename,
+    message: 'Calculated Merkle root!',
+  });
 
   const oTokenOutputFile: ODoloOutputFile = {
     users: walletAddressToLeafMap,

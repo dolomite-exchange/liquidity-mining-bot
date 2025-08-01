@@ -477,7 +477,13 @@ export function calculateFinalPoints(
     const totalPoolEquityPoints = poolToTotalSubLiquidityPoints[pool];
     let totalWhitelistPoints = INTEGERS.ZERO;
 
-    if (totalLiquidityPoolPoints && totalPoolEquityPoints && totalMarketToLiquidityPoolPointsMap) {
+    if (
+      totalLiquidityPoolPoints
+      && totalPoolEquityPoints
+      && totalPoolEquityPoints.gt(INTEGERS.ZERO)
+      && totalMarketToLiquidityPoolPointsMap
+    ) {
+      console.warn('POOL', pool, totalPoolEquityPoints.toFixed(18));
       const events = poolToVirtualLiquidityPositionsAndEvents[pool];
       Object.keys(events.virtualLiquidityBalances).forEach(account => {
         if (!blacklistMap[account]) {

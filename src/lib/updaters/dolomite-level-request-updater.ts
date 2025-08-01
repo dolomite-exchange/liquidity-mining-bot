@@ -49,14 +49,7 @@ export default class DolomiteLevelRequestUpdater {
     const requests = this.levelUpdateRequestStore.getLevelUpdateRequests()
       .filter(p => !this.levelUpdateRequestCache.contains(p));
 
-    const truncatedTime = Math.floor(Date.now() / 1_000);
     if (requests.length === 0) {
-      if (truncatedTime % 10 === 0) {
-        Logger.info({
-          at: 'DolomiteLevelRequestUpdater#_fulfillLevelUpdateRequests',
-          message: 'No accounts to level up',
-        });
-      }
       return;
     }
 

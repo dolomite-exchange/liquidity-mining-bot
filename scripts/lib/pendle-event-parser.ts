@@ -30,7 +30,7 @@ export async function getPendleSyAddressToLiquidityPositionAndEventsForOToken(
     message: 'Getting Pendle data...',
     startTimestamp,
     endTimestamp,
-  })
+  });
   const numberOfTimestampsToFetch = Math.ceil(duration / PENDLE_FETCH_FREQUENCY);
   const timestamps = Array.from(
     { length: numberOfTimestampsToFetch },
@@ -41,10 +41,25 @@ export async function getPendleSyAddressToLiquidityPositionAndEventsForOToken(
   const marketIdToPoolInfoMap = POOL_INFO[networkId as ChainId];
   const syAddressToVirtualLiquidityPositions: Record<string, LiquidityPositionsAndEvents> = {};
   for (const marketId of Object.keys(marketIdToPoolInfoMap)) {
+    Logger.info({
+      file: __filename,
+      message: `Getting Pendle data for market ID: ${marketId}...`,
+      startTimestamp,
+      endTimestamp,
+    });
+
     const userToBalanceMapsForBlockNumbers = await fetchPendleUserBalanceSnapshotBatch(
       parseInt(marketId),
       blockNumbers,
     );
+
+    Logger.info({
+      file: __filename,
+      message: `Fetched Pendle data for market ID: ${marketId}!`,
+      startTimestamp,
+      endTimestamp,
+    });
+
     const userToPositionMap: Record<string, VirtualLiquidityPosition> = {};
     for (const userToBalanceMap of userToBalanceMapsForBlockNumbers) {
       for (let [user, balance] of Object.entries(userToBalanceMap)) {

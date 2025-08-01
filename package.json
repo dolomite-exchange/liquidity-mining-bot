@@ -39,6 +39,7 @@
     "execute:rectify-oarb-rewards-for-arb": "SCRIPT=true npx ts-node scripts/rectify-oarb-rewards-for-arb.ts",
     "execute:rectify-oarb-rewards-for-deltas": "SCRIPT=true npx ts-node scripts/rectify-oarb-rewards-for-deltas.ts",
     "execute:rectify-old-pendle-epochs": "SCRIPT=true npx ts-node scripts/rectify-old-pendle-epochs.ts",
+    "execute:test-pendle-event-parser": "SCRIPT=true npx ts-node scripts/test-pendle-event-parser.ts",
     "execute:transform-csv-to-json": "SCRIPT=true npx ts-node scripts/transform-csv-to-json.ts",
     "execute:transform-all-pendle-minerals-to-events": "SCRIPT=true npx ts-node scripts/transform-all-pendle-minerals-to-events.ts",
     "execute:transform-regular-airdrop-to-json": "SCRIPT=true npx ts-node scripts/transform-regular-airdrop-to-json.ts",
