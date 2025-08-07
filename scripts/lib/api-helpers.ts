@@ -6,6 +6,7 @@ import { ChainId } from '../../src/lib/chain-id';
 export interface ODoloMetadata {
   odoloStartTimestamp: number;
   currentEpochIndex: number;
+  onchainEpochIndex: number;
   currentEpochStartTimestamp: number;
   epochIndexForRewardWeights: number;
   epochStartTimestamp: number;
