@@ -19,9 +19,24 @@ export interface ODoloMetadata {
   allChainStartEpochs: Record<ChainId, number | null>
 }
 
+export interface BorrowRebatesMetadata {
+  rebateStartTimestamp: number;
+  currentEpochIndex: number;
+  onchainEpochIndex: number;
+  currentEpochStartTimestamp: number;
+  epochIndexForRewardWeights: number;
+  epochStartTimestamp: number;
+  epochRewards: number;
+  /**
+   * Chain ID to rebate percentage (decimal format); 0.10 == 10% == 10% rebate on borrow fees paid
+   */
+  allChainWeights: Record<ChainId, Decimal>
+  allChainStartEpochs: Record<ChainId, number | null>
+}
+
 export async function readODoloMetadataFromApi(epoch: number | undefined): Promise<ODoloMetadata> {
   const epochQuery = epoch !== undefined ? `?epoch=${epoch}` : '';
-  const response = await axios.get(`${DOLOMITE_API_SERVER_URL}/liquidity-mining/odolo/metadata${epochQuery}`);
+  const response = await axios.get(`${DOLOMITE_API_SERVER_URL}/liquidity-mining/borrow-rebates/metadata${epochQuery}`);
   const { allChainWeights } = response.data.metadata;
   return {
     ...response.data.metadata,
