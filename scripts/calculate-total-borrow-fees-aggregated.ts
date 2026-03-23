@@ -21,7 +21,7 @@ import VeDoloAbi from '../src/abi/ve-dolo.json';
 
 const DOLO_MARKET_ID = new BigNumber(35); // On Berachain
 
-async function calculateBorrowTotalBorrowFees(
+export async function calculateTotalBorrowFeesAggregated(
   epoch: number = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10),
 ) {
   if (dolomite.networkId !== 80094) {
@@ -32,14 +32,33 @@ async function calculateBorrowTotalBorrowFees(
     return Promise.reject(new Error(`Invalid network, expected Berachain, found: ${dolomite.networkId}`));
   }
 
-  const borrowRebatesMetadata = await readVeDoloRebateMetadataFromApi();
-  const networks = Object.keys(borrowRebatesMetadata.allChainStartEpochs).map(c => Number(c)) as ChainId[];
+  const outputFileName = getTotalBorrowInterestFinalizedFileNameWithPath(epoch);
+  let hasFile = false;
+  try {
+    await readFileFromGitHub<TotalBorrowFeesOutputFile>(outputFileName);
+    hasFile = true;
+    // eslint-disable-next-line no-empty
+  } catch (e) {
+  }
+
+  if (hasFile && !shouldForceUpload()) {
+    Logger.info({
+      file: __filename,
+      message: 'Epoch borrow amounts have already been calculated. Returning...',
+      epoch,
+    });
+
+    return false;
+  }
+
+  const serverMetadata = await readVeDoloRebateMetadataFromApi();
+  const networks = Object.keys(serverMetadata.allChainStartEpochs).map(c => Number(c)) as ChainId[];
 
   const userToTotalBorrowAmountUsd: Record<string, Decimal> = {};
 
   const missingNetworks: number[] = [];
   for (const networkId of networks) {
-    const startEpoch = borrowRebatesMetadata.allChainStartEpochs[networkId];
+    const startEpoch = serverMetadata.allChainStartEpochs[networkId];
     if (startEpoch === null || epoch < startEpoch) {
       continue;
     }
@@ -49,10 +68,10 @@ async function calculateBorrowTotalBorrowFees(
       message: `Processing network ${networkId}`,
     });
 
-    const outputFileName = getBorrowInterestFinalizedFileNameWithPath(networkId, epoch);
+    const borrowFeePerNetworkFileName = getBorrowInterestFinalizedFileNameWithPath(networkId, epoch);
     let borrowAmountFile: BorrowFeesPerNetworkOutputFile;
     try {
-      borrowAmountFile = await readFileFromGitHub<BorrowFeesPerNetworkOutputFile>(outputFileName);
+      borrowAmountFile = await readFileFromGitHub<BorrowFeesPerNetworkOutputFile>(borrowFeePerNetworkFileName);
     } catch (e) {
       missingNetworks.push(networkId);
       continue;
@@ -78,11 +97,10 @@ async function calculateBorrowTotalBorrowFees(
       networks: missingNetworks,
       epoch: epoch?.toString(),
     });
-    return Promise.resolve(epoch);
+    return false
   }
 
-  const veDoloRebateMetadata = await readVeDoloRebateMetadataFromApi();
-  const startTimestamp = veDoloRebateMetadata.startTimestamp + ((epoch - 1) * ONE_WEEK_SECONDS);
+  const startTimestamp = serverMetadata.startTimestamp + ((epoch - 1) * ONE_WEEK_SECONDS);
   const endTimestamp = startTimestamp + ONE_WEEK_SECONDS;
   const endBlockNumber = (await getLatestBlockDataByTimestamp(endTimestamp)).blockNumber;
 
@@ -162,7 +180,6 @@ async function calculateBorrowTotalBorrowFees(
     },
   };
 
-  const outputFileName = getTotalBorrowInterestFinalizedFileNameWithPath(epoch);
   if (!isScript() || shouldForceUpload()) {
     await writeFileToGitHub(outputFileName, borrowAmountOutputFile, false);
   } else {
@@ -173,11 +190,11 @@ async function calculateBorrowTotalBorrowFees(
     writeOutputFile(outputFileName, borrowAmountOutputFile);
   }
 
-  return { epoch };
+  return true;
 }
 
 if (isScript()) {
-  calculateBorrowTotalBorrowFees()
+  calculateTotalBorrowFeesAggregated()
     .then(() => {
       process.exit(0);
     })

@@ -17,9 +17,29 @@ import {
 import { dolomite } from '../src/helpers/web3';
 import { AmountAndLeaf, calculateMerkleRootAndLeafs } from './lib/utils';
 
-async function calculateBorrowRebatePerNetwork(
+export async function calculateBorrowRebatePerNetwork(
   epoch: number = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10),
 ) {
+  const outputFileName = getBorrowFeeRebateFileNameWithPath(dolomite.networkId);
+
+  let hasFile = false;
+  try {
+    const file = await readFileFromGitHub<BorrowRebatePerNetworkOutputFile>(outputFileName);
+    hasFile = file.metadata.epoch === epoch;
+    // eslint-disable-next-line no-empty
+  } catch (e) {
+  }
+
+  if (hasFile && !shouldForceUpload()) {
+    Logger.info({
+      file: __filename,
+      message: 'Borrow rebates have already been calculated. Returning...',
+      epoch,
+    });
+
+    return false;
+  }
+
   const borrowRebatesMetadata = await readVeDoloRebateMetadataFromApi();
 
   const totalBorrowFeesFile = await readFileFromGitHub(
@@ -53,7 +73,6 @@ async function calculateBorrowRebatePerNetwork(
     return Promise.resolve();
   }
 
-  // TODO: initialize with previous epoch's data
   let userToMarketToRebate: Record<string, Record<string, Integer>>;
   let marketTotalRebate: Record<string, Integer>;
   if (epoch === 1) {
@@ -157,7 +176,6 @@ async function calculateBorrowRebatePerNetwork(
     },
   };
 
-  const outputFileName = getBorrowFeeRebateFileNameWithPath(dolomite.networkId);
   if (!isScript() || shouldForceUpload()) {
     await writeFileToGitHub(outputFileName, borrowRebatePerNetworkOutputFile, false);
   } else {

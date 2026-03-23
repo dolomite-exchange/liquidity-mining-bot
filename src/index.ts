@@ -32,6 +32,10 @@ import ODoloAggregatorMerkleTreeUpdater from './lib/updaters/odolo-merkle-tree-u
 import ODoloUpdater from './lib/updaters/odolo-updater';
 import PendleMineralsUpdater from './lib/updaters/pendle-minerals-updater';
 import BorrowFeeRebateMerkleTreeUpdater from './lib/updaters/borrow-fee-rebate-merkle-tree-updater';
+import BorrowFeeUpdater from './lib/updaters/borrow-fee-updater';
+import BorrowFeeRebateUpdater from './lib/updaters/borrow-fee-rebate-updater';
+import BorrowFeeAggregatorUpdater from './lib/updaters/borrow-fee-aggregator-updater';
+import BorrowFeeSweeperUpdater from './lib/updaters/borrow-fee-sweeper-updater';
 
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
@@ -53,6 +57,10 @@ checkBooleanValue('LEVEL_REQUESTS_ENABLED');
 checkDuration('LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS', 1, false);
 checkDuration('LEVEL_REQUESTS_POLL_INTERVAL_MS', 1000, true);
 checkBooleanValue('MINERALS_ENABLED');
+checkConditionally(
+  !!process.env.MIN_SWEEP_REVENUE_AMOUNT_USD,
+  () => checkBigNumber('MIN_SWEEP_REVENUE_AMOUNT_USD'),
+);
 checkBooleanValue('ODOLO_AGGREGATOR_ENABLED');
 checkBooleanValue('ODOLO_ENABLED');
 checkJsNumber('NETWORK_ID');
@@ -90,13 +98,19 @@ async function start() {
   const subgraphBlockNumber = blockStore.getBlockNumber();
   const { riskParams } = await getDolomiteRiskParams(subgraphBlockNumber);
   const networkId = await dolomite.web3.eth.net.getId();
+
+  // TODO: add handler for claiming revenue
+  const borrowFeeUpdater = new BorrowFeeUpdater();
+  const borrowFeeRebateUpdater = new BorrowFeeRebateUpdater();
+  const borrowFeeAggregatorUpdater = new BorrowFeeAggregatorUpdater();
+  const borrowFeeSweeperUpdater = new BorrowFeeSweeperUpdater(marketStore, networkId);
+  const borrowFeeRebateMerkleTreeUpdater = new BorrowFeeRebateMerkleTreeUpdater(networkId);
   const mineralsUpdater = new MineralsUpdater();
   const mineralsMerkleTreeUpdater = new MineralsMerkleTreeUpdater(networkId);
   const pendleMineralsUpdater = new PendleMineralsUpdater();
   const oDoloAggregatorUpdater = new ODoloAggregatorUpdater();
   const oDoloUpdater = new ODoloUpdater();
   const oDoloMerkleTreeUpdater = new ODoloAggregatorMerkleTreeUpdater(networkId);
-  const borrowFeeRebateMerkleTreeUpdater = new BorrowFeeRebateMerkleTreeUpdater(networkId);
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address
   if (riskParams.dolomiteMargin !== libraryDolomiteMargin) {
@@ -133,6 +147,7 @@ async function start() {
     levelRequestsKeyExpirationSeconds: process.env.LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS,
     levelRequestsPollIntervalMillis: process.env.LEVEL_REQUESTS_POLL_INTERVAL_MS,
     mineralsEnabled: process.env.MINERALS_ENABLED,
+    minSweepRevenueAmountUsd: process.env.MIN_SWEEP_REVENUE_AMOUNT_USD,
     oDoloAggregatorEnabled: process.env.ODOLO_AGGREGATOR_ENABLED,
     oDoloEnabled: process.env.ODOLO_ENABLED,
     networkId,
@@ -145,9 +160,12 @@ async function start() {
     blockStore.start();
   }
   if (process.env.BORROW_FEE_REBATES_ENABLED === 'true') {
-    // TODO:
+    borrowFeeUpdater.start();
+    borrowFeeRebateUpdater.start();
   }
   if (process.env.BORROW_FEE_REBATES_AGGREGATOR_ENABLED === 'true') {
+    borrowFeeAggregatorUpdater.start();
+    borrowFeeSweeperUpdater.start();
     borrowFeeRebateMerkleTreeUpdater.start();
   }
   if (process.env.DETONATIONS_ENABLED === 'true') {

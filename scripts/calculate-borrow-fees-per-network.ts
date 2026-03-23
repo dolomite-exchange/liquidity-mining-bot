@@ -145,7 +145,9 @@ export async function calculateBorrowFeesPerNetwork(
   const walletAddressToMarketIdToFinalAmountMap: Record<string, Record<string, Integer>> = {};
   if (epoch > 1) {
     const previousOutputFileName = getBorrowInterestFinalizedFileNameWithPath(networkId, epoch - 1);
-    const previousBorrowAmountOutputFile = await readFileFromGitHub<BorrowFeesPerNetworkOutputFile>(previousOutputFileName);
+    const previousBorrowAmountOutputFile = await readFileFromGitHub<BorrowFeesPerNetworkOutputFile>(
+      previousOutputFileName,
+    );
     Object.keys(previousBorrowAmountOutputFile.users).forEach(user => {
       walletAddressToMarketIdToFinalAmountMap[user] = {};
       Object.keys(previousBorrowAmountOutputFile.users[user]).forEach(marketId => {

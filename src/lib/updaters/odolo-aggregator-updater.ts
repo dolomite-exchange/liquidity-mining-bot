@@ -6,7 +6,6 @@ import Logger from '../logger';
 const WAIT_DURATION_MILLIS = 60 * 1_000; // 60 seconds in millis
 
 export default class ODoloAggregatorUpdater {
-
   start = () => {
     Logger.info({
       at: 'ODoloAggregatorUpdater#start',
