@@ -3,7 +3,7 @@ import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomi
 import { ethers } from 'ethers';
 import { MarketIndex } from '../../src/lib/api-types';
 import { ONE_ETH_WEI } from '../../src/lib/constants';
-import { toNextDailyTimestamp } from '../../src/lib/utils';
+import { invariant, toNextDailyTimestamp } from '../../src/lib/utils';
 import { remapAccountToClaimableAccount } from './remapper';
 
 export const ARB_VESTER_PROXY = '0x531BC6E97b65adF8B3683240bd594932Cfb63797'.toLowerCase();
@@ -77,6 +77,10 @@ export enum InterestOperation {
   ADD_POSITIVE = 'ADD_POSITIVE',
   ADD_NEGATIVE = 'ADD_NEGATIVE',
   NEGATE = 'NEGATE',
+  // Only tallies the accrued borrow interest
+  ONLY_NEGATIVE = 'ONLY_NEGATIVE',
+  // Only tallies the accrued supply interest
+  ONLY_POSITIVE = 'ONLY_POSITIVE',
   NOTHING = 'NOTHING',
 }
 
@@ -92,8 +96,9 @@ export class BalanceAndRewardPoints {
     public readonly effectiveUser: string,
     public readonly marketId: number,
     public pointsPerSecond: Decimal,
-    private lastUpdated: number,
-    private balancePar: Decimal,
+    public lastUpdated: number,
+    public balancePar: Decimal,
+    public balanceWei: Decimal,
   ) {
     this.rewardPoints = INTEGERS.ZERO;
     this.positiveInterestAccrued = INTEGERS.ZERO;
@@ -117,7 +122,12 @@ export class BalanceAndRewardPoints {
     const timeDelta = new BigNumber(event.timestamp - this.lastUpdated);
 
     // Accrue interest
-    if (operation !== InterestOperation.NOTHING) {
+    // TODO: fix accumulation for negative interest
+    if (
+      operation === InterestOperation.ADD_POSITIVE
+      || operation === InterestOperation.ADD_NEGATIVE
+      || operation === InterestOperation.NEGATE
+    ) {
       if (this.balancePar.lt(INTEGERS.ZERO)) {
         const indexDelta = event.interestIndex.borrow.minus(INTEGERS.ONE);
         negativeInterestDelta = this.balancePar.abs().times(indexDelta);
@@ -127,6 +137,16 @@ export class BalanceAndRewardPoints {
         positiveInterestDelta = this.balancePar.times(indexDelta);
         this.positiveInterestAccrued = this.positiveInterestAccrued.plus(positiveInterestDelta);
       }
+    } else if (operation === InterestOperation.ONLY_NEGATIVE && this.balancePar.lt(INTEGERS.ZERO)) {
+      const newBalanceWei = this.balancePar.abs().times(event.interestIndex.borrow);
+      negativeInterestDelta = newBalanceWei.minus(this.balanceWei.abs());
+      this.negativeInterestAccrued = this.negativeInterestAccrued.plus(negativeInterestDelta);
+    } else if (operation === InterestOperation.ONLY_POSITIVE && this.balancePar.gt(INTEGERS.ZERO)) {
+      const newBalanceWei = this.balancePar.abs().times(event.interestIndex.supply);
+      positiveInterestDelta = newBalanceWei.minus(this.balanceWei.abs());
+      this.positiveInterestAccrued = this.positiveInterestAccrued.plus(positiveInterestDelta);
+    } else {
+      invariant(operation === InterestOperation.NOTHING, `Invalid operation, found: ${operation}`);
     }
 
     // Accrue balance-based points
@@ -147,6 +167,10 @@ export class BalanceAndRewardPoints {
       pointsUpdate = pointsUpdate.plus(positiveInterestDelta.minus(negativeInterestDelta)
         .times(timeDelta)
         .times(this.pointsPerSecond));
+    } else if (operation === InterestOperation.ONLY_NEGATIVE) {
+      pointsUpdate = negativeInterestDelta.times(timeDelta).times(this.pointsPerSecond);
+    } else if (operation === InterestOperation.ONLY_POSITIVE) {
+      pointsUpdate = positiveInterestDelta.times(timeDelta).times(this.pointsPerSecond);
     } else if (operation !== InterestOperation.NOTHING) {
       throw new Error(`Invalid operation, found: ${operation}`);
     }
@@ -154,6 +178,12 @@ export class BalanceAndRewardPoints {
     this.rewardPoints = this.rewardPoints.plus(pointsUpdate);
     this.balancePar = this.balancePar.plus(event.amountDeltaPar);
     this.lastUpdated = event.timestamp;
+
+    if (this.balancePar.lt(INTEGERS.ZERO)) {
+      this.balanceWei = this.balancePar.times(event.interestIndex.borrow);
+    } else {
+      this.balanceWei = this.balancePar.times(event.interestIndex.supply);
+    }
 
     return pointsUpdate;
   }
@@ -195,7 +225,8 @@ export function processEventsUntilEndTimestamp(
   marketToPointsPerSecondMap: Record<string, Decimal>,
   endTimestamp: number,
   operation: InterestOperation,
-) {
+): Record<string, Decimal> {
+  const totalMarketPointsMap: Record<string, Decimal> = {};
   Object.keys(accountToMarketToEventsMap).forEach(account => {
     Object.keys(accountToMarketToEventsMap[account]!).forEach(subAccount => {
       // Make sure user => subAccount ==> market => balance record exists
@@ -214,12 +245,16 @@ export function processEventsUntilEndTimestamp(
           if (!userBalanceStruct) {
             // For the first event, initialize the struct. Don't process it because we need to normalize the par value
             // if interest needs to be accrued for the `InterestOperation`
+            const interestIndex = event.amountDeltaPar.lt(INTEGERS.ZERO)
+              ? event.interestIndex.borrow
+              : event.interestIndex.supply;
             userBalanceStruct = new BalanceAndRewardPoints(
               event.effectiveUser,
               event.interestIndex.marketId,
               marketToPointsPerSecondMap[market] ?? INTEGERS.ONE,
               event.timestamp,
               event.amountDeltaPar,
+              event.amountDeltaPar.times(interestIndex),
             );
             accountToDolomiteBalanceMap[account]![subAccount]![market] = userBalanceStruct;
           } else {
@@ -267,9 +302,16 @@ export function processEventsUntilEndTimestamp(
             operation,
           );
         }
+
+        if (!totalMarketPointsMap[market]) {
+          totalMarketPointsMap[market] = INTEGERS.ZERO;
+        }
+        totalMarketPointsMap[market] = totalMarketPointsMap[market].plus(userBalanceStruct.rewardPoints);
       });
     });
   });
+
+  return totalMarketPointsMap;
 }
 
 export function processEventsWithDifferingPointsBasedOnTimestampUntilEndTimestamp(
@@ -300,12 +342,17 @@ export function processEventsWithDifferingPointsBasedOnTimestampUntilEndTimestam
           if (!userBalanceStruct) {
             // For the first event, initialize the struct. Don't process it because we need to normalize the par value
             // if interest needs to be accrued for the `InterestOperation`
+
+            const interestIndex = event.amountDeltaPar.lt(INTEGERS.ZERO)
+              ? event.interestIndex.borrow
+              : event.interestIndex.supply;
             userBalanceStruct = new BalanceAndRewardPoints(
               event.effectiveUser,
               event.interestIndex.marketId,
               pointsPerSecond,
               event.timestamp,
               event.amountDeltaPar,
+              event.amountDeltaPar.times(interestIndex),
             );
             accountToDolomiteBalanceMap[account]![subAccount]![market] = userBalanceStruct;
           } else {
@@ -483,7 +530,6 @@ export function calculateFinalPoints(
       && totalPoolEquityPoints.gt(INTEGERS.ZERO)
       && totalMarketToLiquidityPoolPointsMap
     ) {
-      console.warn('POOL', pool, totalPoolEquityPoints.toFixed(18));
       const events = poolToVirtualLiquidityPositionsAndEvents[pool];
       Object.keys(events.virtualLiquidityBalances).forEach(account => {
         if (!blacklistMap[account]) {
@@ -541,6 +587,40 @@ export function calculateFinalPoints(
   return { userToPointsMap, userToMarketToPointsMap, marketToPointsMap, totalUserPoints };
 }
 
+/**
+ * @return Maps containing interest, which is an BigInt with 18 decimals of precision
+ */
+export function calculateBorrowInterest(
+  networkId: number,
+  accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceAndPointsMap,
+): Record<string, Record<string, Integer>> {
+  const userToMarketToInterestMap: Record<string, Record<string, Integer>> = {};
+
+  Object.keys(accountToDolomiteBalanceMap).forEach(account => {
+    Object.keys(accountToDolomiteBalanceMap[account]!).forEach(subAccount => {
+      Object.keys(accountToDolomiteBalanceMap[account]![subAccount]!).forEach(market => {
+        if (!blacklistMap[account.toLowerCase()]) {
+          const balanceStruct = accountToDolomiteBalanceMap[account]![subAccount]![market]!;
+
+          const remappedAccount = remapAccountToClaimableAccount(networkId, balanceStruct.effectiveUser);
+          if (!userToMarketToInterestMap[remappedAccount]) {
+            userToMarketToInterestMap[remappedAccount] = {};
+          }
+          if (!userToMarketToInterestMap[remappedAccount][market]) {
+            userToMarketToInterestMap[remappedAccount][market] = INTEGERS.ZERO;
+          }
+
+          const interest = balanceStruct.negativeInterestAccrued.times(ONE_ETH_WEI).integerValue();
+          userToMarketToInterestMap[remappedAccount][market] = userToMarketToInterestMap[remappedAccount][market]
+            .plus(interest);
+        }
+      });
+    });
+  });
+
+  return userToMarketToInterestMap;
+}
+
 export function calculateFinalEquityRewards(
   networkId: number,
   accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceAndPointsMap,
@@ -596,7 +676,7 @@ export function calculateFinalEquityRewards(
 
   let filteredAmount = INTEGERS.ZERO;
   const accounts = Object.keys(userToOTokenRewards);
-  const finalizedRewardsMap = accounts.reduce<Record<string, BigNumber>>((map, account) => {
+  return accounts.reduce<Record<string, BigNumber>>((map, account) => {
     if (userToOTokenRewards[account].gte(minimumOTokenAmount)) {
       map[account] = userToOTokenRewards[account];
     } else {
@@ -604,8 +684,4 @@ export function calculateFinalEquityRewards(
     }
     return map;
   }, {});
-
-  console.log('oToken amount filtered out:', filteredAmount.dividedBy(ONE_ETH_WEI).toFixed(2));
-
-  return finalizedRewardsMap;
 }

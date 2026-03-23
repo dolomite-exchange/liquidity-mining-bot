@@ -12,6 +12,14 @@ export interface MerkleRootAndLeafData {
   walletAddressToLeafMap: Record<string, AmountAndLeaf>; // wallet ==> proofs + amounts
 }
 
+export interface MerkleRootAnd2dLeafData {
+  merkleRoot: string;
+  /**
+   * wallet ==> marketId ==> proofs + amounts
+   */
+  walletAddressToMarketIdToLeafMap: Record<string, Record<string, AmountAndLeaf>>;
+}
+
 export interface AmountAndProof {
   amount: string;
   proofs: string[];

@@ -23,6 +23,7 @@
     "execute:calculate-options-airdrop": "SCRIPT=true npx ts-node scripts/calculate-options-airdrop.ts",
     "execute:calculate-odolo-aggregate-rewards": "SCRIPT=true npx ts-node scripts/calculate-odolo-aggregate-rewards.ts",
     "execute:calculate-odolo-rewards": "SCRIPT=true npx ts-node scripts/calculate-odolo-rewards-per-network.ts",
+    "execute:calculate-borrow-amounts": "SCRIPT=true npx ts-node scripts/calculate-borrow-fees-per-network.ts",
     "execute:calculate-otoken-rewards": "SCRIPT=true npx ts-node scripts/calculate-otoken-rewards.ts",
     "execute:calculate-otoken-season-config": "SCRIPT=true npx ts-node scripts/calculate-otoken-season-config.ts",
     "execute:calculate-regular-airdrop": "SCRIPT=true ENV_FILENAME=.env.production npx ts-node scripts/calculate-regular-airdrop.ts",

@@ -31,6 +31,7 @@ import ODoloAggregatorUpdater from './lib/updaters/odolo-aggregator-updater';
 import ODoloAggregatorMerkleTreeUpdater from './lib/updaters/odolo-merkle-tree-updater';
 import ODoloUpdater from './lib/updaters/odolo-updater';
 import PendleMineralsUpdater from './lib/updaters/pendle-minerals-updater';
+import BorrowFeeRebateMerkleTreeUpdater from './lib/updaters/borrow-fee-rebate-merkle-tree-updater';
 
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
@@ -95,6 +96,7 @@ async function start() {
   const oDoloAggregatorUpdater = new ODoloAggregatorUpdater();
   const oDoloUpdater = new ODoloUpdater();
   const oDoloMerkleTreeUpdater = new ODoloAggregatorMerkleTreeUpdater(networkId);
+  const borrowFeeRebateMerkleTreeUpdater = new BorrowFeeRebateMerkleTreeUpdater(networkId);
 
   const libraryDolomiteMargin = dolomite.contracts.dolomiteMargin.options.address
   if (riskParams.dolomiteMargin !== libraryDolomiteMargin) {
@@ -142,12 +144,18 @@ async function start() {
   if (process.env.BLOCK_STORE_ENABLED === 'true') {
     blockStore.start();
   }
-  if (process.env.GAS_PRICE_UPDATER_ENABLED === 'true') {
-    gasPriceUpdater.start();
+  if (process.env.BORROW_FEE_REBATES_ENABLED === 'true') {
+    // TODO:
+  }
+  if (process.env.BORROW_FEE_REBATES_AGGREGATOR_ENABLED === 'true') {
+    borrowFeeRebateMerkleTreeUpdater.start();
   }
   if (process.env.DETONATIONS_ENABLED === 'true') {
     vestingPositionStore.start();
     dolomiteDetonator.start();
+  }
+  if (process.env.GAS_PRICE_UPDATER_ENABLED === 'true') {
+    gasPriceUpdater.start();
   }
   if (process.env.LEVEL_REQUESTS_ENABLED === 'true') {
     marketStore.start();

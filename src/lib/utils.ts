@@ -13,3 +13,7 @@ export function chunkArray<T>(items: T[], maxChunkSize: number): T[][] {
 export function toNextDailyTimestamp(timestamp: number): number {
   return Math.floor(timestamp / ONE_DAY_SECONDS) * ONE_DAY_SECONDS + ONE_DAY_SECONDS
 }
+
+export function invariant(condition: boolean, message: string): asserts condition {
+  if (!condition) throw new Error(message)
+}

@@ -149,6 +149,62 @@ export interface ODoloAggregateOutputFile {
   };
 }
 
+export interface BorrowFeesPerNetworkOutputFile {
+  users: {
+    [walletAddressLowercase: string]: {
+      [market: string]: string // big int
+    }
+  };
+  metadata: {
+    epoch: number;
+    totalUsers: number;
+    marketTotalBorrowInterest: {
+      [market: string]: string // big int
+    }
+    marketPrices: {
+      [market: string]: string // big int
+    }
+  };
+}
+
+export interface TotalBorrowFeesMetadataPerUser {
+  totalBorrowInterestUsd: string; // USD big int (18 decimals)
+  totalVeDoloUsd: string; // USD big int (18 decimals)
+}
+
+export interface TotalBorrowFeesOutputFile {
+  users: {
+    [walletAddressLowercase: string]: TotalBorrowFeesMetadataPerUser;
+  };
+  metadata: {
+    epoch: number;
+    totalUsers: number;
+    totalBorrowInterestUsd: string; // big int (18 decimals)
+    doloPriceUsd: string;
+  };
+}
+
+export interface BorrowRebatePerNetworkOutputFile {
+  users: {
+    [walletAddressLowercase: string]: {
+      [market: string]: {
+        amount: string // big int
+        leaf: string
+      }
+    }
+  };
+  metadata: {
+    epoch: number;
+    marketToMerkleRoot: {
+      [market: string]: string // merkle root
+    };
+    totalUsers: number;
+    marketToTotalRebate: {
+      [market: string]: string // big int
+    }
+  };
+}
+
 export interface OTokenConfigEpoch extends EpochConfig {
   oTokenAmount: string;
   rewardWeights: Record<string, string>;

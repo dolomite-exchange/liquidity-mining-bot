@@ -23,7 +23,7 @@ const ACCOUNT_MAP: Record<number, Record<string, string | undefined>> = {}
 
 export function remapAccountToClaimableAccount(chainId: ChainId, account: string): string {
   if (!ACCOUNT_MAP[chainId]) {
-    throw new Error(`Account remapping is not setup for ${chainId}`);
+    return account;
   }
   return ACCOUNT_MAP[chainId][account] ?? account;
 }
