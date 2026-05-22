@@ -79,7 +79,7 @@ export default class BorrowFeeSweeperUpdater {
 
     const rollingClaimsAddress = (FeeRebateRollingClaimsProxy as any)[this.networkId]?.address;
     if (!rollingClaimsAddress) {
-      Logger.warn({
+      Logger.error({
         at: 'BorrowFeeSweeperUpdater#_update',
         message: 'FeeRebateRollingClaimsProxy not found for this network',
       });

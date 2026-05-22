@@ -142,17 +142,17 @@ export async function calculateBorrowFeesPerNetwork(
     accountToDolomiteBalanceMap,
   );
 
-  const walletAddressToMarketIdToFinalAmountMap: Record<string, Record<string, Integer>> = {};
+  const walletAddressToMarketIdToFinalBorrowFeesMap: Record<string, Record<string, Integer>> = {};
   if (epoch > 1) {
     const previousOutputFileName = getBorrowInterestFinalizedFileNameWithPath(networkId, epoch - 1);
-    const previousBorrowAmountOutputFile = await readFileFromGitHub<BorrowFeesPerNetworkOutputFile>(
+    const previousBorrowFeesOutputFile = await readFileFromGitHub<BorrowFeesPerNetworkOutputFile>(
       previousOutputFileName,
     );
-    Object.keys(previousBorrowAmountOutputFile.users).forEach(user => {
-      walletAddressToMarketIdToFinalAmountMap[user] = {};
-      Object.keys(previousBorrowAmountOutputFile.users[user]).forEach(marketId => {
-        walletAddressToMarketIdToFinalAmountMap[user][marketId] = new BigNumber(
-          previousBorrowAmountOutputFile.users[user][marketId],
+    Object.keys(previousBorrowFeesOutputFile.users).forEach(user => {
+      walletAddressToMarketIdToFinalBorrowFeesMap[user] = {};
+      Object.keys(previousBorrowFeesOutputFile.users[user]).forEach(marketId => {
+        walletAddressToMarketIdToFinalBorrowFeesMap[user][marketId] = new BigNumber(
+          previousBorrowFeesOutputFile.users[user][marketId],
         );
       });
     });
@@ -162,19 +162,19 @@ export async function calculateBorrowFeesPerNetwork(
   Object.keys(userToMarketIdToBorrowInterest).forEach(user => {
     Object.keys(userToMarketIdToBorrowInterest[user]).forEach(marketId => {
       const amount = userToMarketIdToBorrowInterest[user][marketId];
-      if (!walletAddressToMarketIdToFinalAmountMap[user]) {
-        walletAddressToMarketIdToFinalAmountMap[user] = {};
+      if (!walletAddressToMarketIdToFinalBorrowFeesMap[user]) {
+        walletAddressToMarketIdToFinalBorrowFeesMap[user] = {};
       }
-      const previous = walletAddressToMarketIdToFinalAmountMap[user][marketId] ?? INTEGERS.ZERO;
-      walletAddressToMarketIdToFinalAmountMap[user][marketId] = previous.plus(amount);
+      const previous = walletAddressToMarketIdToFinalBorrowFeesMap[user][marketId] ?? INTEGERS.ZERO;
+      walletAddressToMarketIdToFinalBorrowFeesMap[user][marketId] = previous.plus(amount);
     });
   });
 
   const walletAddressToMarketIdToFinalAmountStringMap: Record<string, Record<string, string>> = {};
-  Object.keys(walletAddressToMarketIdToFinalAmountMap).forEach(user => {
+  Object.keys(walletAddressToMarketIdToFinalBorrowFeesMap).forEach(user => {
     walletAddressToMarketIdToFinalAmountStringMap[user] = {};
-    Object.keys(walletAddressToMarketIdToFinalAmountMap[user]).forEach(marketId => {
-      const amount = walletAddressToMarketIdToFinalAmountMap[user][marketId];
+    Object.keys(walletAddressToMarketIdToFinalBorrowFeesMap[user]).forEach(marketId => {
+      const amount = walletAddressToMarketIdToFinalBorrowFeesMap[user][marketId];
       walletAddressToMarketIdToFinalAmountStringMap[user][marketId] = amount.toFixed();
       marketTotalBorrowInterest[marketId] = (marketTotalBorrowInterest[marketId] ?? INTEGERS.ZERO).plus(amount);
     });
