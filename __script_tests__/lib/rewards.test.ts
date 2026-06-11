@@ -17,6 +17,7 @@ import {
   processEventsUntilEndTimestamp,
   VirtualBalanceAndRewardPoints,
 } from '../../scripts/lib/rewards';
+import { ApiMarket } from '../../src/lib/api-types';
 
 const blockRewardStartTimestamp = 1697000000;
 const blockRewardEndTimestamp = 1698000000;
@@ -223,6 +224,29 @@ const poolToVirtualLiquidityPositionsAndEvents: Record<string, LiquidityPosition
     virtualLiquidityBalances: ammLiquidityBalances,
   },
 }
+
+const marketMap: Record<string, ApiMarket> = {
+  '0': {
+    marketId: 0,
+    symbol: 'WETH',
+    name: 'Wrapped Ether',
+    tokenAddress: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+    decimals: 18,
+    liquidationRewardPremium: INTEGERS.ZERO,
+    marginPremium: INTEGERS.ZERO,
+    oraclePrice: INTEGERS.ZERO,
+  } as ApiMarket,
+  '17': {
+    marketId: 17,
+    symbol: 'USDC',
+    name: 'USD Coin',
+    tokenAddress: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    decimals: 6,
+    liquidationRewardPremium: INTEGERS.ZERO,
+    marginPremium: INTEGERS.ZERO,
+    oraclePrice: INTEGERS.ZERO,
+  } as ApiMarket,
+};
 
 let totalPointsPerMarket: Record<string, BigNumber>;
 let totalLiquidityPoints: Record<string, BigNumber>;
@@ -472,6 +496,7 @@ describe('rewards', () => {
       const borrowInterestMap = calculateBorrowInterest(
         ChainId.ArbitrumOne,
         accountToDolomiteBalanceMap,
+        marketMap,
       );
 
       // User 2 has negativeInterestAccrued of 200 in market 2 (USDC) from #processEvent tests (though accountToDolomiteBalanceMap might differ)

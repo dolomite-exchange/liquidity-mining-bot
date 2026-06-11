@@ -1,5 +1,6 @@
 import { readVeDoloRebateMetadataFromApi } from '../../scripts/lib/api-helpers';
+import { ChainId } from '../lib/chain-id';
 
-export async function getVeDoloRebateCurrentEpochNumber(): Promise<number> {
-  return (await readVeDoloRebateMetadataFromApi()).onchainEpochIndex;
+export async function getVeDoloRebateRollingClaimsCurrentEpochNumber(networkId: ChainId): Promise<number | null> {
+  return (await readVeDoloRebateMetadataFromApi()).onchainRollingClaimsEpochIndexMap[networkId];
 }

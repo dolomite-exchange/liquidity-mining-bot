@@ -1,6 +1,7 @@
+import { dolomite } from '../../helpers/web3';
 import { delay } from '../delay';
 import Logger from '../logger';
-import { getVeDoloRebateCurrentEpochNumber } from '../../helpers/vedolo-rebate-helpers';
+import { getVeDoloRebateRollingClaimsCurrentEpochNumber } from '../../helpers/vedolo-rebate-helpers';
 import { calculateBorrowRebatePerNetwork } from '../../../scripts/calculate-borrow-rebate-per-network';
 
 const WAIT_DURATION_MILLIS = 60 * 1_000; // 60 seconds in millis
@@ -43,7 +44,15 @@ export default class BorrowFeeRebateUpdater {
       message: 'Starting update...',
     });
 
-    const epoch = await getVeDoloRebateCurrentEpochNumber();
+    const epoch = await getVeDoloRebateRollingClaimsCurrentEpochNumber(dolomite.networkId);
+    if (epoch === null || Number.isNaN(epoch)) {
+      Logger.info({
+        at: 'BorrowFeeRebateUpdater#_update',
+        message: 'Skipping update due to missing epoch...',
+      });
+      return;
+    }
+
     try {
       await calculateBorrowRebatePerNetwork(epoch + 1);
     } catch (e: any) {

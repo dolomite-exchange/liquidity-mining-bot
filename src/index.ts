@@ -131,6 +131,8 @@ async function start() {
     accountWalletAddress: process.env.ACCOUNT_WALLET_ADDRESS,
     blockPollIntervalMillis: process.env.BLOCK_POLL_INTERVAL_MS,
     blockStoreEnabled: process.env.BLOCK_STORE_ENABLED,
+    borrowFeeRebatesEnabled: process.env.BORROW_FEE_REBATES_ENABLED,
+    borrowFeeRebatesAggregatorEnabled: process.env.BORROW_FEE_REBATES_AGGREGATOR_ENABLED,
     detonationsEnabled: process.env.DETONATIONS_ENABLED,
     detonationsKeyExpirationSeconds: process.env.DETONATIONS_KEY_EXPIRATION_SECONDS,
     detonationsPollIntervalMillis: process.env.DETONATIONS_POLL_INTERVAL_MS,

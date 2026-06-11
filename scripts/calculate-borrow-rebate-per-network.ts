@@ -1,9 +1,13 @@
 import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
-import { ONE_ETH_WEI } from '../src/lib/constants';
+import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
+import FeeRebateClaimerAbi from '../src/abi/fee-rebate-claimer.json';
+import { dolomite } from '../src/helpers/web3';
+import { ChainId } from '../src/lib/chain-id';
+import { ONE_ETH_WEI, REBATE_START_TIMESTAMP_MAP } from '../src/lib/constants';
 import { isScript, shouldForceUpload } from '../src/lib/env'
 import Logger from '../src/lib/logger';
+import { decodeUint256ToBigNumber } from '../src/lib/utils';
 import { readVeDoloRebateMetadataFromApi } from './lib/api-helpers';
-import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
 import {
   getBorrowFeeRebateFileNameWithPath,
   getBorrowInterestFinalizedFileNameWithPath,
@@ -14,12 +18,16 @@ import {
   BorrowRebatePerNetworkOutputFile,
   TotalBorrowFeesOutputFile,
 } from './lib/data-types';
-import { dolomite } from '../src/helpers/web3';
+import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
 import { AmountAndLeaf, calculateMerkleRootAndLeafs } from './lib/utils';
 
 export async function calculateBorrowRebatePerNetwork(
   epoch: number = parseInt(process.env.EPOCH_NUMBER ?? 'NaN', 10),
 ) {
+  if (Number.isNaN(epoch)) {
+    return Promise.reject(new Error(`Invalid EPOCH_NUMBER, found: ${epoch}`));
+  }
+
   const outputFileName = getBorrowFeeRebateFileNameWithPath(dolomite.networkId);
 
   let hasFile = false;
@@ -46,11 +54,17 @@ export async function calculateBorrowRebatePerNetwork(
     getTotalBorrowInterestFinalizedFileNameWithPath(epoch),
   ) as TotalBorrowFeesOutputFile;
 
-  const startEpoch = borrowRebatesMetadata.allChainStartEpochs[dolomite.networkId];
-  if (startEpoch === null || epoch < startEpoch) {
+  const startEpoch = borrowRebatesMetadata.allChainRebateInfo[dolomite.networkId]?.startEpoch;
+  if (!startEpoch) {
     Logger.info({
       file: __filename,
       message: 'Skipping borrow fee rebate calculation. Epoch data is null...',
+    });
+    return Promise.resolve();
+  } else if (epoch < startEpoch) {
+    Logger.info({
+      file: __filename,
+      message: `Skipping borrow fee rebate calculation. Tracking for ${dolomite.networkId} has not started yet...`,
     });
     return Promise.resolve();
   }
@@ -71,6 +85,26 @@ export async function calculateBorrowRebatePerNetwork(
       message: 'No borrow fee file can be found yet. Returning...',
     });
     return Promise.resolve();
+  }
+
+  const feeClaimer = new dolomite.web3.eth.Contract(
+    FeeRebateClaimerAbi,
+    ModuleDeployments.FeeRebateClaimerProxy[dolomite.networkId].address,
+  );
+  const marketIds = Object.keys(borrowAmountFile.metadata.marketTotalBorrowInterest);
+  const revenueCalls = marketIds.map(marketId => ({
+    target: feeClaimer.options.address,
+    callData: feeClaimer.methods.getClaimAmountByEpochAndMarketId(epoch, marketId).encodeABI(),
+  }));
+  const timestampCalls: { target: string, callData: string }[] = marketIds.map(marketId => ({
+    target: feeClaimer.options.address,
+    callData: feeClaimer.methods.getClaimTimestampByEpochAndMarketId(epoch, marketId).encodeABI(),
+  }));
+  if (epoch >= 2) {
+    timestampCalls.push(...marketIds.map(marketId => ({
+      target: feeClaimer.options.address,
+      callData: feeClaimer.methods.getClaimTimestampByEpochAndMarketId(epoch - 1, marketId).encodeABI(),
+    })));
   }
 
   let userToMarketToRebate: Record<string, Record<string, Integer>>;
@@ -102,18 +136,26 @@ export async function calculateBorrowRebatePerNetwork(
       const marketBorrowFees = new BigNumber(borrowAmountFile.users[user][marketId]);
       const rebateInfo = totalBorrowFeesFile.users[user];
       if (rebateInfo) {
-        const totalBorrowFeesUsd: Decimal = new BigNumber(rebateInfo.totalBorrowInterestUsd).div(ONE_ETH_WEI);
         const totalVeDoloUsd: Decimal = new BigNumber(rebateInfo.totalVeDoloUsd).div(ONE_ETH_WEI);
-        const maxRebateUsd: Decimal = totalBorrowFeesUsd.times(borrowRebatesMetadata.maximumRebatePercentage);
 
+        const maxRebateUsd: Decimal = Object.keys(rebateInfo.totalBorrowInterestUsdPerNetwork)
+          .reduce((acc, chainId) => {
+            const networkId = parseInt(chainId, 10) as ChainId;
+            const borrowFeesUsd = new BigNumber(rebateInfo.totalBorrowInterestUsdPerNetwork[networkId]).div(ONE_ETH_WEI);
+            const rebatePercentage = borrowRebatesMetadata.allChainRebateInfo[networkId]!.rebatePercentage;
+            return acc.plus(borrowFeesUsd.times(rebatePercentage));
+          }, INTEGERS.ZERO);
+        const rebatePercentage = borrowRebatesMetadata.allChainRebateInfo[dolomite.networkId]!.rebatePercentage;
+
+        // TODO: fix this to be based on the actual amount claimed vs theoretical rebate
         let rebate: Integer;
         if (maxRebateUsd.lte(INTEGERS.ZERO)) {
           rebate = INTEGERS.ZERO;
         } else if (totalVeDoloUsd.gte(maxRebateUsd.times(borrowRebatesMetadata.veDoloHoldingFactor))) {
-          rebate = marketBorrowFees.times(borrowRebatesMetadata.maximumRebatePercentage);
+          rebate = marketBorrowFees.times(rebatePercentage);
         } else {
           rebate = marketBorrowFees
-            .times(borrowRebatesMetadata.maximumRebatePercentage)
+            .times(rebatePercentage)
             .times(totalVeDoloUsd)
             .dividedToIntegerBy(maxRebateUsd.times(borrowRebatesMetadata.veDoloHoldingFactor))
         }

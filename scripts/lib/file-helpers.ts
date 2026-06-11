@@ -92,13 +92,14 @@ export function writeOutputFile(
   fileContent: object,
   space?: string | number,
 ): void {
-  const directory = `${process.cwd()}/scripts/output`;
-  if (!fs.existsSync(directory)) {
-    fs.mkdirSync(directory);
+  const fullName = `${process.cwd()}/scripts/output/${fileName}`;
+  const fullDirectory = fullName.split('/').slice(0, -1).join('/');
+  if (!fs.existsSync(fullDirectory)) {
+    fs.mkdirSync(fullDirectory, { recursive: true });
   }
 
   fs.writeFileSync(
-    `${directory}/${fileName}`,
+    fullName,
     JSON.stringify(fileContent, undefined, space),
     { encoding: 'utf8', flag: 'w' },
   );

@@ -3,7 +3,7 @@ import { FeeRebateRollingClaimsProxy } from '@dolomite-exchange/modules-deployme
 import { getBorrowFeeRebateFileNameWithPath } from '../../../scripts/lib/config-helper';
 import { BorrowRebatePerNetworkOutputFile } from '../../../scripts/lib/data-types';
 import { readFileFromGitHub } from '../../../scripts/lib/file-helpers';
-import ODoloRollingClaimsAbi from '../../abi/odolo-reward-distributor.json';
+import FeeRebatingRollingClaimsAbi from '../../abi/fee-rebate-rolling-claims.json';
 import { getGasPriceWei } from '../../helpers/gas-price-helpers';
 import { dolomite } from '../../helpers/web3';
 import { delay } from '../delay';
@@ -66,7 +66,7 @@ export default class BorrowFeeRebateMerkleTreeUpdater {
     }
 
     const distributor = new dolomite.web3.eth.Contract(
-      ODoloRollingClaimsAbi,
+      FeeRebatingRollingClaimsAbi,
       FeeRebateRollingClaimsProxy[this.networkId].address,
     );
     const onchainEpochRaw = await dolomite.contracts.callConstantContractFunction<string>(

@@ -152,24 +152,49 @@ export interface ODoloAggregateOutputFile {
 export interface BorrowFeesPerNetworkOutputFile {
   users: {
     [walletAddressLowercase: string]: {
-      [market: string]: string // big int
+      /**
+       * big int (native decimals)
+       */
+      [market: string]: string;
     }
   };
   metadata: {
     epoch: number;
+    claimStartTimestamp: number;
+    claimStartBlockNumber: number;
+    claimEndTimestamp: number;
+    claimEndBlockNumber: number;
     totalUsers: number;
     marketTotalBorrowInterest: {
-      [market: string]: string // big int
+      /**
+       * big int (native decimals)
+       */
+      [market: string]: string;
     }
     marketPrices: {
-      [market: string]: string // big int
+      /**
+       * big int (native decimals)
+       */
+      [market: string]: string;
     }
   };
 }
 
 export interface TotalBorrowFeesMetadataPerUser {
-  totalBorrowInterestUsd: string; // USD big int (18 decimals)
-  totalVeDoloUsd: string; // USD big int (18 decimals)
+  /**
+   * USD big int (18 decimals)
+   */
+  totalBorrowInterestUsd: string;
+  /**
+   * USD big int (18 decimals)
+   */
+  totalVeDoloUsd: string;
+  totalBorrowInterestUsdPerNetwork: {
+    /**
+     * Value is USD big int (18 decimals)
+     */
+    [chainId: string]: string;
+  }
 }
 
 export interface TotalBorrowFeesOutputFile {
@@ -187,7 +212,7 @@ export interface TotalBorrowFeesOutputFile {
 export interface BorrowRebatePerNetworkOutputFile {
   users: {
     [walletAddressLowercase: string]: {
-      [market: string]: {
+      [marketId: string]: {
         amount: string // big int
         leaf: string
       }
@@ -196,11 +221,11 @@ export interface BorrowRebatePerNetworkOutputFile {
   metadata: {
     epoch: number;
     marketToMerkleRoot: {
-      [market: string]: string // merkle root
+      [marketId: string]: string // merkle root
     };
     totalUsers: number;
     marketToTotalRebate: {
-      [market: string]: string // big int
+      [marketId: string]: string // big int
     }
   };
 }

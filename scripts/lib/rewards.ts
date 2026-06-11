@@ -1,7 +1,7 @@
 /* eslint-disable max-classes-per-file */
 import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import { ethers } from 'ethers';
-import { MarketIndex } from '../../src/lib/api-types';
+import { ApiMarket, MarketIndex } from '../../src/lib/api-types';
 import { ONE_ETH_WEI } from '../../src/lib/constants';
 import { invariant, toNextDailyTimestamp } from '../../src/lib/utils';
 import { remapAccountToClaimableAccount } from './remapper';
@@ -122,7 +122,6 @@ export class BalanceAndRewardPoints {
     const timeDelta = new BigNumber(event.timestamp - this.lastUpdated);
 
     // Accrue interest
-    // TODO: fix accumulation for negative interest
     if (
       operation === InterestOperation.ADD_POSITIVE
       || operation === InterestOperation.ADD_NEGATIVE
@@ -137,14 +136,18 @@ export class BalanceAndRewardPoints {
         positiveInterestDelta = this.balancePar.times(indexDelta);
         this.positiveInterestAccrued = this.positiveInterestAccrued.plus(positiveInterestDelta);
       }
-    } else if (operation === InterestOperation.ONLY_NEGATIVE && this.balancePar.lt(INTEGERS.ZERO)) {
-      const newBalanceWei = this.balancePar.abs().times(event.interestIndex.borrow);
-      negativeInterestDelta = newBalanceWei.minus(this.balanceWei.abs());
-      this.negativeInterestAccrued = this.negativeInterestAccrued.plus(negativeInterestDelta);
-    } else if (operation === InterestOperation.ONLY_POSITIVE && this.balancePar.gt(INTEGERS.ZERO)) {
-      const newBalanceWei = this.balancePar.abs().times(event.interestIndex.supply);
-      positiveInterestDelta = newBalanceWei.minus(this.balanceWei.abs());
-      this.positiveInterestAccrued = this.positiveInterestAccrued.plus(positiveInterestDelta);
+    } else if (operation === InterestOperation.ONLY_NEGATIVE) {
+      if (this.balancePar.lt(INTEGERS.ZERO)) {
+        const newBalanceWei = this.balancePar.abs().times(event.interestIndex.borrow);
+        negativeInterestDelta = newBalanceWei.minus(this.balanceWei.abs());
+        this.negativeInterestAccrued = this.negativeInterestAccrued.plus(negativeInterestDelta);
+      }
+    } else if (operation === InterestOperation.ONLY_POSITIVE) {
+      if (this.balancePar.gt(INTEGERS.ZERO)) {
+        const newBalanceWei = this.balancePar.abs().times(event.interestIndex.supply);
+        positiveInterestDelta = newBalanceWei.minus(this.balanceWei.abs());
+        this.positiveInterestAccrued = this.positiveInterestAccrued.plus(positiveInterestDelta);
+      }
     } else {
       invariant(operation === InterestOperation.NOTHING, `Invalid operation, found: ${operation}`);
     }
@@ -593,6 +596,7 @@ export function calculateFinalPoints(
 export function calculateBorrowInterest(
   networkId: number,
   accountToDolomiteBalanceMap: AccountToSubAccountToMarketToBalanceAndPointsMap,
+  marketIdToMarketMap: { [marketId: string]: ApiMarket },
 ): Record<string, Record<string, Integer>> {
   const userToMarketToInterestMap: Record<string, Record<string, Integer>> = {};
 
@@ -610,7 +614,9 @@ export function calculateBorrowInterest(
             userToMarketToInterestMap[remappedAccount][market] = INTEGERS.ZERO;
           }
 
-          const interest = balanceStruct.negativeInterestAccrued.times(ONE_ETH_WEI).integerValue();
+          const decimals = marketIdToMarketMap[market].decimals;
+          const decimalFactor = new BigNumber(10).pow(decimals);
+          const interest = balanceStruct.negativeInterestAccrued.times(decimalFactor).integerValue();
           userToMarketToInterestMap[remappedAccount][market] = userToMarketToInterestMap[remappedAccount][market]
             .plus(interest);
         }
