@@ -1,12 +1,9 @@
 import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
-import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
-import FeeRebateClaimerAbi from '../src/abi/fee-rebate-claimer.json';
 import { dolomite } from '../src/helpers/web3';
 import { ChainId } from '../src/lib/chain-id';
-import { ONE_ETH_WEI, REBATE_START_TIMESTAMP_MAP } from '../src/lib/constants';
+import { ONE_ETH_WEI } from '../src/lib/constants';
 import { isScript, shouldForceUpload } from '../src/lib/env'
 import Logger from '../src/lib/logger';
-import { decodeUint256ToBigNumber } from '../src/lib/utils';
 import { readVeDoloRebateMetadataFromApi } from './lib/api-helpers';
 import {
   getBorrowFeeRebateFileNameWithPath,
@@ -87,26 +84,6 @@ export async function calculateBorrowRebatePerNetwork(
     return Promise.resolve();
   }
 
-  const feeClaimer = new dolomite.web3.eth.Contract(
-    FeeRebateClaimerAbi,
-    ModuleDeployments.FeeRebateClaimerProxy[dolomite.networkId].address,
-  );
-  const marketIds = Object.keys(borrowAmountFile.metadata.marketTotalBorrowInterest);
-  const revenueCalls = marketIds.map(marketId => ({
-    target: feeClaimer.options.address,
-    callData: feeClaimer.methods.getClaimAmountByEpochAndMarketId(epoch, marketId).encodeABI(),
-  }));
-  const timestampCalls: { target: string, callData: string }[] = marketIds.map(marketId => ({
-    target: feeClaimer.options.address,
-    callData: feeClaimer.methods.getClaimTimestampByEpochAndMarketId(epoch, marketId).encodeABI(),
-  }));
-  if (epoch >= 2) {
-    timestampCalls.push(...marketIds.map(marketId => ({
-      target: feeClaimer.options.address,
-      callData: feeClaimer.methods.getClaimTimestampByEpochAndMarketId(epoch - 1, marketId).encodeABI(),
-    })));
-  }
-
   let userToMarketToRebate: Record<string, Record<string, Integer>>;
   let marketTotalRebate: Record<string, Integer>;
   if (epoch === 1) {
@@ -147,7 +124,6 @@ export async function calculateBorrowRebatePerNetwork(
           }, INTEGERS.ZERO);
         const rebatePercentage = borrowRebatesMetadata.allChainRebateInfo[dolomite.networkId]!.rebatePercentage;
 
-        // TODO: fix this to be based on the actual amount claimed vs theoretical rebate
         let rebate: Integer;
         if (maxRebateUsd.lte(INTEGERS.ZERO)) {
           rebate = INTEGERS.ZERO;

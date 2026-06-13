@@ -51,6 +51,16 @@ export async function calculateBorrowFeesPerNetwork(
     });
     return { epoch };
   }
+  if (epoch > veDoloRebateMetadata.currentEpochIndex) {
+    // There's nothing to do. The week has not passed yet
+    Logger.info({
+      file: __filename,
+      message: 'Epoch has not passed yet. Returning...',
+      foundEpoch: epoch,
+      serverEpoch: veDoloRebateMetadata.currentEpochIndex,
+    });
+    return { epoch };
+  }
 
   const marketIdToEnabledMap = Object.keys(veDoloRebateMetadata.allChainRebateInfo[networkId].marketToRebateInfo)
     .reduce((acc, marketId) => {
@@ -221,6 +231,11 @@ export async function calculateBorrowFeesPerNetwork(
       marketTotalBorrowInterest[marketId] = (marketTotalBorrowInterest[marketId] ?? INTEGERS.ZERO).plus(amount);
     });
   });
+
+  for (const marketId of Object.keys(marketTotalBorrowInterest)) {
+    const totalBorrowInterest = marketTotalBorrowInterest[marketId];
+    const revenue =
+  }
 
   const borrowAmountOutputFile: BorrowFeesPerNetworkOutputFile = {
     users: walletAddressToMarketIdToFinalAmountStringMap,
