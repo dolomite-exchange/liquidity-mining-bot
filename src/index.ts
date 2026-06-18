@@ -22,6 +22,7 @@ import BlockStore from './lib/stores/block-store';
 import LevelUpdateRequestStore from './lib/stores/level-update-request-store';
 import MarketStore from './lib/stores/market-store';
 import VestingPositionStore from './lib/stores/vesting-position-store';
+import BorrowFeeClaimerUpdater from './lib/updaters/borrow-fee-claimer-updater';
 import DolomiteDetonatorUpdater from './lib/updaters/dolomite-detonator-updater';
 import DolomiteLevelRequestUpdater from './lib/updaters/dolomite-level-request-updater';
 import GasPriceUpdater from './lib/updaters/gas-price-updater';
@@ -99,8 +100,8 @@ async function start() {
   const { riskParams } = await getDolomiteRiskParams(subgraphBlockNumber);
   const networkId = await dolomite.web3.eth.net.getId();
 
-  // TODO: add handler for claiming revenue
   const borrowFeeUpdater = new BorrowFeeUpdater();
+  const borrowFeeClaimerUpdater = new BorrowFeeClaimerUpdater(networkId);
   const borrowFeeRebateUpdater = new BorrowFeeRebateUpdater();
   const borrowFeeAggregatorUpdater = new BorrowFeeAggregatorUpdater();
   const borrowFeeSweeperUpdater = new BorrowFeeSweeperUpdater(marketStore, networkId);
@@ -163,6 +164,7 @@ async function start() {
   }
   if (process.env.BORROW_FEE_REBATES_ENABLED === 'true') {
     borrowFeeUpdater.start();
+    borrowFeeClaimerUpdater.start();
     borrowFeeRebateUpdater.start();
   }
   if (process.env.BORROW_FEE_REBATES_AGGREGATOR_ENABLED === 'true') {
@@ -178,7 +180,6 @@ async function start() {
     gasPriceUpdater.start();
   }
   if (process.env.LEVEL_REQUESTS_ENABLED === 'true') {
-    marketStore.start();
     requestUpdaterStore.start();
     dolomiteRequestUpdater.start();
   }
@@ -196,6 +197,8 @@ async function start() {
   if (process.env.PENDLE_MINERALS_ENABLED === 'true') {
     pendleMineralsUpdater.start();
   }
+
+  marketStore.start();
   return true
 }
 

@@ -65,12 +65,12 @@ export default class BorrowFeeRebateMerkleTreeUpdater {
       return Promise.reject(new Error('Invalid network for FeeRebateRollingClaimsProxy'));
     }
 
-    const distributor = new dolomite.web3.eth.Contract(
+    const rollingClaimsDistributor = new dolomite.web3.eth.Contract(
       FeeRebatingRollingClaimsAbi,
       FeeRebateRollingClaimsProxy[this.networkId].address,
     );
     const onchainEpochRaw = await dolomite.contracts.callConstantContractFunction<string>(
-      distributor.methods.currentEpoch(),
+      rollingClaimsDistributor.methods.currentEpoch(),
     );
 
     const onchainEpoch = Number(onchainEpochRaw);
@@ -95,7 +95,13 @@ export default class BorrowFeeRebateMerkleTreeUpdater {
     });
 
     const result = await dolomite.contracts.callContractFunction(
-      distributor.methods.handlerSetMerkleRoots(marketIds, merkleRoots, totalAmounts, offchainEpoch),
+      rollingClaimsDistributor.methods.handlerSetMerkleRoots(
+        marketIds,
+        merkleRoots,
+        totalAmounts,
+        offchainEpoch,
+        /* incrementEpoch = */ true,
+      ),
       {
         gasPrice: getGasPriceWei().toFixed(),
         confirmationType: ConfirmationType.Hash,

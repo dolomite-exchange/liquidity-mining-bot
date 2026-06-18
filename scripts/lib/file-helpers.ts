@@ -135,6 +135,12 @@ function _getCommitMessage(filePath: string, fileContent: any): string {
       return 'AUTOMATED: Updated finalized mineral metadata';
     } else if (filePath.includes('oarb') && filePath.includes('metadata')) {
       return 'AUTOMATED: Updated finalized oARB metadata';
+    } else if (filePath.includes('borrow-interest') && filePath.includes('*')) {
+      return 'AUTOMATED: Added finalized aggregated borrow data';
+    } else if (filePath.includes('borrow-interest')) {
+      return 'AUTOMATED: Added finalized borrow data for specific network';
+    } else if (filePath.includes('rebate')) {
+      return 'AUTOMATED: Added finalized rebate data for specific network';
     } else {
       return 'AUTOMATED: Added finalized data';
     }

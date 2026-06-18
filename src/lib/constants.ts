@@ -14,8 +14,10 @@ export const REBATE_START_TIMESTAMP_MAP: { [networkId: number]: number } = {
   [ChainId.Berachain]: 1779920962,
 };
 
-// ==================== Isolation Mode Getters ====================
-
 export function isIsolationModeToken(token: GraphqlToken): boolean {
   return token.name.includes('Dolomite Isolation:') || token.symbol === 'dfsGLP';
 }
+
+export const RESERVE_FACTOR = new BigNumber(0.2);
+
+export const REVENUE_MARGIN_OF_ERROR = new BigNumber(0.05);

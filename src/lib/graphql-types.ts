@@ -322,6 +322,7 @@ export interface GraphqlMarket {
   token: GraphqlToken
   marginPremium: string
   liquidationRewardPremium: string
+  isBorrowingDisabled: boolean
 }
 
 export interface GraphqlRiskParamsResult extends GraphqlResult {

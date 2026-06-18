@@ -171,6 +171,18 @@ export interface BorrowFeesPerNetworkOutputFile {
        */
       [market: string]: string;
     }
+    marketExpectedTotalRevenue: {
+      /**
+       * big int (native decimals)
+       */
+      [market: string]: string;
+    }
+    marketFoundTotalRevenue: {
+      /**
+       * big int (native decimals)
+       */
+      [market: string]: string;
+    }
     marketPrices: {
       /**
        * big int (native decimals)

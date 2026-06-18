@@ -8,12 +8,12 @@ import FeeRebateRollingClaimsAbi from '../../abi/fee-rebate-rolling-claims.json'
 import { getGasPriceWei } from '../../helpers/gas-price-helpers';
 import { dolomite } from '../../helpers/web3';
 import { ApiMarket } from '../api-types';
+import { ONE_DOLLAR } from '../constants';
 import { delay } from '../delay';
 import Logger from '../logger';
 import MarketStore from '../stores/market-store';
-import { ONE_DOLLAR } from '../constants';
 
-const WAIT_DURATION_MILLIS = 10 * 60 * 1_000; // 10 minutes
+const WAIT_DURATION_MILLIS = 5 * 60 * 1_000; // 5 minutes
 
 export default class BorrowFeeSweeperUpdater {
   private lastSweptEpoch: number;
@@ -58,7 +58,7 @@ export default class BorrowFeeSweeperUpdater {
     });
 
     const marketMap = this.marketStore.getMarketMap();
-    const marketIds = Object.keys(marketMap);
+    const marketIds = Object.keys(marketMap).filter((marketId) => !marketMap[marketId].isBorrowingDisabled);
 
     if (marketIds.length === 0) {
       Logger.info({
@@ -88,7 +88,7 @@ export default class BorrowFeeSweeperUpdater {
 
     const claimer = new dolomite.web3.eth.Contract(FeeRebateClaimerAbi as any, claimerAddress);
 
-    const claimerEpochRaw = await dolomite.contracts.callConstantContractFunction<string>(claimer.methods.epoch());
+    const claimerEpochRaw = await dolomite.contracts.callConstantContractFunction<string>(claimer.methods.currentEpoch());
 
     const claimerEpoch = Number(claimerEpochRaw);
 
@@ -135,7 +135,7 @@ export default class BorrowFeeSweeperUpdater {
       : 100;
 
     const marketIdsToSweep: string[] = [];
-    for (let i = 0; i < marketIds.length; i += 11) {
+    for (let i = 0; i < marketIds.length; i += 1) {
       const marketId = marketIds[i];
       const amountWei = sweepableAmountsRaw[i];
       const market = marketMap[marketId] as ApiMarket;

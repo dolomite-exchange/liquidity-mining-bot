@@ -5,7 +5,7 @@ import FeeRebateClaimerAbi from '../src/abi/fee-rebate-claimer.json';
 import { getBlockDataByBlockNumber, getLatestBlockDataByTimestamp } from '../src/clients/blocks';
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
-import { REBATE_START_TIMESTAMP_MAP } from '../src/lib/constants';
+import { REBATE_START_TIMESTAMP_MAP, RESERVE_FACTOR, REVENUE_MARGIN_OF_ERROR } from '../src/lib/constants';
 import { isScript, shouldForceUpload } from '../src/lib/env'
 import Logger from '../src/lib/logger';
 import Pageable from '../src/lib/pageable';
@@ -100,13 +100,13 @@ export async function calculateBorrowFeesPerNetwork(
     });
   }
 
-  const { results } = await dolomite.multiCall.aggregate(timestampCalls);
+  const { results: timestampResults } = await dolomite.multiCall.aggregate(timestampCalls);
 
   const startTimestamp = epoch >= 2
-    ? decodeUint256ToBigNumber(results[1]).toNumber()
+    ? decodeUint256ToBigNumber(timestampResults[1]).toNumber()
     : REBATE_START_TIMESTAMP_MAP[dolomite.networkId];
   const startBlockNumber = (await getLatestBlockDataByTimestamp(startTimestamp)).blockNumber;
-  const endTimestamp = decodeUint256ToBigNumber(results[0]).toNumber();
+  const endTimestamp = decodeUint256ToBigNumber(timestampResults[0]).toNumber();
   const endBlockNumber = (await getLatestBlockDataByTimestamp(endTimestamp)).blockNumber;
   // const startTimestamp = veDoloRebateMetadata.veDoloStartTimestamp + (ONE_WEEK_SECONDS * (epoch - 1));
   // const endTimestamp = startTimestamp + ONE_WEEK_SECONDS;
@@ -232,9 +232,33 @@ export async function calculateBorrowFeesPerNetwork(
     });
   });
 
+  const revenueCalls: { target: string, callData: string }[] = marketIds.map(marketId => ({
+    target: feeClaimer.options.address,
+    callData: feeClaimer.methods.getClaimAmountByEpochAndMarketId(epoch, marketId).encodeABI(),
+  }));
+  const { results: revenueResults } = await dolomite.multiCall.aggregate(revenueCalls);
+  const marketRevenueMap = {};
+  marketIds.forEach((marketId, index) => {
+    marketRevenueMap[marketId] = decodeUint256ToBigNumber(revenueResults[index]);
+  });
+
+
   for (const marketId of Object.keys(marketTotalBorrowInterest)) {
     const totalBorrowInterest = marketTotalBorrowInterest[marketId];
-    const revenue =
+    const expectedRevenue = totalBorrowInterest.times(RESERVE_FACTOR).integerValue();
+    const foundRevenue = marketRevenueMap[marketId];
+
+    if (foundRevenue.lt(expectedRevenue.minus(expectedRevenue.times(REVENUE_MARGIN_OF_ERROR)))) {
+      const missingRevenue = expectedRevenue.minus(foundRevenue);
+      const missingPercentage = missingRevenue.div(expectedRevenue).times(100).integerValue();
+      Logger.warn({
+        file: __filename,
+        message: `Missing revenue for market ${marketId}`,
+        expectedRevenue: expectedRevenue.toFixed(0),
+        foundRevenue: foundRevenue.toFixed(0),
+        missingPercentage: missingPercentage.toFixed(2),
+      });
+    }
   }
 
   const borrowAmountOutputFile: BorrowFeesPerNetworkOutputFile = {
@@ -248,6 +272,14 @@ export async function calculateBorrowFeesPerNetwork(
       totalUsers: Object.keys(walletAddressToMarketIdToFinalAmountStringMap).length,
       marketTotalBorrowInterest: Object.keys(marketTotalBorrowInterest).reduce((acc, market) => {
         acc[market] = marketTotalBorrowInterest[market].toFixed();
+        return acc;
+      }, {} as Record<string, string>),
+      marketExpectedTotalRevenue: Object.keys(marketTotalBorrowInterest).reduce((acc, market) => {
+        acc[market] = marketTotalBorrowInterest[market].times(RESERVE_FACTOR).toFixed();
+        return acc;
+      }, {} as Record<string, string>),
+      marketFoundTotalRevenue: Object.keys(marketRevenueMap).reduce((acc, market) => {
+        acc[market] = marketRevenueMap[market].toFixed();
         return acc;
       }, {} as Record<string, string>),
       marketPrices: Object.values(marketStore.getMarketMap()).reduce((acc, market) => {

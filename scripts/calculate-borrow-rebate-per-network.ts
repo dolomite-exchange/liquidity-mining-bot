@@ -1,9 +1,10 @@
 import { BigNumber, Decimal, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import { dolomite } from '../src/helpers/web3';
 import { ChainId } from '../src/lib/chain-id';
-import { ONE_ETH_WEI } from '../src/lib/constants';
+import { ONE_ETH_WEI, REVENUE_MARGIN_OF_ERROR } from '../src/lib/constants';
 import { isScript, shouldForceUpload } from '../src/lib/env'
 import Logger from '../src/lib/logger';
+import { invariant } from '../src/lib/utils';
 import { readVeDoloRebateMetadataFromApi } from './lib/api-helpers';
 import {
   getBorrowFeeRebateFileNameWithPath,
@@ -27,29 +28,42 @@ export async function calculateBorrowRebatePerNetwork(
 
   const outputFileName = getBorrowFeeRebateFileNameWithPath(dolomite.networkId);
 
-  let hasFile = false;
+  let previousFile: BorrowRebatePerNetworkOutputFile | undefined;
   try {
-    const file = await readFileFromGitHub<BorrowRebatePerNetworkOutputFile>(outputFileName);
-    hasFile = file.metadata.epoch === epoch;
+    previousFile = await readFileFromGitHub<BorrowRebatePerNetworkOutputFile>(outputFileName);
     // eslint-disable-next-line no-empty
   } catch (e) {
   }
 
-  if (hasFile && !shouldForceUpload()) {
+  if (previousFile?.metadata.epoch === epoch && !shouldForceUpload()) {
     Logger.info({
       file: __filename,
       message: 'Borrow rebates have already been calculated. Returning...',
       epoch,
     });
 
-    return false;
+    return Promise.resolve();
   }
 
   const borrowRebatesMetadata = await readVeDoloRebateMetadataFromApi();
 
-  const totalBorrowFeesFile = await readFileFromGitHub(
-    getTotalBorrowInterestFinalizedFileNameWithPath(epoch),
-  ) as TotalBorrowFeesOutputFile;
+  let totalBorrowFeesFile: TotalBorrowFeesOutputFile;
+  try {
+    totalBorrowFeesFile = await readFileFromGitHub(
+      getTotalBorrowInterestFinalizedFileNameWithPath(epoch),
+    ) as TotalBorrowFeesOutputFile;
+  } catch (e: any) {
+    if (e.message.includes('404')) {
+      Logger.info({
+        file: __filename,
+        message: 'Skipping borrow fee rebate calculation. Total borrow fees file not found...',
+        epoch,
+      });
+      return Promise.resolve();
+    } else {
+      return Promise.reject(new Error(e.message));
+    }
+  }
 
   const startEpoch = borrowRebatesMetadata.allChainRebateInfo[dolomite.networkId]?.startEpoch;
   if (!startEpoch) {
@@ -90,9 +104,7 @@ export async function calculateBorrowRebatePerNetwork(
     userToMarketToRebate = {};
     marketTotalRebate = {};
   } else {
-    const previousFile = await readFileFromGitHub<BorrowRebatePerNetworkOutputFile>(
-      getBorrowFeeRebateFileNameWithPath(dolomite.networkId),
-    );
+    invariant(!!previousFile, 'Previous file should be defined');
 
     userToMarketToRebate = Object.keys(previousFile.users).reduce((acc1, user) => {
       acc1[user] = Object.keys(previousFile.users[user]).reduce((acc2, market) => {
@@ -107,6 +119,26 @@ export async function calculateBorrowRebatePerNetwork(
       return acc;
     }, {} as Record<string, Integer>);
   }
+
+  const marketToRevenueFactorMap: Record<string, BigNumber> = {};
+  for (const marketId of Object.keys(borrowAmountFile.metadata.marketPrices)) {
+    const expectedRevenue = new BigNumber(borrowAmountFile.metadata.marketExpectedTotalRevenue[marketId]);
+    const foundRevenue = new BigNumber(borrowAmountFile.metadata.marketFoundTotalRevenue[marketId]);
+    if (foundRevenue.lt(expectedRevenue.minus(expectedRevenue.times(REVENUE_MARGIN_OF_ERROR)))) {
+      const revenueFactor = foundRevenue.div(expectedRevenue);
+      marketToRevenueFactorMap[marketId] = revenueFactor;
+      Logger.info({
+        file: __filename,
+        message: `Scaling revenues for market ${marketId}`,
+        expectedRevenue: expectedRevenue.toFixed(0),
+        foundRevenue: foundRevenue.toFixed(0),
+        revenueFactor: revenueFactor.toFixed(2),
+      });
+    } else {
+      marketToRevenueFactorMap[marketId] = new BigNumber(1);
+    }
+  }
+
 
   for (const user of Object.keys(borrowAmountFile.users)) {
     for (const marketId of Object.keys(borrowAmountFile.users[user])) {
@@ -124,13 +156,17 @@ export async function calculateBorrowRebatePerNetwork(
           }, INTEGERS.ZERO);
         const rebatePercentage = borrowRebatesMetadata.allChainRebateInfo[dolomite.networkId]!.rebatePercentage;
 
+        const revenueFactor = marketToRevenueFactorMap[marketId];
         let rebate: Integer;
         if (maxRebateUsd.lte(INTEGERS.ZERO)) {
           rebate = INTEGERS.ZERO;
         } else if (totalVeDoloUsd.gte(maxRebateUsd.times(borrowRebatesMetadata.veDoloHoldingFactor))) {
-          rebate = marketBorrowFees.times(rebatePercentage);
+          rebate = marketBorrowFees
+            .times(revenueFactor)
+            .times(rebatePercentage);
         } else {
           rebate = marketBorrowFees
+            .times(revenueFactor)
             .times(rebatePercentage)
             .times(totalVeDoloUsd)
             .dividedToIntegerBy(maxRebateUsd.times(borrowRebatesMetadata.veDoloHoldingFactor))
