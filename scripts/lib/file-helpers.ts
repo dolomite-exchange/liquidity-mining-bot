@@ -92,13 +92,14 @@ export function writeOutputFile(
   fileContent: object,
   space?: string | number,
 ): void {
-  const directory = `${process.cwd()}/scripts/output`;
-  if (!fs.existsSync(directory)) {
-    fs.mkdirSync(directory);
+  const fullName = `${process.cwd()}/scripts/output/${fileName}`;
+  const fullDirectory = fullName.split('/').slice(0, -1).join('/');
+  if (!fs.existsSync(fullDirectory)) {
+    fs.mkdirSync(fullDirectory, { recursive: true });
   }
 
   fs.writeFileSync(
-    `${directory}/${fileName}`,
+    fullName,
     JSON.stringify(fileContent, undefined, space),
     { encoding: 'utf8', flag: 'w' },
   );
@@ -134,6 +135,12 @@ function _getCommitMessage(filePath: string, fileContent: any): string {
       return 'AUTOMATED: Updated finalized mineral metadata';
     } else if (filePath.includes('oarb') && filePath.includes('metadata')) {
       return 'AUTOMATED: Updated finalized oARB metadata';
+    } else if (filePath.includes('borrow-interest') && filePath.includes('*')) {
+      return 'AUTOMATED: Added finalized aggregated borrow data';
+    } else if (filePath.includes('borrow-interest')) {
+      return 'AUTOMATED: Added finalized borrow data for specific network';
+    } else if (filePath.includes('rebate')) {
+      return 'AUTOMATED: Added finalized rebate data for specific network';
     } else {
       return 'AUTOMATED: Added finalized data';
     }

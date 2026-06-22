@@ -24,6 +24,7 @@ module.exports = {
   rules: {
     'jest/no-focused-tests': 0,
     'class-methods-use-this': 0,
+    'consistent-return': 0,
     'no-use-before-define': 0,
     'no-await-in-loop': 0,
     'no-underscore-dangle': 0,
@@ -44,6 +45,7 @@ module.exports = {
     'no-else-return': 0,
     'no-nested-ternary': 0,
     'no-param-reassign': 0,
+    'no-restricted-syntax': 0,
     '@typescript-eslint/naming-convention': ['error',
       {
         selector: 'variableLike',

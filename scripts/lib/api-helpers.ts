@@ -19,6 +19,40 @@ export interface ODoloMetadata {
   allChainStartEpochs: Record<ChainId, number | null>
 }
 
+export interface VeDoloRebateInfo {
+  startEpoch: number;
+  rebatePercentage: number;
+  marketToRebateInfo: {
+    [marketId: string]: {
+      startEpoch: number;
+      endEpoch: number | null;
+    }
+  }
+}
+
+export interface VeDoloRebateMetadata {
+  /**
+   * Timestamp the program started (which corresponds with epoch 1)
+   */
+  veDoloStartTimestamp: number;
+  /**
+   * 1-based index for the current epoch
+   */
+  currentEpochIndex: number;
+  /**
+   * Start timestamp of the current epoch
+   */
+  currentEpochStartTimestamp: number;
+  onchainFeeRebateEpochIndexMap: Record<ChainId, number | null>
+  onchainRollingClaimsEpochIndexMap: Record<ChainId, number | null>
+  allChainRebateInfo: Record<ChainId, VeDoloRebateInfo | null>
+  /**
+   * Decimal number (5.0 means the user must have at least 5x the maximumRebatePercentage as veDOLO to qualify for the
+   * max discount). If the maxRebateUsd for a user is $5 and the factor is 3, then the user must have $15 of veDOLO.
+   */
+  veDoloHoldingFactor: number;
+}
+
 export async function readODoloMetadataFromApi(epoch: number | undefined): Promise<ODoloMetadata> {
   const epochQuery = epoch !== undefined ? `?epoch=${epoch}` : '';
   const response = await axios.get(`${DOLOMITE_API_SERVER_URL}/liquidity-mining/odolo/metadata${epochQuery}`);
@@ -33,4 +67,9 @@ export async function readODoloMetadataFromApi(epoch: number | undefined): Promi
       return acc;
     }, {}),
   };
+}
+
+export async function readVeDoloRebateMetadataFromApi(): Promise<VeDoloRebateMetadata> {
+  const response = await axios.get(`${DOLOMITE_API_SERVER_URL}/liquidity-mining/ve-dolo-rebate/metadata`);
+  return response.data.metadata
 }

@@ -61,12 +61,17 @@ export function getAccountBalancesByMarket(
       = accountToDolomiteBalanceMap[accountOwner]![accountNumber] ?? {};
 
     Object.values(account.balances).forEach(balance => {
+      // convert to Decimals from "BigInt" format
+      const balanceDivisor = TEN.pow(balance.tokenDecimals);
+      const balancePar = balance.par.dividedBy(balanceDivisor);
+      const balanceWei = balance.wei.dividedBy(balanceDivisor);
       accountToDolomiteBalanceMap[accountOwner]![accountNumber]![balance.marketId] = new BalanceAndRewardPoints(
         account.effectiveUser,
         balance.marketId,
         rewardMultipliersMap[balance.marketId] ?? INTEGERS.ONE,
         startTimestamp,
-        balance.par.dividedBy(TEN.pow(balance.tokenDecimals)), // convert to Decimals from "BigInt" format
+        balancePar,
+        balanceWei,
       );
     });
   });

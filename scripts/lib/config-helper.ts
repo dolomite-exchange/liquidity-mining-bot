@@ -96,6 +96,18 @@ export function getODoloAggregatedFileNameWithPath(networkId: number): string {
   return `finalized/${networkId}/odolo/odolo-aggregated-output.json`;
 }
 
+export function getBorrowInterestFinalizedFileNameWithPath(networkId: number, epoch: number): string {
+  return `finalized/${networkId}/borrow-interest/epoch-${epoch}-output.json`;
+}
+
+export function getTotalBorrowInterestFinalizedFileNameWithPath(epoch: number): string {
+  return `finalized/*/borrow-interest/epoch-${epoch}-output.json`;
+}
+
+export function getBorrowFeeRebateFileNameWithPath(networkId: number): string {
+  return `finalized/${networkId}/rebate/rebate-aggregated-output.json`;
+}
+
 export function getOTokenTypeFromEnvironment(): OTokenType {
   const oTokenType = process.env.OTOKEN_TYPE;
   const oTokens = Object.values(OTokenType);

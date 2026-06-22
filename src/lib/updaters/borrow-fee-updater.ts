@@ -1,15 +1,16 @@
-import { calculateODoloAggregateRewards } from '../../../scripts/calculate-odolo-aggregate-rewards';
-import { getODoloCurrentEpochNumber } from '../../helpers/odolo-helpers';
+import { dolomite } from '../../helpers/web3';
 import { delay } from '../delay';
 import Logger from '../logger';
+import { getVeDoloRebateRollingClaimsCurrentEpochNumber } from '../../helpers/vedolo-rebate-helpers';
+import { calculateBorrowFeesPerNetwork } from '../../../scripts/calculate-borrow-fees-per-network';
 
 const WAIT_DURATION_MILLIS = 60 * 1_000; // 60 seconds in millis
 
-export default class ODoloAggregatorUpdater {
+export default class BorrowFeeUpdater {
   start = () => {
     Logger.info({
-      at: 'ODoloAggregatorUpdater#start',
-      message: 'Starting oDOLO aggregator updater',
+      at: 'BorrowFeeUpdater#start',
+      message: 'Starting borrow fee updater',
     });
     delay(Number(WAIT_DURATION_MILLIS))
       .then(() => this._poll())
@@ -22,14 +23,14 @@ export default class ODoloAggregatorUpdater {
       try {
         await this._update();
         Logger.info({
-          at: 'ODoloAggregatorUpdater#_poll',
+          at: 'BorrowFeeUpdater#_poll',
           message: `Waiting for ${WAIT_DURATION_MILLIS}ms until next update`,
         })
         await delay(WAIT_DURATION_MILLIS);
       } catch (e: any) {
         Logger.error({
-          at: 'ODoloAggregatorUpdater#_poll',
-          message: `Could not update oDOLO aggregated rewards due to error: ${e.message}`,
+          at: 'BorrowFeeUpdater#_poll',
+          message: `Could not update borrow fees due to error: ${e.message}`,
           remediation: `Waiting for ${WAIT_DURATION_MILLIS} before trying again...`,
         })
         await delay(WAIT_DURATION_MILLIS);
@@ -39,13 +40,21 @@ export default class ODoloAggregatorUpdater {
 
   _update = async (): Promise<void> => {
     Logger.info({
-      at: 'ODoloAggregatorUpdater#_update',
+      at: 'BorrowFeeUpdater#_update',
       message: 'Starting update...',
     });
 
-    const epoch = await getODoloCurrentEpochNumber();
+    const epoch = await getVeDoloRebateRollingClaimsCurrentEpochNumber(dolomite.networkId);
+    if (epoch === null || Number.isNaN(epoch)) {
+      Logger.info({
+        at: 'BorrowFeeUpdater#_update',
+        message: 'Skipping update due to missing epoch...',
+      });
+      return;
+    }
+
     try {
-      await calculateODoloAggregateRewards(epoch + 1);
+      await calculateBorrowFeesPerNetwork(epoch + 1);
     } catch (e: any) {
       return Promise.reject(e);
     }

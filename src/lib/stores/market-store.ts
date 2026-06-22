@@ -162,7 +162,7 @@ export default class MarketStore {
       if (invalidMarketIds.length > 0) {
         Logger.warn({
           at: 'MarketStore#_update',
-          message: `Found invalid prices!`,
+          message: 'Found invalid prices!',
           marketIds: invalidMarketIds.join(', '),
         });
       }

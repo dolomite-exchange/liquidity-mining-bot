@@ -1450,6 +1450,7 @@ export async function getDolomiteMarkets(
                   }
                   marginPremium
                   liquidationRewardPremium
+                  isBorrowingDisabled
                 }
               }`,
       variables: {
@@ -1483,6 +1484,7 @@ export async function getDolomiteMarkets(
       tokenAddress: market.token.id,
       marginPremium: new BigNumber(decimalToString(market.marginPremium)),
       liquidationRewardPremium: new BigNumber(decimalToString(market.liquidationRewardPremium)),
+      isBorrowingDisabled: market.isBorrowingDisabled,
       oraclePrice: undefined,
     };
     return apiMarket;

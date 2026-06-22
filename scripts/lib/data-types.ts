@@ -149,6 +149,99 @@ export interface ODoloAggregateOutputFile {
   };
 }
 
+export interface BorrowFeesPerNetworkOutputFile {
+  users: {
+    [walletAddressLowercase: string]: {
+      /**
+       * big int (native decimals)
+       */
+      [market: string]: string;
+    }
+  };
+  metadata: {
+    epoch: number;
+    claimStartTimestamp: number;
+    claimStartBlockNumber: number;
+    claimEndTimestamp: number;
+    claimEndBlockNumber: number;
+    totalUsers: number;
+    marketTotalBorrowInterest: {
+      /**
+       * big int (native decimals)
+       */
+      [market: string]: string;
+    }
+    marketExpectedTotalRevenue: {
+      /**
+       * big int (native decimals)
+       */
+      [market: string]: string;
+    }
+    marketFoundTotalRevenue: {
+      /**
+       * big int (native decimals)
+       */
+      [market: string]: string;
+    }
+    marketPrices: {
+      /**
+       * big int (native decimals)
+       */
+      [market: string]: string;
+    }
+  };
+}
+
+export interface TotalBorrowFeesMetadataPerUser {
+  /**
+   * USD big int (18 decimals)
+   */
+  totalBorrowInterestUsd: string;
+  /**
+   * USD big int (18 decimals)
+   */
+  totalVeDoloUsd: string;
+  totalBorrowInterestUsdPerNetwork: {
+    /**
+     * Value is USD big int (18 decimals)
+     */
+    [chainId: string]: string;
+  }
+}
+
+export interface TotalBorrowFeesOutputFile {
+  users: {
+    [walletAddressLowercase: string]: TotalBorrowFeesMetadataPerUser;
+  };
+  metadata: {
+    epoch: number;
+    totalUsers: number;
+    totalBorrowInterestUsd: string; // big int (18 decimals)
+    doloPriceUsd: string;
+  };
+}
+
+export interface BorrowRebatePerNetworkOutputFile {
+  users: {
+    [walletAddressLowercase: string]: {
+      [marketId: string]: {
+        amount: string // big int
+        leaf: string
+      }
+    }
+  };
+  metadata: {
+    epoch: number;
+    marketToMerkleRoot: {
+      [marketId: string]: string // merkle root
+    };
+    totalUsers: number;
+    marketToTotalRebate: {
+      [marketId: string]: string // big int
+    }
+  };
+}
+
 export interface OTokenConfigEpoch extends EpochConfig {
   oTokenAmount: string;
   rewardWeights: Record<string, string>;

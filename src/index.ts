@@ -22,6 +22,7 @@ import BlockStore from './lib/stores/block-store';
 import LevelUpdateRequestStore from './lib/stores/level-update-request-store';
 import MarketStore from './lib/stores/market-store';
 import VestingPositionStore from './lib/stores/vesting-position-store';
+import BorrowFeeClaimerUpdater from './lib/updaters/borrow-fee-claimer-updater';
 import DolomiteDetonatorUpdater from './lib/updaters/dolomite-detonator-updater';
 import DolomiteLevelRequestUpdater from './lib/updaters/dolomite-level-request-updater';
 import GasPriceUpdater from './lib/updaters/gas-price-updater';
@@ -31,6 +32,11 @@ import ODoloAggregatorUpdater from './lib/updaters/odolo-aggregator-updater';
 import ODoloAggregatorMerkleTreeUpdater from './lib/updaters/odolo-merkle-tree-updater';
 import ODoloUpdater from './lib/updaters/odolo-updater';
 import PendleMineralsUpdater from './lib/updaters/pendle-minerals-updater';
+import BorrowFeeRebateMerkleTreeUpdater from './lib/updaters/borrow-fee-rebate-merkle-tree-updater';
+import BorrowFeeUpdater from './lib/updaters/borrow-fee-updater';
+import BorrowFeeRebateUpdater from './lib/updaters/borrow-fee-rebate-updater';
+import BorrowFeeAggregatorUpdater from './lib/updaters/borrow-fee-aggregator-updater';
+import BorrowFeeSweeperUpdater from './lib/updaters/borrow-fee-sweeper-updater';
 
 checkDuration('ACCOUNT_POLL_INTERVAL_MS', 1000);
 checkEthereumAddress('ACCOUNT_WALLET_ADDRESS');
@@ -52,6 +58,10 @@ checkBooleanValue('LEVEL_REQUESTS_ENABLED');
 checkDuration('LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS', 1, false);
 checkDuration('LEVEL_REQUESTS_POLL_INTERVAL_MS', 1000, true);
 checkBooleanValue('MINERALS_ENABLED');
+checkConditionally(
+  !!process.env.MIN_SWEEP_REVENUE_AMOUNT_USD,
+  () => checkBigNumber('MIN_SWEEP_REVENUE_AMOUNT_USD'),
+);
 checkBooleanValue('ODOLO_AGGREGATOR_ENABLED');
 checkBooleanValue('ODOLO_ENABLED');
 checkJsNumber('NETWORK_ID');
@@ -89,6 +99,13 @@ async function start() {
   const subgraphBlockNumber = blockStore.getBlockNumber();
   const { riskParams } = await getDolomiteRiskParams(subgraphBlockNumber);
   const networkId = await dolomite.web3.eth.net.getId();
+
+  const borrowFeeUpdater = new BorrowFeeUpdater();
+  const borrowFeeClaimerUpdater = new BorrowFeeClaimerUpdater(networkId);
+  const borrowFeeRebateUpdater = new BorrowFeeRebateUpdater();
+  const borrowFeeAggregatorUpdater = new BorrowFeeAggregatorUpdater();
+  const borrowFeeSweeperUpdater = new BorrowFeeSweeperUpdater(marketStore, networkId);
+  const borrowFeeRebateMerkleTreeUpdater = new BorrowFeeRebateMerkleTreeUpdater(networkId);
   const mineralsUpdater = new MineralsUpdater();
   const mineralsMerkleTreeUpdater = new MineralsMerkleTreeUpdater(networkId);
   const pendleMineralsUpdater = new PendleMineralsUpdater();
@@ -115,6 +132,8 @@ async function start() {
     accountWalletAddress: process.env.ACCOUNT_WALLET_ADDRESS,
     blockPollIntervalMillis: process.env.BLOCK_POLL_INTERVAL_MS,
     blockStoreEnabled: process.env.BLOCK_STORE_ENABLED,
+    borrowFeeRebatesEnabled: process.env.BORROW_FEE_REBATES_ENABLED,
+    borrowFeeRebatesAggregatorEnabled: process.env.BORROW_FEE_REBATES_AGGREGATOR_ENABLED,
     detonationsEnabled: process.env.DETONATIONS_ENABLED,
     detonationsKeyExpirationSeconds: process.env.DETONATIONS_KEY_EXPIRATION_SECONDS,
     detonationsPollIntervalMillis: process.env.DETONATIONS_POLL_INTERVAL_MS,
@@ -131,6 +150,7 @@ async function start() {
     levelRequestsKeyExpirationSeconds: process.env.LEVEL_REQUESTS_KEY_EXPIRATION_SECONDS,
     levelRequestsPollIntervalMillis: process.env.LEVEL_REQUESTS_POLL_INTERVAL_MS,
     mineralsEnabled: process.env.MINERALS_ENABLED,
+    minSweepRevenueAmountUsd: process.env.MIN_SWEEP_REVENUE_AMOUNT_USD,
     oDoloAggregatorEnabled: process.env.ODOLO_AGGREGATOR_ENABLED,
     oDoloEnabled: process.env.ODOLO_ENABLED,
     networkId,
@@ -142,15 +162,24 @@ async function start() {
   if (process.env.BLOCK_STORE_ENABLED === 'true') {
     blockStore.start();
   }
-  if (process.env.GAS_PRICE_UPDATER_ENABLED === 'true') {
-    gasPriceUpdater.start();
+  if (process.env.BORROW_FEE_REBATES_ENABLED === 'true') {
+    borrowFeeUpdater.start();
+    borrowFeeClaimerUpdater.start();
+    borrowFeeRebateUpdater.start();
+  }
+  if (process.env.BORROW_FEE_REBATES_AGGREGATOR_ENABLED === 'true') {
+    borrowFeeAggregatorUpdater.start();
+    borrowFeeSweeperUpdater.start();
+    borrowFeeRebateMerkleTreeUpdater.start();
   }
   if (process.env.DETONATIONS_ENABLED === 'true') {
     vestingPositionStore.start();
     dolomiteDetonator.start();
   }
+  if (process.env.GAS_PRICE_UPDATER_ENABLED === 'true') {
+    gasPriceUpdater.start();
+  }
   if (process.env.LEVEL_REQUESTS_ENABLED === 'true') {
-    marketStore.start();
     requestUpdaterStore.start();
     dolomiteRequestUpdater.start();
   }
@@ -168,6 +197,8 @@ async function start() {
   if (process.env.PENDLE_MINERALS_ENABLED === 'true') {
     pendleMineralsUpdater.start();
   }
+
+  marketStore.start();
   return true
 }
 

@@ -103,6 +103,7 @@ export interface ApiMarket {
   marginPremium: Integer
   liquidationRewardPremium: Integer
   oraclePrice: Integer | undefined
+  isBorrowingDisabled: boolean;
 }
 
 export interface ApiRiskParam {
