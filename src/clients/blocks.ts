@@ -19,7 +19,7 @@ interface LatestBlockNumberAndTimestamp {
 
 export async function getLatestBlockDataByTimestamp(
   timestamp: number,
-): Promise<LatestBlockNumberAndTimestamp> {
+): Promise<LatestBlockNumberAndTimestamp | undefined> {
   const query = `
   query getLatestBlockDataByTimestamp($timestamp: BigInt) {
     blocks(first: 1, orderBy: number orderDirection: desc where: { timestamp_lte: $timestamp }) {
@@ -28,7 +28,7 @@ export async function getLatestBlockDataByTimestamp(
     }
   }
   `;
-  return (await getBlockDataFromQuery(query, { timestamp }))!;
+  return (await getBlockDataFromQuery(query, { timestamp }));
 }
 
 export async function getBlockDataByBlockNumber(

@@ -139,7 +139,6 @@ export async function calculateBorrowRebatePerNetwork(
     }
   }
 
-
   for (const user of Object.keys(borrowAmountFile.users)) {
     for (const marketId of Object.keys(borrowAmountFile.users[user])) {
       const marketBorrowFees = new BigNumber(borrowAmountFile.users[user][marketId]);
@@ -150,17 +149,20 @@ export async function calculateBorrowRebatePerNetwork(
         const maxRebateUsd: Decimal = Object.keys(rebateInfo.totalBorrowInterestUsdPerNetwork)
           .reduce((acc, chainId) => {
             const networkId = parseInt(chainId, 10) as ChainId;
-            const borrowFeesUsd = new BigNumber(rebateInfo.totalBorrowInterestUsdPerNetwork[networkId]).div(ONE_ETH_WEI);
+            const borrowFeesUsd = new BigNumber(rebateInfo.totalBorrowInterestUsdPerNetwork[networkId])
+              .div(ONE_ETH_WEI);
             const rebatePercentage = borrowRebatesMetadata.allChainRebateInfo[networkId]!.rebatePercentage;
             return acc.plus(borrowFeesUsd.times(rebatePercentage));
           }, INTEGERS.ZERO);
+
+        const maxRebateUsdAnnualized = maxRebateUsd.times(52);
         const rebatePercentage = borrowRebatesMetadata.allChainRebateInfo[dolomite.networkId]!.rebatePercentage;
 
         const revenueFactor = marketToRevenueFactorMap[marketId];
         let rebate: Integer;
-        if (maxRebateUsd.lte(INTEGERS.ZERO)) {
+        if (maxRebateUsdAnnualized.lte(INTEGERS.ZERO)) {
           rebate = INTEGERS.ZERO;
-        } else if (totalVeDoloUsd.gte(maxRebateUsd.times(borrowRebatesMetadata.veDoloHoldingFactor))) {
+        } else if (totalVeDoloUsd.gte(maxRebateUsdAnnualized.times(borrowRebatesMetadata.veDoloHoldingFactor))) {
           rebate = marketBorrowFees
             .times(revenueFactor)
             .times(rebatePercentage);
@@ -169,7 +171,7 @@ export async function calculateBorrowRebatePerNetwork(
             .times(revenueFactor)
             .times(rebatePercentage)
             .times(totalVeDoloUsd)
-            .dividedToIntegerBy(maxRebateUsd.times(borrowRebatesMetadata.veDoloHoldingFactor))
+            .dividedToIntegerBy(maxRebateUsdAnnualized.times(borrowRebatesMetadata.veDoloHoldingFactor))
         }
 
         if (rebate.gte(INTEGERS.ONE)) {

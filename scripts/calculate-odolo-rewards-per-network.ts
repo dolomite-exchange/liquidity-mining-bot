@@ -65,9 +65,9 @@ export async function calculateOdoloRewardsPerNetwork(
 
   // We need to check if `newEndBlockNumberResult` is the last block of the week
   const startTimestamp = oDoloConfig.epochStartTimestamp;
-  const startBlockNumber = (await getLatestBlockDataByTimestamp(startTimestamp)).blockNumber;
+  const startBlockNumber = (await getLatestBlockDataByTimestamp(startTimestamp))!.blockNumber;
   const endTimestamp = startTimestamp + ONE_WEEK_SECONDS;
-  const endBlockNumber = (await getLatestBlockDataByTimestamp(endTimestamp)).blockNumber;
+  const endBlockNumber = (await getLatestBlockDataByTimestamp(endTimestamp))!.blockNumber;
 
   // The week is over if the block is at the end OR if the next block goes into next week
   const nextBlockData = await getBlockDataByBlockNumber(endBlockNumber + 1);

@@ -1,10 +1,13 @@
-import { BigNumber, DolomiteMargin, Integer } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Decimal, DolomiteMargin, Integer } from '@dolomite-exchange/dolomite-margin';
 import axios from 'axios';
 import { ChainId, isArbitrum, isBerachain, isBotanix, isEthereum, isInk, isMantle } from '../lib/chain-id';
 import Logger from '../lib/logger';
 import '../lib/env';
+import { dolomite } from './web3';
+import { ethers } from 'ethers';
 
 const ONE_GWEI_IN_WEI_UNITS = new BigNumber('1000000000');
+const TEN = new BigNumber(10);
 
 let lastPriceWei: string = process.env.INITIAL_GAS_PRICE_WEI as string;
 
@@ -70,9 +73,7 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<{ fast: string }>
       fast: result.perArbGasTotal.dividedBy('1000000000').toFixed(), // convert to gwei
     };
   } else if (isBerachain(networkId)) {
-    const response = await dolomite.web3.eth.getGasPrice();
-    const gasPrice = new BigNumber(response).div(ONE_GWEI_IN_WEI_UNITS).toFixed();
-    return { fast: gasPrice };
+    return await getBerachainGasPrice();
   } else if (isBotanix(networkId)) {
     const response = await dolomite.web3.eth.getGasPrice();
     const gasPrice = new BigNumber(response).div(ONE_GWEI_IN_WEI_UNITS).toFixed();
@@ -100,3 +101,53 @@ async function getGasPrices(dolomite: DolomiteMargin): Promise<{ fast: string }>
     return Promise.reject(new Error(errorMessage));
   }
 }
+
+async function getBerachainGasPrice(): Promise<{ fast: string }> {
+  const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_NODE_URL);
+  const feeData = await provider.getFeeData();
+  if (feeData.maxPriorityFeePerGas === null || feeData.lastBaseFeePerGas === null) {
+    return Promise.reject(new Error('No gas data found!'));
+  }
+  const blockPriorityFee = new BigNumber(feeData.maxPriorityFeePerGas.toString());
+
+  let priorityFeeWei: BigNumber;
+  try {
+    priorityFeeWei = await getPriorityFeeForBerachain();
+  } catch (e) {
+    Logger.error({
+      message: 'Could not get priority fee for Berachain due to error',
+      error: e,
+    });
+    priorityFeeWei = blockPriorityFee;
+  }
+
+  priorityFeeWei = BigNumber.maximum(priorityFeeWei, blockPriorityFee);
+
+  const totalGasFee = priorityFeeWei.plus(feeData.lastBaseFeePerGas.toString());
+  return {
+    fast: totalGasFee.dividedToIntegerBy(ONE_GWEI_IN_WEI_UNITS).toFixed(),
+  };
+}
+
+async function getPriorityFeeForBerachain(): Promise<BigNumber> {
+  let wbtcPrice: Decimal;
+  let beraPrice: Decimal;
+  try {
+    const data = await fetch('https://api.dolomite.io/tokens/80094/prices').then(res => res.json());
+    wbtcPrice = new BigNumber(data.prices['0x0555e30da8f98308edb960aa94c0db47230d2b9c'])
+    beraPrice = new BigNumber(data.prices['0x6969696969696969696969696969696969696969'])
+  } catch (e) {
+    wbtcPrice = (await dolomite.getters.getMarketPrice(new BigNumber(4))).div(TEN.pow(28));
+    beraPrice = (await dolomite.getters.getMarketPrice(new BigNumber(1))).div(TEN.pow(18));
+  }
+  const gasLimit = new BigNumber(125_000);
+
+  return wbtcPrice
+    .div(TEN.pow(8))
+    .div(beraPrice)
+    .div(gasLimit)
+    .times(TEN.pow(18))
+    .times(1.05) // Add a 5% buffer
+    .integerValue();
+}
+

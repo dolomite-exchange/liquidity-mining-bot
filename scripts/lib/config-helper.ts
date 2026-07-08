@@ -20,7 +20,7 @@ export async function getNextConfigIfNeeded<T extends EpochConfig>(oldEpoch: T):
   const newStartBlockNumber = isReadyForNext ? oldEpoch.endBlockNumber : oldEpoch.startBlockNumber;
   const newStartTimestamp = isReadyForNext ? oldEpoch.endTimestamp : oldEpoch.startTimestamp;
   const newEndTimestamp = newStartTimestamp + ONE_WEEK_SECONDS;
-  const newEndBlockNumberResult = await getLatestBlockDataByTimestamp(newEndTimestamp);
+  const newEndBlockNumberResult = (await getLatestBlockDataByTimestamp(newEndTimestamp))!;
 
   // We need to check if `newEndBlockNumberResult` is the last block of the week
   const nextBlockData = await getBlockDataByBlockNumber(newEndBlockNumberResult.blockNumber + 1)

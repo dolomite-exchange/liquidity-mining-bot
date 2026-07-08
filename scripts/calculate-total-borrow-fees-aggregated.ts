@@ -115,7 +115,7 @@ export async function calculateTotalBorrowFeesAggregated(
 
   const startTimestamp = serverMetadata.veDoloStartTimestamp + (ONE_WEEK_SECONDS * (epoch - 1));
   const endTimestamp = startTimestamp + ONE_WEEK_SECONDS;
-  const endBlockNumber = (await getLatestBlockDataByTimestamp(endTimestamp)).blockNumber;
+  const endBlockNumber = (await getLatestBlockDataByTimestamp(endTimestamp))!.blockNumber;
 
   const veDolo = new dolomite.web3.eth.Contract(
     VeDoloAbi,

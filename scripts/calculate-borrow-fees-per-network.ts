@@ -105,9 +105,24 @@ export async function calculateBorrowFeesPerNetwork(
   const startTimestamp = epoch >= 2
     ? decodeUint256ToBigNumber(timestampResults[1]).toNumber()
     : REBATE_START_TIMESTAMP_MAP[dolomite.networkId];
-  const startBlockNumber = (await getLatestBlockDataByTimestamp(startTimestamp)).blockNumber;
+  const startBlockNumber = (await getLatestBlockDataByTimestamp(startTimestamp))?.blockNumber;
+  if (startBlockNumber === undefined) {
+    Logger.error({
+      message: "Could not get start block number",
+      startTimestamp,
+    });
+    return Promise.reject(new Error("Could not get start block number"));
+  }
+
   const endTimestamp = decodeUint256ToBigNumber(timestampResults[0]).toNumber();
-  const endBlockNumber = (await getLatestBlockDataByTimestamp(endTimestamp)).blockNumber;
+  const endBlockNumber = (await getLatestBlockDataByTimestamp(endTimestamp))?.blockNumber;
+  if (endBlockNumber === undefined) {
+    Logger.error({
+      message: "Could not get end block number",
+      endTimestamp,
+    });
+    return Promise.reject(new Error("Could not get end block number"));
+  }
   // const startTimestamp = veDoloRebateMetadata.veDoloStartTimestamp + (ONE_WEEK_SECONDS * (epoch - 1));
   // const endTimestamp = startTimestamp + ONE_WEEK_SECONDS;
 
