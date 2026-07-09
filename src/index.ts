@@ -48,7 +48,7 @@ checkDuration('DETONATIONS_KEY_EXPIRATION_SECONDS', 1, false);
 checkDuration('DETONATIONS_POLL_INTERVAL_MS', 1000);
 checkExists('ETHEREUM_NODE_URL');
 checkExists('ETHERSCAN_API_KEY');
-checkBigNumber('GAS_PRICE_ADDITION');
+checkBigNumber('GAS_PRICE_ADDITION_WEI');
 checkBigNumber('GAS_PRICE_MULTIPLIER');
 checkBigNumber('GAS_PRICE_POLL_INTERVAL_MS');
 checkBooleanValue('GAS_PRICE_UPDATER_ENABLED');
@@ -139,7 +139,7 @@ async function start() {
     detonationsPollIntervalMillis: process.env.DETONATIONS_POLL_INTERVAL_MS,
     dolomiteMargin: libraryDolomiteMargin,
     ethereumNodeUrl: process.env.ETHEREUM_NODE_URL,
-    gasPriceAddition: process.env.GAS_PRICE_ADDITION,
+    gasPriceAddition: process.env.GAS_PRICE_ADDITION_WEI,
     gasPriceMultiplier: process.env.GAS_PRICE_MULTIPLIER,
     gasPricePollIntervalMillis: process.env.GAS_PRICE_POLL_INTERVAL_MS,
     gasPriceUpdaterEnabled: process.env.GAS_PRICE_UPDATER_ENABLED,

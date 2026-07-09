@@ -35,11 +35,11 @@ export async function updateGasPrice(dolomite: DolomiteMargin) {
   }
 
   const multiplier = new BigNumber(process.env.GAS_PRICE_MULTIPLIER as string);
-  const addition = new BigNumber(process.env.GAS_PRICE_ADDITION as string);
+  const additionWei = new BigNumber(process.env.GAS_PRICE_ADDITION_WEI as string);
   const totalWei = new BigNumber(fast)
     .times(1_000_000_000)
     .times(multiplier)
-    .plus(addition)
+    .plus(additionWei)
     .toFixed(0);
 
   Logger.info({
