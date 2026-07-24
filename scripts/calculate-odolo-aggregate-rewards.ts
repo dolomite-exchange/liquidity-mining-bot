@@ -38,34 +38,106 @@ async function getODoloPerNetworkFiles(
   ).filter((value): value is [ChainId, ODoloOutputFile] => !!value);
 }
 
+/**
+ * Reads a user's per-network cumulative out of a previous aggregated file entry.
+ *
+ * `amountPerNetwork` is declared as `{ [network]: { amount } }` but is actually
+ * written (and read by the frontend) as a flat `{ [network]: string }`. Tolerate
+ * both shapes so carry-forward keeps working regardless of which the on-disk
+ * file uses.
+ */
+function readPreviousPerNetworkAmount(
+  amountPerNetwork: ODoloAggregateUserData['amountPerNetwork'],
+  chainId: string,
+): Integer {
+  const raw = amountPerNetwork[chainId] as unknown;
+  if (raw === undefined || raw === null) {
+    return INTEGERS.ZERO;
+  }
+  if (typeof raw === 'string') {
+    return new BigNumber(raw);
+  }
+  if (typeof raw === 'object' && typeof (raw as { amount?: string }).amount === 'string') {
+    return new BigNumber((raw as { amount: string }).amount);
+  }
+  return new BigNumber(raw as string);
+}
+
+/**
+ * Folds the per-network oDOLO files for an epoch into per-user cumulative totals.
+ *
+ * The aggregated leaf a user claims against is the SUM of their per-network
+ * cumulative amounts, and the on-chain `ODoloRollingClaims` contract treats that
+ * leaf as a cumulative: it transfers `leaf - userToClaimAmount[user]` and then
+ * ratchets `userToClaimAmount[user]` up to `leaf`. That makes the leaf a
+ * monotonic quantity — it must never decrease across epochs, or a user who
+ * already claimed the higher amount is stranded with a negative claimable and
+ * can never claim again.
+ *
+ * The networks summed are whatever currently has weights in `allChainWeights`.
+ * When a network is retired from that config its per-epoch files stop being
+ * produced, so summing only the current epoch's files silently drops that
+ * network's entire historical cumulative from every user who earned on it (this
+ * is exactly what happened when Botanix / chain 3637 was removed after epoch 60).
+ * To keep the leaf monotonic we reconcile against the previous aggregated file
+ * and take a per-(network, user) MAX:
+ *   - a retired network (absent this epoch) keeps its last-known cumulative, and
+ *   - an active network whose freshly-computed cumulative regressed (e.g. a
+ *     subgraph re-index) is clamped up to its previous value.
+ * Because every per-network component is >= its previous value, the summed leaf
+ * is guaranteed >= the previous leaf, while `amount` stays exactly equal to the
+ * sum of `amountPerNetwork`.
+ */
 function reduceAllNetworkFilesByUser(
   allFiles: [ChainId, ODoloOutputFile][],
+  previousFile: ODoloAggregateOutputFile | undefined,
 ): {
   userToAmountMap: Record<string, Integer>;
   chainToUserToAmountMap: Record<string, Record<string, string>>;
   metadataPerNetwork: Record<string, ODoloMetadataPerNetwork>
 } {
+  // 1) Seed each network's per-user cumulative from this epoch's finalized files.
   const chainToUserToAmountMap: Record<string, Record<string, string>> = {};
-  const metadataPerNetwork: Record<string, ODoloMetadataPerNetwork> = {};
-  const userToAmountMap = allFiles.reduce((memo, [chainId, file]) => {
+  allFiles.forEach(([chainId, file]) => {
     chainToUserToAmountMap[chainId] = {};
-    metadataPerNetwork[chainId] = {
-      totalUsers: file.metadata.totalUsers,
-      amount: INTEGERS.ZERO.toFixed(),
-    };
     Object.keys(file.users).forEach(user => {
-      const userAmount = file.users[user].amount;
-      if (!memo[user]) {
-        memo[user] = INTEGERS.ZERO;
-      }
-
-      chainToUserToAmountMap[chainId][user] = userAmount;
-      metadataPerNetwork[chainId].amount = new BigNumber(metadataPerNetwork[chainId].amount).plus(userAmount).toFixed();
-
-      memo[user] = memo[user].plus(userAmount);
+      chainToUserToAmountMap[chainId][user] = file.users[user].amount;
     });
-    return memo;
-  }, {} as Record<string, Integer>);
+  });
+
+  // 2) Carry forward every network the previous aggregation knew about, taking a
+  //    per-(network, user) max so no network's cumulative can ever regress.
+  if (previousFile) {
+    Object.keys(previousFile.users).forEach(user => {
+      const previousPerNetwork = previousFile.users[user].amountPerNetwork;
+      Object.keys(previousPerNetwork).forEach(chainId => {
+        if (!chainToUserToAmountMap[chainId]) {
+          chainToUserToAmountMap[chainId] = {};
+        }
+        const previousAmount = readPreviousPerNetworkAmount(previousPerNetwork, chainId);
+        const currentAmount = new BigNumber(chainToUserToAmountMap[chainId][user] ?? INTEGERS.ZERO.toFixed());
+        chainToUserToAmountMap[chainId][user] = (currentAmount.gt(previousAmount) ? currentAmount : previousAmount)
+          .toFixed();
+      });
+    });
+  }
+
+  // 3) Fold the reconciled per-network cumulatives into per-user totals + metadata.
+  const metadataPerNetwork: Record<string, ODoloMetadataPerNetwork> = {};
+  const userToAmountMap: Record<string, Integer> = {};
+  Object.keys(chainToUserToAmountMap).forEach(chainId => {
+    const usersOnNetwork = chainToUserToAmountMap[chainId];
+    let networkAmount = INTEGERS.ZERO;
+    Object.keys(usersOnNetwork).forEach(user => {
+      const userAmount = new BigNumber(usersOnNetwork[user]);
+      networkAmount = networkAmount.plus(userAmount);
+      userToAmountMap[user] = (userToAmountMap[user] ?? INTEGERS.ZERO).plus(userAmount);
+    });
+    metadataPerNetwork[chainId] = {
+      totalUsers: Object.keys(usersOnNetwork).length,
+      amount: networkAmount.toFixed(),
+    };
+  });
 
   return {
     chainToUserToAmountMap,
@@ -106,8 +178,9 @@ export async function calculateODoloAggregateRewards(
   }
 
   const oDoloAggregatedFileName = getODoloAggregatedFileNameWithPath(networkId);
+  let previousFile: ODoloAggregateOutputFile | undefined;
   if (epochNumber !== 0) {
-    const previousFile = await readFileFromGitHub<ODoloAggregateOutputFile>(oDoloAggregatedFileName);
+    previousFile = await readFileFromGitHub<ODoloAggregateOutputFile>(oDoloAggregatedFileName);
     if (previousFile.metadata.epoch !== epochNumber - 1) {
       // There's nothing to do. The epochs do not align
       Logger.info({
@@ -131,7 +204,30 @@ export async function calculateODoloAggregateRewards(
     userToAmountMap: userToOTokenRewards,
     chainToUserToAmountMap,
     metadataPerNetwork,
-  } = reduceAllNetworkFilesByUser(allFiles);
+  } = reduceAllNetworkFilesByUser(allFiles, previousFile);
+
+  // Defense in depth for the monotonic-leaf invariant. The per-network carry
+  // forward inside `reduceAllNetworkFilesByUser` already guarantees each user's
+  // summed leaf is >= its previous value, so this clamp should never bind. If it
+  // ever does, the previous aggregated file's per-network breakdown didn't sum to
+  // its stored leaf — surface it loudly and still refuse to ship a decrease that
+  // would push a claimed user's claimable negative.
+  if (previousFile) {
+    Object.keys(previousFile.users).forEach(user => {
+      const previousAmount = new BigNumber(previousFile!.users[user].amount);
+      const nextAmount = userToOTokenRewards[user] ?? INTEGERS.ZERO;
+      if (nextAmount.lt(previousAmount)) {
+        Logger.error({
+          at: __filename,
+          message: 'oDOLO leaf would decrease vs previous epoch; clamping up to previous amount',
+          user,
+          previousAmount: previousAmount.toFixed(),
+          computedAmount: nextAmount.toFixed(),
+        });
+        userToOTokenRewards[user] = previousAmount;
+      }
+    });
+  }
 
   let totalODolo = INTEGERS.ZERO;
   allFiles.forEach(([_, file]) => {
