@@ -224,7 +224,7 @@ export async function calculateODoloAggregateRewards(
           previousAmount: previousAmount.toFixed(),
           computedAmount: nextAmount.toFixed(),
         });
-        userToOTokenRewards[user] = previousAmount;
+        throw new Error('oDOLO leaf would decrease vs previous epoch; clamping up to previous amount');
       }
     });
   }
