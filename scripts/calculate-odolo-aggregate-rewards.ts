@@ -219,12 +219,12 @@ export async function calculateODoloAggregateRewards(
       if (nextAmount.lt(previousAmount)) {
         Logger.error({
           at: __filename,
-          message: 'oDOLO leaf would decrease vs previous epoch; clamping up to previous amount',
+          message: 'oDOLO leaf would decrease vs previous epoch',
           user,
           previousAmount: previousAmount.toFixed(),
           computedAmount: nextAmount.toFixed(),
         });
-        throw new Error('oDOLO leaf would decrease vs previous epoch; clamping up to previous amount');
+        throw new Error('oDOLO leaf would decrease vs previous epoch');
       }
     });
   }
