@@ -1,4 +1,4 @@
-import { Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import v8 from 'v8';
 import FeeRebateClaimerAbi from '../src/abi/fee-rebate-claimer.json';
@@ -290,7 +290,7 @@ export async function calculateBorrowFeesPerNetwork(
         return acc;
       }, {} as Record<string, string>),
       marketExpectedTotalRevenue: Object.keys(marketTotalBorrowInterest).reduce((acc, market) => {
-        acc[market] = marketTotalBorrowInterest[market].times(RESERVE_FACTOR).toFixed();
+        acc[market] = marketTotalBorrowInterest[market].times(RESERVE_FACTOR).toFixed(0, BigNumber.ROUND_DOWN);
         return acc;
       }, {} as Record<string, string>),
       marketFoundTotalRevenue: Object.keys(marketRevenueMap).reduce((acc, market) => {

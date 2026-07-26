@@ -262,6 +262,11 @@
         "internalType": "uint256",
         "name": "_expectedEpoch",
         "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "_incrementEpoch",
+        "type": "bool"
       }
     ],
     "name": "handlerSetMerkleRoot",

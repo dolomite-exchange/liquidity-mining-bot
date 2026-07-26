@@ -146,16 +146,16 @@ export async function calculateBorrowRebatePerNetwork(
       if (rebateInfo) {
         const totalVeDoloUsd: Decimal = new BigNumber(rebateInfo.totalVeDoloUsd).div(ONE_ETH_WEI);
 
-        const maxRebateUsd: Decimal = Object.keys(rebateInfo.totalBorrowInterestUsdPerNetwork)
+        const maxRebateUsdPerWeek: Decimal = Object.keys(rebateInfo.totalBorrowInterestUsdPerNetwork)
           .reduce((acc, chainId) => {
             const networkId = parseInt(chainId, 10) as ChainId;
-            const borrowFeesUsd = new BigNumber(rebateInfo.totalBorrowInterestUsdPerNetwork[networkId])
+            const borrowFeesUsd: Decimal = new BigNumber(rebateInfo.totalBorrowInterestUsdPerNetwork[networkId])
               .div(ONE_ETH_WEI);
             const rebatePercentage = borrowRebatesMetadata.allChainRebateInfo[networkId]!.rebatePercentage;
             return acc.plus(borrowFeesUsd.times(rebatePercentage));
           }, INTEGERS.ZERO);
 
-        const maxRebateUsdAnnualized = maxRebateUsd.times(52);
+        const maxRebateUsdAnnualized = maxRebateUsdPerWeek.times(52);
         const rebatePercentage = borrowRebatesMetadata.allChainRebateInfo[dolomite.networkId]!.rebatePercentage;
 
         const revenueFactor = marketToRevenueFactorMap[marketId];
