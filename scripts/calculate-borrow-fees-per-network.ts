@@ -12,7 +12,7 @@ import Pageable from '../src/lib/pageable';
 import BlockStore from '../src/lib/stores/block-store';
 import MarketStore from '../src/lib/stores/market-store';
 import { decodeUint256ToBigNumber } from '../src/lib/utils';
-import { readVeDoloRebateMetadataFromApi } from './lib/api-helpers';
+import { getEnabledVeDoloRebateMarketIds, readVeDoloRebateMetadataFromApi } from './lib/api-helpers';
 import { getBorrowInterestFinalizedFileNameWithPath } from './lib/config-helper';
 import { BorrowFeesPerNetworkOutputFile } from './lib/data-types';
 import { getAccountBalancesByMarket, getBalanceChangingEvents } from './lib/event-parser';
@@ -62,14 +62,7 @@ export async function calculateBorrowFeesPerNetwork(
     return { epoch };
   }
 
-  const marketIdToEnabledMap = Object.keys(veDoloRebateMetadata.allChainRebateInfo[networkId].marketToRebateInfo)
-    .reduce((acc, marketId) => {
-      const marketInfo = veDoloRebateMetadata.allChainRebateInfo[networkId]!.marketToRebateInfo[marketId];
-      if (epoch >= marketInfo.startEpoch && epoch <= (marketInfo.endEpoch ?? Number.MAX_SAFE_INTEGER)) {
-        acc[marketId] = true;
-      }
-      return acc;
-    }, {} as Record<string, boolean | undefined>);
+  const marketIdToEnabledMap = getEnabledVeDoloRebateMarketIds(veDoloRebateMetadata, networkId, epoch);
   const marketIds = Object.keys(marketIdToEnabledMap);
   if (marketIds.length === 0) {
     // There's nothing to do. No markets are enabled
@@ -239,11 +232,15 @@ export async function calculateBorrowFeesPerNetwork(
   const marketTotalBorrowInterest: Record<string, Integer> = {};
   const walletAddressToMarketIdToFinalAmountStringMap: Record<string, Record<string, string>> = {};
   Object.keys(walletAddressToMarketIdToFinalBorrowFeesMap).forEach(user => {
-    walletAddressToMarketIdToFinalAmountStringMap[user] = {};
     Object.keys(walletAddressToMarketIdToFinalBorrowFeesMap[user]).forEach(marketId => {
       const amount = walletAddressToMarketIdToFinalBorrowFeesMap[user][marketId];
-      walletAddressToMarketIdToFinalAmountStringMap[user][marketId] = amount.toFixed();
-      marketTotalBorrowInterest[marketId] = (marketTotalBorrowInterest[marketId] ?? INTEGERS.ZERO).plus(amount);
+      if (amount.gt(INTEGERS.ZERO)) {
+        if (!walletAddressToMarketIdToFinalAmountStringMap[user]) {
+          walletAddressToMarketIdToFinalAmountStringMap[user] = {};
+        }
+        walletAddressToMarketIdToFinalAmountStringMap[user][marketId] = amount.toFixed();
+        marketTotalBorrowInterest[marketId] = (marketTotalBorrowInterest[marketId] ?? INTEGERS.ZERO).plus(amount);
+      }
     });
   });
 

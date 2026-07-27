@@ -94,6 +94,14 @@ export default class BorrowFeeRebateMerkleTreeUpdater {
       totalAmounts.push(outputFile.metadata.marketToTotalRebate[marketId]);
     });
 
+    Logger.info({
+      at: 'BorrowFeeRebateMerkleTreeUpdater#_update',
+      message: 'Updating merkle roots..',
+      data: marketIds.map((m, index) => ({
+        marketId: m,
+        amount: totalAmounts[index],
+      })),
+    })
     const result = await dolomite.contracts.callContractFunction(
       rollingClaimsDistributor.methods.handlerSetMerkleRoots(
         marketIds,

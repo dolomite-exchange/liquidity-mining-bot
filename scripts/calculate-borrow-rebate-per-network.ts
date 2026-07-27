@@ -98,11 +98,13 @@ export async function calculateBorrowRebatePerNetwork(
     return Promise.resolve();
   }
 
+  // There is no need to populate this with the previous user data, because it's re-tallied using `userToMarketToRebate`
+  // below, once it's populated.
+  const marketTotalRebate: Record<string, Integer> = {};
+
   let userToMarketToRebate: Record<string, Record<string, Integer>>;
-  let marketTotalRebate: Record<string, Integer>;
   if (epoch === 1) {
     userToMarketToRebate = {};
-    marketTotalRebate = {};
   } else {
     invariant(!!previousFile, 'Previous file should be defined');
 
@@ -113,11 +115,6 @@ export async function calculateBorrowRebatePerNetwork(
       }, {} as Record<string, Integer>);
       return acc1;
     }, {} as Record<string, Record<string, Integer>>);
-
-    marketTotalRebate = Object.keys(previousFile.metadata.marketToTotalRebate).reduce((acc, market) => {
-      acc[market] = new BigNumber(previousFile.metadata.marketToTotalRebate[market]);
-      return acc;
-    }, {} as Record<string, Integer>);
   }
 
   const marketToRevenueFactorMap: Record<string, BigNumber> = {};

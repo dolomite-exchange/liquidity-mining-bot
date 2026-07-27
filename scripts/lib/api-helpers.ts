@@ -73,3 +73,18 @@ export async function readVeDoloRebateMetadataFromApi(): Promise<VeDoloRebateMet
   const response = await axios.get(`${DOLOMITE_API_SERVER_URL}/liquidity-mining/ve-dolo-rebate/metadata`);
   return response.data.metadata
 }
+
+export function getEnabledVeDoloRebateMarketIds(
+  veDoloRebateMetadata: VeDoloRebateMetadata,
+  networkId: number,
+  epoch: number,
+): Record<string, boolean | undefined> {
+  return Object.keys(veDoloRebateMetadata.allChainRebateInfo[networkId].marketToRebateInfo)
+    .reduce((acc, marketId) => {
+      const marketInfo = veDoloRebateMetadata.allChainRebateInfo[networkId]!.marketToRebateInfo[marketId];
+      if (epoch >= marketInfo.startEpoch && epoch <= (marketInfo.endEpoch ?? Number.MAX_SAFE_INTEGER)) {
+        acc[marketId] = true;
+      }
+      return acc;
+    }, {} as Record<string, boolean | undefined>);
+}
