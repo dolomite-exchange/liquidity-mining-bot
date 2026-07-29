@@ -32,21 +32,28 @@ import { computeCorrectedEpochPoints } from './make-whole-odolo-diluted-market';
  * Honest suppliers get a positive delta (make-whole); the two offenders get a large
  * negative delta (clawback). We apply netDelta to the current aggregated cumulative.
  *
- * ── Clawback floor (important) ──
- * oDOLO is a cumulative merkle drop: a user's leaf can never drop below what they
- * already claimed on-chain, or their claimable goes negative. So any user whose
- * corrected leaf would fall below their on-chain `userToClaimAmount` is floored
- * there. `0x557aab…` never withdrew its spurious oDOLO (fully clawed back);
- * `0xd516c9…` already claimed ~118k of it (unrecoverable via merkle — floored at
- * claimed, an off-chain-recovery decision).
+ * ── Clawback floor + offset accounts (important) ──
+ * oDOLO is a cumulative merkle drop: if a user's leaf drops below what they already
+ * claimed on-chain, their claimable goes negative and the contract can't process a
+ * claim. By default, any user whose corrected leaf would fall below their on-chain
+ * `userToClaimAmount` is floored there (claimable pinned at 0; the already-withdrawn
+ * spurious is kept by them). `0x557aab…` never withdrew its spurious (fully clawed
+ * back); `0xd516c9…` already withdrew ~118k of it.
+ *
+ * Accounts listed in `ODOLO_RECTIFY_OFFSET_ACCOUNTS` are EXEMPT from the floor: they
+ * are held at their legit leaf even below claimed, going negative-claimable, so the
+ * over-claim is recovered as their future weekly earnings lift the leaf back above
+ * claimed (~1.2 yr for `0xd516c9…` at its rate). This is opt-in per account precisely
+ * so a miscalculation can never silently push anyone else negative — every non-listed
+ * user stays positive, protected by the monotonic invariant.
  *
  * ── Rollout ──
- * Published epoch 56–63 roots are on-chain and immutable; this does NOT rewrite
- * them. It rewrites the CURRENT aggregated cumulative + root, which the
- * merkle-tree-updater pushes at the next epoch (offchain == onchain+1). For the
- * correction to persist through future aggregations, the same netDelta must also be
- * applied to the current per-network Arbitrum cumulative file (the additive base the
- * next per-network calc builds on) — see PER_NETWORK note in the summary output.
+ * Published epoch 56–63 roots are on-chain and immutable; this does NOT rewrite them.
+ * It rewrites the CURRENT aggregated cumulative + root (which the merkle-tree-updater
+ * pushes at the next epoch, offchain == onchain+1) AND applies the same effective
+ * per-user change to the current per-network Arbitrum cumulative file — the additive
+ * base the next per-network calc builds on — so the fix persists and the monotonic
+ * invariant maintains it instead of clamping the lowered leaf back up.
  *
  * DRY RUN by default: writes the correction map + corrected aggregated file to
  * scripts/output for review. Only writes to GitHub when `shouldForceUpload()` is set.
@@ -54,6 +61,7 @@ import { computeCorrectedEpochPoints } from './make-whole-odolo-diluted-market';
  *
  * Usage (run with the ARBITRUM env so the recompute reads Arbitrum data):
  *   NETWORK_ID=42161 ODOLO_RECTIFY_EPOCHS=56,63 \
+ *   ODOLO_RECTIFY_OFFSET_ACCOUNTS=0xd516c9877578f3d21c4221fbd3cb8d2a17312ebe \
  *     SCRIPT=true npx ts-node scripts/rectify-odolo-diluted-epochs.ts
  */
 
@@ -65,6 +73,19 @@ const AFFECTED_EPOCHS = (process.env.ODOLO_RECTIFY_EPOCHS ?? '56,63')
   .map(e => parseInt(e.trim(), 10))
   .filter(e => !Number.isNaN(e));
 const BERACHAIN_RPCS = ['https://rpc.berachain.com/', 'https://berachain.drpc.org'];
+
+// Accounts deliberately held at their LEGIT (corrected) leaf even when that is below
+// what they already claimed on-chain — i.e. allowed to go negative-claimable, so their
+// over-claim is recovered as future weekly earnings lift the leaf back above claimed.
+// Everything NOT listed here is floored at on-chain claimed and can never go negative.
+// Opt-in per account so a miscalculation can never silently push anyone else negative;
+// the monotonic invariant keeps every non-listed user positive.
+const OFFSET_ACCOUNTS = new Set(
+  (process.env.ODOLO_RECTIFY_OFFSET_ACCOUNTS ?? '')
+    .split(',')
+    .map(a => a.trim().toLowerCase())
+    .filter(a => a.length > 0),
+);
 
 function readUserAmount(file: ODoloOutputFile, user: string): Integer {
   const entry = file.users[user];
@@ -173,13 +194,19 @@ export async function rectifyODoloDilutedEpochs(): Promise<void> {
   const loweredUsers = Object.keys(netDelta).filter(u => netDelta[u].lt(INTEGERS.ZERO));
   const claimedMap = await readOnChainClaimed(loweredUsers);
 
-  // 3) Apply netDelta (Arbitrum-sourced) to each user's aggregated leaf, flooring lowered
-  //    users at their on-chain claimed amount so claimable can never go negative.
+  // 3) Apply netDelta (Arbitrum-sourced) to each user's aggregated leaf:
+  //    - positive delta (honest supplier) -> raised by their shortfall (make-whole)
+  //    - negative delta NOT in the offset list -> floored at on-chain claimed so
+  //      claimable can't go negative (already-claimed spurious is kept by them)
+  //    - negative delta IN the offset list -> held at its legit leaf even when below
+  //      claimed (negative-claimable, recovered as future earnings lift the leaf)
   const sourceKey = SOURCE_NETWORK.toString();
-  const correctionMap: Record<string, { oldAmount: string; delta: string; newAmount: string; flooredAtClaimed: boolean }> = {};
-  let clawedBackWei = INTEGERS.ZERO;
+  const correctionMap: Record<string, { oldAmount: string; delta: string; newAmount: string; mode: string }> = {};
+  const effectiveDelta: Record<string, Integer> = {};
   let madeWholeWei = INTEGERS.ZERO;
-  let unrecoverableWei = INTEGERS.ZERO;
+  let clawedBackWei = INTEGERS.ZERO;
+  let offsetPendingWei = INTEGERS.ZERO;
+  let unrecoverableKeptWei = INTEGERS.ZERO;
 
   Object.keys(netDelta).forEach(user => {
     const entry = aggregated.users[user];
@@ -190,23 +217,33 @@ export async function rectifyODoloDilutedEpochs(): Promise<void> {
     }
     const oldAmount = new BigNumber(entry.amount);
     let newAmount = oldAmount.plus(netDelta[user]);
-    let flooredAtClaimed = false;
-    if (netDelta[user].lt(INTEGERS.ZERO)) {
+    let mode: string;
+    if (netDelta[user].gte(INTEGERS.ZERO)) {
+      mode = 'make-whole';
+      madeWholeWei = madeWholeWei.plus(newAmount.minus(oldAmount));
+    } else {
       const claimed = claimedMap[user] ?? INTEGERS.ZERO;
-      if (newAmount.lt(claimed)) {
-        unrecoverableWei = unrecoverableWei.plus(claimed.minus(newAmount));
+      if (OFFSET_ACCOUNTS.has(user)) {
+        mode = 'offset';
+        if (newAmount.lt(claimed)) {
+          offsetPendingWei = offsetPendingWei.plus(claimed.minus(newAmount)); // recovered via future earnings
+        }
+      } else if (newAmount.lt(claimed)) {
+        mode = 'floored-at-claimed';
+        unrecoverableKeptWei = unrecoverableKeptWei.plus(claimed.minus(newAmount)); // already withdrawn; kept by user
         newAmount = claimed;
-        flooredAtClaimed = true;
+      } else {
+        mode = 'clawed-back';
       }
       clawedBackWei = clawedBackWei.plus(oldAmount.minus(newAmount));
-    } else {
-      madeWholeWei = madeWholeWei.plus(newAmount.minus(oldAmount));
     }
 
     // Keep amount == Σ(amountPerNetwork): push the whole change onto the source network.
+    const change = newAmount.minus(oldAmount);
+    effectiveDelta[user] = change;
     const perNetwork = entry.amountPerNetwork as unknown as Record<string, string>;
     const oldSource = new BigNumber(perNetwork[sourceKey] ?? INTEGERS.ZERO.toFixed());
-    const newSource = oldSource.plus(newAmount.minus(oldAmount));
+    const newSource = oldSource.plus(change);
     perNetwork[sourceKey] = (newSource.lt(INTEGERS.ZERO) ? INTEGERS.ZERO : newSource).toFixed();
     entry.amount = newAmount.toFixed();
 
@@ -214,7 +251,7 @@ export async function rectifyODoloDilutedEpochs(): Promise<void> {
       oldAmount: oldAmount.toFixed(),
       delta: netDelta[user].toFixed(),
       newAmount: newAmount.toFixed(),
-      flooredAtClaimed,
+      mode,
     };
   });
 
@@ -233,42 +270,79 @@ export async function rectifyODoloDilutedEpochs(): Promise<void> {
   const oldRoot = aggregated.metadata.merkleRoot;
   aggregated.metadata.merkleRoot = merkleRoot;
 
+  // 5) Apply the SAME effective per-user change to the current per-network Arbitrum
+  //    cumulative file, so the additive next-epoch calc builds on the corrected base
+  //    (and the monotonic invariant maintains the corrected leaf rather than clamping
+  //    it back up). Only per-user `amount` matters downstream; we regenerate the file's
+  //    leaves/root/cumulative for consistency and leave the epoch's historical
+  //    totalODolo / marketTotalPointsForEpoch untouched.
+  const currentEpoch = aggregated.metadata.epoch;
+  const perNetworkFileName = getOTokenFinalizedFileNameWithPath(SOURCE_NETWORK, ODOLO_TYPE, currentEpoch);
+  const perNetworkFile = await readFileFromGitHub<ODoloOutputFile>(perNetworkFileName);
+  Object.keys(effectiveDelta).forEach(user => {
+    const entry = perNetworkFile.users[user];
+    if (!entry) {
+      Logger.warn({ at: __filename, message: 'corrected user missing from per-network file — skipping', user });
+      return;
+    }
+    const corrected = new BigNumber(entry.amount).plus(effectiveDelta[user]);
+    entry.amount = (corrected.lt(INTEGERS.ZERO) ? INTEGERS.ZERO : corrected).toFixed();
+  });
+  const perNetworkAmounts = Object.keys(perNetworkFile.users).reduce((memo, user) => {
+    memo[user] = new BigNumber(perNetworkFile.users[user].amount);
+    return memo;
+  }, {} as Record<string, Integer>);
+  const perNetworkResult = await calculateMerkleRootAndLeafs(perNetworkAmounts);
+  let perNetworkCumulative = INTEGERS.ZERO;
+  Object.keys(perNetworkFile.users).forEach(user => {
+    perNetworkFile.users[user].leaf = perNetworkResult.walletAddressToLeafMap[user].leaf;
+    perNetworkCumulative = perNetworkCumulative.plus(perNetworkFile.users[user].amount);
+  });
+  perNetworkFile.metadata.cumulativeODolo = perNetworkCumulative.toFixed();
+  perNetworkFile.metadata.merkleRoot = perNetworkResult.merkleRoot;
+
   const oneODolo = new BigNumber(10).pow(18);
   Logger.info({
     at: __filename,
     message: 'Computed oDOLO dilution correction (dry run unless force-upload set)',
     affectedEpochs: AFFECTED_EPOCHS,
+    offsetAccounts: Array.from(OFFSET_ACCOUNTS),
     usersCorrected: Object.keys(correctionMap).length,
     madeWholeODolo: madeWholeWei.div(oneODolo).toFixed(2),
     clawedBackODolo: clawedBackWei.div(oneODolo).toFixed(2),
-    unrecoverableAlreadyClaimedODolo: unrecoverableWei.div(oneODolo).toFixed(2),
-    oldMerkleRoot: oldRoot,
-    newMerkleRoot: merkleRoot,
+    offsetPendingODolo: offsetPendingWei.div(oneODolo).toFixed(2),
+    unrecoverableKeptODolo: unrecoverableKeptWei.div(oneODolo).toFixed(2),
+    aggregatedOldRoot: oldRoot,
+    aggregatedNewRoot: merkleRoot,
+    perNetworkNewRoot: perNetworkResult.merkleRoot,
   });
 
   const summary = {
     metadata: {
       affectedEpochs: AFFECTED_EPOCHS,
+      offsetAccounts: Array.from(OFFSET_ACCOUNTS),
       sourceNetwork: SOURCE_NETWORK,
       aggregatedNetwork: AGGREGATED_NETWORK,
+      currentEpoch,
       usersCorrected: Object.keys(correctionMap).length,
       madeWholeWei: madeWholeWei.toFixed(),
       clawedBackWei: clawedBackWei.toFixed(),
-      unrecoverableAlreadyClaimedWei: unrecoverableWei.toFixed(),
-      oldMerkleRoot: oldRoot,
-      newMerkleRoot: merkleRoot,
-      PER_NETWORK_NOTE: `Apply the same per-user delta to the current finalized/${SOURCE_NETWORK}/odolo per-network `
-        + 'cumulative file so the next per-network calc builds on the corrected base; otherwise the additive '
-        + 'cumulative re-introduces the error next epoch.',
+      offsetPendingWei: offsetPendingWei.toFixed(),
+      unrecoverableKeptWei: unrecoverableKeptWei.toFixed(),
+      aggregatedOldRoot: oldRoot,
+      aggregatedNewRoot: merkleRoot,
+      perNetworkNewRoot: perNetworkResult.merkleRoot,
     },
     corrections: correctionMap,
   };
 
   if (shouldForceUpload()) {
     await writeFileToGitHub(aggregatedFileName, aggregated, false);
+    await writeFileToGitHub(perNetworkFileName, perNetworkFile, false);
   } else {
-    Logger.info({ at: __filename, message: 'Dry run — writing to scripts/output. Set force-upload to commit.' });
+    Logger.info({ at: __filename, message: 'Dry run — writing corrected files + map to scripts/output. Set force-upload to commit.' });
     writeOutputFile(`odolo/odolo-${AGGREGATED_NETWORK}-aggregated-output-rectified.json`, aggregated);
+    writeOutputFile(`odolo/odolo-${SOURCE_NETWORK}-epoch-${currentEpoch}-perNetwork-rectified.json`, perNetworkFile);
     writeOutputFile(`odolo/odolo-dilution-correction-map.json`, summary);
   }
 }
