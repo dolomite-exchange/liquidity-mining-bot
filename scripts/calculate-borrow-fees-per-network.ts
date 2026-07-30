@@ -18,6 +18,7 @@ import { BorrowFeesPerNetworkOutputFile } from './lib/data-types';
 import { getAccountBalancesByMarket, getBalanceChangingEvents } from './lib/event-parser';
 import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
 import { calculateBorrowInterest, InterestOperation, processEventsUntilEndTimestamp } from './lib/rewards';
+import { ChainId } from '../src/lib/chain-id';
 
 const REWARD_MULTIPLIERS_MAP = {};
 
@@ -35,6 +36,24 @@ export async function calculateBorrowFeesPerNetwork(
   }
 
   const veDoloRebateMetadata = await readVeDoloRebateMetadataFromApi();
+  const rebateInfo = veDoloRebateMetadata.allChainRebateInfo[dolomite.networkId as ChainId];
+  if (!rebateInfo) {
+    Logger.warn({
+      file: __filename,
+      message: 'No rebate info found for this chain!',
+    });
+
+    return { epoch };
+  } else if (veDoloRebateMetadata.currentEpochIndex < rebateInfo.startEpoch) {
+    Logger.warn({
+      file: __filename,
+      message: 'This network has not started yet!',
+      epoch: veDoloRebateMetadata.currentEpochIndex,
+      startEpoch: rebateInfo.startEpoch,
+    });
+
+    return { epoch };
+  }
 
   const blockStore = new BlockStore();
   await blockStore._update();
@@ -86,7 +105,7 @@ export async function calculateBorrowFeesPerNetwork(
       callData: feeClaimer.methods.getClaimTimestampByEpochAndMarketId(epoch, marketIds[0]).encodeABI(),
     },
   ];
-  if (epoch >= 2) {
+  if (epoch >= rebateInfo.startEpoch + 1) {
     timestampCalls.push({
       target: feeClaimer.options.address,
       callData: feeClaimer.methods.getClaimTimestampByEpochAndMarketId(epoch - 1, marketIds[0]).encodeABI(),
@@ -95,7 +114,7 @@ export async function calculateBorrowFeesPerNetwork(
 
   const { results: timestampResults } = await dolomite.multiCall.aggregate(timestampCalls);
 
-  const startTimestamp = epoch >= 2
+  const startTimestamp = epoch >= rebateInfo.startEpoch + 1
     ? decodeUint256ToBigNumber(timestampResults[1]).toNumber()
     : REBATE_START_TIMESTAMP_MAP[dolomite.networkId];
   const startBlockNumber = (await getLatestBlockDataByTimestamp(startTimestamp))?.blockNumber;

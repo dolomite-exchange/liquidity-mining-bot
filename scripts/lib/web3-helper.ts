@@ -1,3 +1,5 @@
+import { sleep } from '../../src/helpers/async-helpers';
+
 const MAX_RETRIES = 100;
 
 export async function getWeb3RequestWithBackoff<T>(

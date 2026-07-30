@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { ADDRESS_ZERO } from '../constants';
+import { sleep } from '../../helpers/async-helpers';
 
 const SLEEP_DURATION_BETWEEN_QUERIES = 1_000;
 
@@ -35,10 +36,10 @@ export class PendleAPI {
 
   static async queryLL(
     chainId: number,
-    market: string
+    market: string,
   ): Promise<LiquidLockerData[]> {
     const resp = await axios.get(
-      `https://api-v2.pendle.finance/core/v1/statistics/liquid-locker-pools?chainId=${chainId}&lpAddress=${market.toLowerCase()}`
+      `https://api-v2.pendle.finance/core/v1/statistics/liquid-locker-pools?chainId=${chainId}&lpAddress=${market.toLowerCase()}`,
     );
     return resp.data.results;
   }

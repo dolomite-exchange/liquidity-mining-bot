@@ -11,6 +11,7 @@ export const ONE_DOLLAR: Integer = new BigNumber(10).pow(36);
 export const ONE_WEEK_SECONDS = 604_800;
 
 export const REBATE_START_TIMESTAMP_MAP: { [networkId: number]: number } = {
+  [ChainId.ArbitrumOne]: 1784769110,
   [ChainId.Berachain]: 1779920962,
 };
 
