@@ -78,7 +78,7 @@ export async function calculateBorrowFeesPerNetwork(
 
   const feeClaimer = new dolomite.web3.eth.Contract(
     FeeRebateClaimerAbi,
-    ModuleDeployments.FeeRebateClaimerProxy['80094'].address,
+    ModuleDeployments.FeeRebateClaimerProxy[dolomite.networkId].address,
   );
   const timestampCalls: { target: string, callData: string }[] = [
     {

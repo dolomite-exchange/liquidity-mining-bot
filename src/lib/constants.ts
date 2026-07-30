@@ -21,3 +21,7 @@ export function isIsolationModeToken(token: GraphqlToken): boolean {
 export const RESERVE_FACTOR = new BigNumber(0.2);
 
 export const REVENUE_MARGIN_OF_ERROR = new BigNumber(0.05);
+
+export const ADDRESS_ZERO = '0x0000000000000000000000000000000000000000';
+
+export const DOLOMITE_API_SERVER_URL = 'https://api.dolomite.io';

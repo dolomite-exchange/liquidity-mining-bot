@@ -1,5 +1,3 @@
-import sleep from '@dolomite-exchange/zap-sdk/dist/__tests__/helpers/sleep';
-
 const MAX_RETRIES = 100;
 
 export async function getWeb3RequestWithBackoff<T>(

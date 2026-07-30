@@ -1,7 +1,7 @@
 import { BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
-import { DOLOMITE_API_SERVER_URL } from '@dolomite-exchange/zap-sdk';
 import axios from 'axios';
 import { ChainId } from '../../src/lib/chain-id';
+import { DOLOMITE_API_SERVER_URL } from '../../src/lib/constants';
 
 export interface ODoloMetadata {
   odoloStartTimestamp: number;
