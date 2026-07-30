@@ -7,7 +7,7 @@ import './env';
 export type CallStruct = { target: string; callData: string };
 
 const multiCallWithExceptionHandlerAddress =
-  ModuleDeployments.MultiCallWithExceptionHandler[process.env.NETWORK_ID!].address;
+  ModuleDeployments.MultiCallWithExceptionHandlerV2[process.env.NETWORK_ID!].address;
 if (!multiCallWithExceptionHandlerAddress) {
   throw new Error('Could not find multiCallWithExceptionHandlerAddress');
 }
