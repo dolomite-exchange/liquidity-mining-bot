@@ -11,6 +11,7 @@ export const ONE_DOLLAR: Integer = new BigNumber(10).pow(36);
 export const ONE_WEEK_SECONDS = 604_800;
 
 export const REBATE_START_TIMESTAMP_MAP: { [networkId: number]: number } = {
+  [ChainId.ArbitrumOne]: 1784769110,
   [ChainId.Berachain]: 1779920962,
 };
 
@@ -21,3 +22,7 @@ export function isIsolationModeToken(token: GraphqlToken): boolean {
 export const RESERVE_FACTOR = new BigNumber(0.2);
 
 export const REVENUE_MARGIN_OF_ERROR = new BigNumber(0.05);
+
+export const ADDRESS_ZERO = '0x0000000000000000000000000000000000000000';
+
+export const DOLOMITE_API_SERVER_URL = 'https://api.dolomite.io';

@@ -1,7 +1,7 @@
 import { BigNumber, Decimal } from '@dolomite-exchange/dolomite-margin';
-import { DOLOMITE_API_SERVER_URL } from '@dolomite-exchange/zap-sdk';
 import axios from 'axios';
 import { ChainId } from '../../src/lib/chain-id';
+import { DOLOMITE_API_SERVER_URL } from '../../src/lib/constants';
 
 export interface ODoloMetadata {
   odoloStartTimestamp: number;
@@ -72,4 +72,19 @@ export async function readODoloMetadataFromApi(epoch: number | undefined): Promi
 export async function readVeDoloRebateMetadataFromApi(): Promise<VeDoloRebateMetadata> {
   const response = await axios.get(`${DOLOMITE_API_SERVER_URL}/liquidity-mining/ve-dolo-rebate/metadata`);
   return response.data.metadata
+}
+
+export function getEnabledVeDoloRebateMarketIds(
+  veDoloRebateMetadata: VeDoloRebateMetadata,
+  networkId: number,
+  epoch: number,
+): Record<string, boolean | undefined> {
+  return Object.keys(veDoloRebateMetadata.allChainRebateInfo[networkId].marketToRebateInfo)
+    .reduce((acc, marketId) => {
+      const marketInfo = veDoloRebateMetadata.allChainRebateInfo[networkId]!.marketToRebateInfo[marketId];
+      if (epoch >= marketInfo.startEpoch && epoch <= (marketInfo.endEpoch ?? Number.MAX_SAFE_INTEGER)) {
+        acc[marketId] = true;
+      }
+      return acc;
+    }, {} as Record<string, boolean | undefined>);
 }

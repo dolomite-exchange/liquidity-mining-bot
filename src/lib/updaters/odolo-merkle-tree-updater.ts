@@ -85,8 +85,9 @@ export default class ODoloMerkleTreeUpdater {
       return Promise.reject(new Error('Onchain and Offchain epochs do not align!'));
     }
 
+    const incrementEpoch = true;
     const result = await dolomite.contracts.callContractFunction(
-      distributor.methods.handlerSetMerkleRoot(outputFile.metadata.merkleRoot, offchainEpoch),
+      distributor.methods.handlerSetMerkleRoot(outputFile.metadata.merkleRoot, offchainEpoch, incrementEpoch),
       {
         gasPrice: getGasPriceWei().toFixed(),
         confirmationType: ConfirmationType.Hash,

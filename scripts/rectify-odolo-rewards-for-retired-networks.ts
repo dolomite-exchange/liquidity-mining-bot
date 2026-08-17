@@ -89,8 +89,8 @@ function readAggregatePerNetworkAmount(
   if (typeof raw === 'string') {
     return new BigNumber(raw);
   }
-  if (typeof raw === 'object' && typeof (raw as { amount?: string }).amount === 'string') {
-    return new BigNumber((raw as { amount: string }).amount);
+  if (typeof raw === 'object' && typeof (raw as any).amount === 'string') {
+    return new BigNumber((raw as any).amount);
   }
   return new BigNumber(raw as string);
 }

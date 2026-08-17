@@ -98,11 +98,13 @@ export async function calculateBorrowRebatePerNetwork(
     return Promise.resolve();
   }
 
+  // There is no need to populate this with the previous user data, because it's re-tallied using `userToMarketToRebate`
+  // below, once it's populated.
+  const marketTotalRebate: Record<string, Integer> = {};
+
   let userToMarketToRebate: Record<string, Record<string, Integer>>;
-  let marketTotalRebate: Record<string, Integer>;
   if (epoch === 1) {
     userToMarketToRebate = {};
-    marketTotalRebate = {};
   } else {
     invariant(!!previousFile, 'Previous file should be defined');
 
@@ -113,11 +115,6 @@ export async function calculateBorrowRebatePerNetwork(
       }, {} as Record<string, Integer>);
       return acc1;
     }, {} as Record<string, Record<string, Integer>>);
-
-    marketTotalRebate = Object.keys(previousFile.metadata.marketToTotalRebate).reduce((acc, market) => {
-      acc[market] = new BigNumber(previousFile.metadata.marketToTotalRebate[market]);
-      return acc;
-    }, {} as Record<string, Integer>);
   }
 
   const marketToRevenueFactorMap: Record<string, BigNumber> = {};
@@ -146,16 +143,16 @@ export async function calculateBorrowRebatePerNetwork(
       if (rebateInfo) {
         const totalVeDoloUsd: Decimal = new BigNumber(rebateInfo.totalVeDoloUsd).div(ONE_ETH_WEI);
 
-        const maxRebateUsd: Decimal = Object.keys(rebateInfo.totalBorrowInterestUsdPerNetwork)
+        const maxRebateUsdPerWeek: Decimal = Object.keys(rebateInfo.totalBorrowInterestUsdPerNetwork)
           .reduce((acc, chainId) => {
             const networkId = parseInt(chainId, 10) as ChainId;
-            const borrowFeesUsd = new BigNumber(rebateInfo.totalBorrowInterestUsdPerNetwork[networkId])
+            const borrowFeesUsd: Decimal = new BigNumber(rebateInfo.totalBorrowInterestUsdPerNetwork[networkId])
               .div(ONE_ETH_WEI);
             const rebatePercentage = borrowRebatesMetadata.allChainRebateInfo[networkId]!.rebatePercentage;
             return acc.plus(borrowFeesUsd.times(rebatePercentage));
           }, INTEGERS.ZERO);
 
-        const maxRebateUsdAnnualized = maxRebateUsd.times(52);
+        const maxRebateUsdAnnualized = maxRebateUsdPerWeek.times(52);
         const rebatePercentage = borrowRebatesMetadata.allChainRebateInfo[dolomite.networkId]!.rebatePercentage;
 
         const revenueFactor = marketToRevenueFactorMap[marketId];

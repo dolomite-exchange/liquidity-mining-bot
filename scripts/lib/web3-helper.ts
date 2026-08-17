@@ -1,4 +1,4 @@
-import sleep from '@dolomite-exchange/zap-sdk/dist/__tests__/helpers/sleep';
+import { sleep } from '../../src/helpers/async-helpers';
 
 const MAX_RETRIES = 100;
 

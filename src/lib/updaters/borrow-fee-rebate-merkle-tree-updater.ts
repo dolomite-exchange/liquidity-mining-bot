@@ -77,7 +77,7 @@ export default class BorrowFeeRebateMerkleTreeUpdater {
     const offchainEpoch = outputFile.metadata.epoch;
     if (onchainEpoch === offchainEpoch) {
       Logger.info({
-        at: __filename,
+        at: 'BorrowFeeRebateMerkleTreeUpdater#_update',
         message: 'Merkle root does not need updating',
       });
       return false;
@@ -93,7 +93,14 @@ export default class BorrowFeeRebateMerkleTreeUpdater {
       merkleRoots.push(outputFile.metadata.marketToMerkleRoot[marketId]);
       totalAmounts.push(outputFile.metadata.marketToTotalRebate[marketId]);
     });
-
+    Logger.info({
+      at: 'BorrowFeeRebateMerkleTreeUpdater#_update',
+      message: 'Updating merkle roots..',
+      data: marketIds.map((m, index) => ({
+        marketId: m,
+        amount: totalAmounts[index],
+      })),
+    });
     const result = await dolomite.contracts.callContractFunction(
       rollingClaimsDistributor.methods.handlerSetMerkleRoots(
         marketIds,

@@ -1,4 +1,4 @@
-import { Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
+import { BigNumber, Integer, INTEGERS } from '@dolomite-exchange/dolomite-margin';
 import ModuleDeployments from '@dolomite-exchange/modules-deployments/src/deploy/deployments.json';
 import v8 from 'v8';
 import FeeRebateClaimerAbi from '../src/abi/fee-rebate-claimer.json';
@@ -12,12 +12,13 @@ import Pageable from '../src/lib/pageable';
 import BlockStore from '../src/lib/stores/block-store';
 import MarketStore from '../src/lib/stores/market-store';
 import { decodeUint256ToBigNumber } from '../src/lib/utils';
-import { readVeDoloRebateMetadataFromApi } from './lib/api-helpers';
+import { getEnabledVeDoloRebateMarketIds, readVeDoloRebateMetadataFromApi } from './lib/api-helpers';
 import { getBorrowInterestFinalizedFileNameWithPath } from './lib/config-helper';
 import { BorrowFeesPerNetworkOutputFile } from './lib/data-types';
 import { getAccountBalancesByMarket, getBalanceChangingEvents } from './lib/event-parser';
 import { readFileFromGitHub, writeFileToGitHub, writeOutputFile } from './lib/file-helpers';
 import { calculateBorrowInterest, InterestOperation, processEventsUntilEndTimestamp } from './lib/rewards';
+import { ChainId } from '../src/lib/chain-id';
 
 const REWARD_MULTIPLIERS_MAP = {};
 
@@ -35,6 +36,24 @@ export async function calculateBorrowFeesPerNetwork(
   }
 
   const veDoloRebateMetadata = await readVeDoloRebateMetadataFromApi();
+  const rebateInfo = veDoloRebateMetadata.allChainRebateInfo[dolomite.networkId as ChainId];
+  if (!rebateInfo) {
+    Logger.warn({
+      file: __filename,
+      message: 'No rebate info found for this chain!',
+    });
+
+    return { epoch };
+  } else if (veDoloRebateMetadata.currentEpochIndex < rebateInfo.startEpoch) {
+    Logger.warn({
+      file: __filename,
+      message: 'This network has not started yet!',
+      epoch: veDoloRebateMetadata.currentEpochIndex,
+      startEpoch: rebateInfo.startEpoch,
+    });
+
+    return { epoch };
+  }
 
   const blockStore = new BlockStore();
   await blockStore._update();
@@ -62,14 +81,7 @@ export async function calculateBorrowFeesPerNetwork(
     return { epoch };
   }
 
-  const marketIdToEnabledMap = Object.keys(veDoloRebateMetadata.allChainRebateInfo[networkId].marketToRebateInfo)
-    .reduce((acc, marketId) => {
-      const marketInfo = veDoloRebateMetadata.allChainRebateInfo[networkId]!.marketToRebateInfo[marketId];
-      if (epoch >= marketInfo.startEpoch && epoch <= (marketInfo.endEpoch ?? Number.MAX_SAFE_INTEGER)) {
-        acc[marketId] = true;
-      }
-      return acc;
-    }, {} as Record<string, boolean | undefined>);
+  const marketIdToEnabledMap = getEnabledVeDoloRebateMarketIds(veDoloRebateMetadata, networkId, epoch);
   const marketIds = Object.keys(marketIdToEnabledMap);
   if (marketIds.length === 0) {
     // There's nothing to do. No markets are enabled
@@ -93,7 +105,7 @@ export async function calculateBorrowFeesPerNetwork(
       callData: feeClaimer.methods.getClaimTimestampByEpochAndMarketId(epoch, marketIds[0]).encodeABI(),
     },
   ];
-  if (epoch >= 2) {
+  if (epoch >= rebateInfo.startEpoch + 1) {
     timestampCalls.push({
       target: feeClaimer.options.address,
       callData: feeClaimer.methods.getClaimTimestampByEpochAndMarketId(epoch - 1, marketIds[0]).encodeABI(),
@@ -102,7 +114,7 @@ export async function calculateBorrowFeesPerNetwork(
 
   const { results: timestampResults } = await dolomite.multiCall.aggregate(timestampCalls);
 
-  const startTimestamp = epoch >= 2
+  const startTimestamp = epoch >= rebateInfo.startEpoch + 1
     ? decodeUint256ToBigNumber(timestampResults[1]).toNumber()
     : REBATE_START_TIMESTAMP_MAP[dolomite.networkId];
   const startBlockNumber = (await getLatestBlockDataByTimestamp(startTimestamp))?.blockNumber;
@@ -239,11 +251,15 @@ export async function calculateBorrowFeesPerNetwork(
   const marketTotalBorrowInterest: Record<string, Integer> = {};
   const walletAddressToMarketIdToFinalAmountStringMap: Record<string, Record<string, string>> = {};
   Object.keys(walletAddressToMarketIdToFinalBorrowFeesMap).forEach(user => {
-    walletAddressToMarketIdToFinalAmountStringMap[user] = {};
     Object.keys(walletAddressToMarketIdToFinalBorrowFeesMap[user]).forEach(marketId => {
       const amount = walletAddressToMarketIdToFinalBorrowFeesMap[user][marketId];
-      walletAddressToMarketIdToFinalAmountStringMap[user][marketId] = amount.toFixed();
-      marketTotalBorrowInterest[marketId] = (marketTotalBorrowInterest[marketId] ?? INTEGERS.ZERO).plus(amount);
+      if (amount.gt(INTEGERS.ZERO)) {
+        if (!walletAddressToMarketIdToFinalAmountStringMap[user]) {
+          walletAddressToMarketIdToFinalAmountStringMap[user] = {};
+        }
+        walletAddressToMarketIdToFinalAmountStringMap[user][marketId] = amount.toFixed();
+        marketTotalBorrowInterest[marketId] = (marketTotalBorrowInterest[marketId] ?? INTEGERS.ZERO).plus(amount);
+      }
     });
   });
 
@@ -290,7 +306,7 @@ export async function calculateBorrowFeesPerNetwork(
         return acc;
       }, {} as Record<string, string>),
       marketExpectedTotalRevenue: Object.keys(marketTotalBorrowInterest).reduce((acc, market) => {
-        acc[market] = marketTotalBorrowInterest[market].times(RESERVE_FACTOR).toFixed();
+        acc[market] = marketTotalBorrowInterest[market].times(RESERVE_FACTOR).toFixed(0, BigNumber.ROUND_DOWN);
         return acc;
       }, {} as Record<string, string>),
       marketFoundTotalRevenue: Object.keys(marketRevenueMap).reduce((acc, market) => {

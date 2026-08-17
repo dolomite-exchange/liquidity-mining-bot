@@ -1,5 +1,5 @@
 import { BigNumber, Decimal, Integer } from '@dolomite-exchange/dolomite-margin';
-import sleep from '@dolomite-exchange/zap-sdk/dist/__tests__/helpers/sleep';
+import { sleep } from '../../src/helpers/async-helpers';
 import { dolomite } from '../../src/helpers/web3';
 import { getWeb3RequestWithBackoff } from './web3-helper';
 
