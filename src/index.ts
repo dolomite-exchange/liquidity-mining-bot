@@ -166,10 +166,10 @@ async function start() {
     borrowFeeUpdater.start();
     borrowFeeClaimerUpdater.start();
     borrowFeeRebateUpdater.start();
+    borrowFeeSweeperUpdater.start();
   }
   if (process.env.BORROW_FEE_REBATES_AGGREGATOR_ENABLED === 'true') {
     borrowFeeAggregatorUpdater.start();
-    borrowFeeSweeperUpdater.start();
     borrowFeeRebateMerkleTreeUpdater.start();
   }
   if (process.env.DETONATIONS_ENABLED === 'true') {

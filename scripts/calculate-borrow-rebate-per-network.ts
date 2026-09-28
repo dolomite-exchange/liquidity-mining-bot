@@ -103,10 +103,10 @@ export async function calculateBorrowRebatePerNetwork(
   const marketTotalRebate: Record<string, Integer> = {};
 
   let userToMarketToRebate: Record<string, Record<string, Integer>>;
-  if (epoch === 1) {
+  if (epoch === startEpoch) {
     userToMarketToRebate = {};
   } else {
-    invariant(!!previousFile, 'Previous file should be defined');
+    invariant(!!previousFile, `Previous file should be defined, epoch=${epoch}`);
 
     userToMarketToRebate = Object.keys(previousFile.users).reduce((acc1, user) => {
       acc1[user] = Object.keys(previousFile.users[user]).reduce((acc2, market) => {
