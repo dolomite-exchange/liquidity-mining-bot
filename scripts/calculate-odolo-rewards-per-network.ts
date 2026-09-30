@@ -5,7 +5,7 @@ import { getBlockDataByBlockNumber, getLatestBlockDataByTimestamp } from '../src
 import { getAllDolomiteAccountsWithSupplyValue, getDolomiteRiskParams } from '../src/clients/dolomite';
 import { dolomite } from '../src/helpers/web3';
 import { ChainId } from '../src/lib/chain-id';
-import { ONE_WEEK_SECONDS } from '../src/lib/constants';
+import { ONE_ETH_WEI, ONE_WEEK_SECONDS } from '../src/lib/constants';
 import { isScript, shouldForceUpload } from '../src/lib/env'
 import Logger from '../src/lib/logger';
 import Pageable from '../src/lib/pageable';
@@ -36,6 +36,76 @@ const REWARD_MULTIPLIERS_MAP = {};
 export interface ODoloRewardsPerNetworkCalculation {
   epoch: number;
   merkleRoot: string | null
+}
+
+/**
+ * Guards against a corrupt balance snapshot silently inflating a market's total
+ * oDOLO points. Each market's weekly oDOLO is a FIXED amount split by points
+ * share, so if one market's total points balloon, every honest supplier in that
+ * market is diluted — this is what zeroed out legitimate WBTC (market 4) farmers
+ * for epoch 63, where the points implied ~20,000 WBTC supplied on a market that
+ * holds ~60.
+ *
+ * `points[market] = Σ (balancePar × secondsHeld × 1e18)`, so
+ *   `impliedAvgSupplyPar = points[market] / (1e18 × epochSeconds)`
+ * is the time-weighted average supplied balance (whole tokens, par) the points
+ * claim. We cross-check it against the market's actual on-chain total supply par
+ * at the epoch boundaries — an INDEPENDENT source, so a bad snapshot cannot hide
+ * by also corrupting the reference. If the points imply a supply that can't
+ * exist, refuse to publish the epoch (throw) and log loudly rather than ship a
+ * diluted distribution. `ODOLO_POINTS_SANITY_FACTOR` (default 10) is the tolerated
+ * multiple over real supply, leaving generous headroom for intra-week peaks.
+ */
+async function assertMarketPointsAreSane(
+  marketIds: string[],
+  marketToPointsMap: Record<string, Integer>,
+  marketMap: { [marketId: string]: { decimals: number } },
+  epochSeconds: number,
+  startBlockNumber: number,
+  endBlockNumber: number,
+  epoch: number,
+): Promise<void> {
+  const sanityFactor = new BigNumber(process.env.ODOLO_POINTS_SANITY_FACTOR ?? '10');
+  const pointsScale = ONE_ETH_WEI.times(epochSeconds);
+  for (let i = 0; i < marketIds.length; i += 1) {
+    const market = marketIds[i];
+    const marketPoints = marketToPointsMap[market];
+    if (!marketPoints || marketPoints.lte(INTEGERS.ZERO)) {
+      continue;
+    }
+
+    const impliedAvgSupplyPar = marketPoints.dividedBy(pointsScale);
+    const decimals = marketMap[market]?.decimals ?? 18;
+    const divisor = new BigNumber(10).pow(decimals);
+    // eslint-disable-next-line no-await-in-loop
+    const [startPar, endPar] = await Promise.all([
+      dolomite.getters.getMarketTotalPar(new BigNumber(market), { blockNumber: startBlockNumber }),
+      dolomite.getters.getMarketTotalPar(new BigNumber(market), { blockNumber: endBlockNumber }),
+    ]);
+    const maxSupplyParRaw = startPar.supply.gt(endPar.supply) ? startPar.supply : endPar.supply;
+    const actualSupplyPar = maxSupplyParRaw.dividedBy(divisor);
+    const sanityCeiling = actualSupplyPar.times(sanityFactor);
+
+    if (impliedAvgSupplyPar.gt(sanityCeiling)) {
+      Logger.error({
+        at: __filename,
+        message: 'oDOLO market points imply an impossible supply — refusing to publish epoch',
+        remediation: 'A corrupt start-of-epoch balance snapshot likely inflated this market’s points '
+          + 'and would dilute every honest supplier. Run diagnose-odolo-market-points for this epoch '
+          + 'to find the offending account before retrying.',
+        epoch,
+        market,
+        impliedAvgSupplyPar: impliedAvgSupplyPar.toFixed(),
+        actualSupplyPar: actualSupplyPar.toFixed(),
+        sanityFactor: sanityFactor.toFixed(),
+      });
+      throw new Error(
+        `oDOLO points sanity check failed for market ${market}: points imply avg supply `
+        + `${impliedAvgSupplyPar.toFixed(2)} but on-chain supply is only ${actualSupplyPar.toFixed(2)} `
+        + `(> ${sanityFactor.toFixed()}x)`,
+      );
+    }
+  }
 }
 
 export async function calculateOdoloRewardsPerNetwork(
@@ -207,6 +277,19 @@ export async function calculateOdoloRewardsPerNetwork(
     file: __filename,
     message: 'Calculated final points!',
   });
+
+  // Refuse to publish an epoch whose points imply an impossible supply for any
+  // rewarded market — a single corrupt balance snapshot would otherwise silently
+  // dilute every honest supplier in that market (see epoch-63 WBTC dilution).
+  await assertMarketPointsAreSane(
+    Object.keys(oTokenRewardWeiMap),
+    marketToPointsMap,
+    endMarketMap,
+    endTimestamp - startTimestamp,
+    startBlockNumber,
+    endBlockNumber,
+    epoch,
+  );
 
   let cumulativeODolo = INTEGERS.ZERO;
   let previousUsers: Record<string, Integer> = {};
